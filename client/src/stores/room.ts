@@ -227,7 +227,7 @@ function loadVideoBackground(customImage: string): BackgroundChoice {
 export interface VideoTile {
   producerId: string;
   peerId: string;
-  source: "camera" | "screen";
+  source: "camera" | "screen" | "file-video";
 }
 
 function loadChatAnnounceMode(): ChatAnnounceMode {

@@ -69,8 +69,10 @@ export default function VideoStage({ getLocalStream, getStream }: VideoStageProp
   void localVideoSeq;
 
   const tiles: VideoTile[] = Array.from(videoTiles.values());
-  // Screens first (they're the thing being shown), then cameras.
-  tiles.sort((a, b) => (a.source === b.source ? 0 : a.source === "screen" ? -1 : 1));
+  // Screens and media files first (they're the thing being shown), then cameras.
+  tiles.sort((a, b) =>
+    a.source === b.source ? 0 : a.source === "camera" ? 1 : b.source === "camera" ? -1 : 0,
+  );
 
   if (!localStream && tiles.length === 0) {
     return (
@@ -98,10 +100,12 @@ export default function VideoStage({ getLocalStream, getStream }: VideoStageProp
           label={
             tile.source === "screen"
               ? m.video_tile_screen({ name: nameOf(tile.peerId) })
-              : m.video_tile_camera({ name: nameOf(tile.peerId) })
+              : tile.source === "file-video"
+                ? m.file_stream_name({ name: nameOf(tile.peerId) })
+                : m.video_tile_camera({ name: nameOf(tile.peerId) })
           }
           mirrored={false}
-          large={tile.source === "screen"}
+          large={tile.source !== "camera"}
         />
       ))}
       {localStream && (

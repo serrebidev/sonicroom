@@ -228,7 +228,7 @@ function loadVideoBackground(customImage: string): BackgroundChoice {
 export interface VideoTile {
   producerId: string;
   peerId: string;
-  source: "camera" | "screen";
+  source: "camera" | "screen" | "file-video";
 }
 
 // A pinned video (video rooms only): one peer's camera or screen blown up to

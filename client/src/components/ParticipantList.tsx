@@ -14,8 +14,10 @@ import {
   Video,
   MonitorUp,
   ScanEye,
+  Pin,
+  PinOff,
 } from "lucide-react";
-import type { PeerState } from "../stores/room";
+import { isPinned, type PeerState, type PinnedVideo } from "../stores/room";
 import { m } from "../paraglide/messages.js";
 
 interface ParticipantListProps {
@@ -49,6 +51,16 @@ interface ParticipantListProps {
   // offered): have Claude describe a snapshot of this peer's camera / screen
   // (or our own camera). Offered as options in the participant's menu.
   onDescribeVideo?: (peerId: string, source: "camera" | "screen") => void;
+  // VIDEO rooms only: pin one camera/screen to fill the video stage. Local view
+  // choice, never signaled. `pinnedVideo` is the store's current pin (needed
+  // both to flip the option to "Unpin" and to KEEP offering it while the pinned
+  // camera is momentarily off — otherwise a pin could become unremovable).
+  pinnedVideo?: PinnedVideo | null;
+  onTogglePinVideo?: (peerId: string, source: "camera" | "screen") => void;
+  // How tall the list may grow before it scrolls itself. A video room passes a
+  // smaller cap so the pictures keep the majority of the window; audio rooms
+  // (where the list IS the UI) keep the roomy default.
+  maxHeightClass?: string;
 }
 
 function getInitials(name: string): string {
@@ -87,6 +99,9 @@ export function ParticipantList({
   announce,
   speakerBadges,
   onDescribeVideo,
+  pinnedVideo = null,
+  onTogglePinVideo,
+  maxHeightClass = "max-h-[70vh]",
 }: ParticipantListProps) {
   const rows = useMemo(() => [selfPeer, ...peerList], [selfPeer, peerList]);
   const isSelf = (peerId: string) => peerId === selfPeer.peerId;
@@ -149,6 +164,12 @@ export function ParticipantList({
     // Video-room status (false everywhere in an audio room).
     if (peer.hasVideo) label += `, ${m.participants_sharing_video()}`;
     if (peer.hasScreen) label += `, ${m.participants_sharing_screen()}`;
+    if (
+      isPinned(pinnedVideo, peer.peerId, "camera") ||
+      isPinned(pinnedVideo, peer.peerId, "screen")
+    ) {
+      label += `, ${m.video_pinned_fragment()}`;
+    }
     if (peer.localMuted) label += `, ${m.participants_muted_fragment()}`;
     if (kickEnabled && !peer.isMusic && !peer.isMicStream && !self && peer.kickVotes > 0) {
       label += `, ${peer.kickVotes === 1 ? m.card_votes_one() : m.card_votes_many({ count: peer.kickVotes })}`;
@@ -213,6 +234,8 @@ export function ParticipantList({
         showStopStream={(openPeer.isMusic && !openPeer.isCaster) || openPeer.isMicStream}
         onStopStream={onStopStream}
         onDescribeVideo={onDescribeVideo}
+        pinnedVideo={pinnedVideo}
+        onTogglePinVideo={onTogglePinVideo}
         announce={announce}
         onClose={closeOptions}
       />
@@ -231,7 +254,7 @@ export function ParticipantList({
       aria-activedescendant={activeId}
       onKeyDown={onListKeyDown}
       onFocus={() => setActiveIdx((i) => (i < 0 && rows.length ? 0 : i))}
-      className="max-h-[70vh] w-full max-w-md space-y-1 overflow-y-auto rounded-xl border border-sonic-700 bg-sonic-800/40 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sonic-accent/60"
+      className={`${maxHeightClass} w-full max-w-md space-y-1 overflow-y-auto rounded-xl border border-sonic-700 bg-sonic-800/40 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sonic-accent/60`}
     >
       {rows.map((peer, i) => {
         const self = isSelf(peer.peerId);
@@ -366,6 +389,9 @@ interface ParticipantOptionsProps {
   onStopStream: (producerId: string) => void;
   // Video rooms only: "Describe X's video / screen" (Claude). Undefined elsewhere.
   onDescribeVideo?: (peerId: string, source: "camera" | "screen") => void;
+  // Video rooms only: "Pin / Unpin X's video / screen". Undefined elsewhere.
+  pinnedVideo?: PinnedVideo | null;
+  onTogglePinVideo?: (peerId: string, source: "camera" | "screen") => void;
   announce: (message: string) => void;
   onClose: () => void;
 }
@@ -419,6 +445,8 @@ function ParticipantOptions({
   showStopStream,
   onStopStream,
   onDescribeVideo,
+  pinnedVideo = null,
+  onTogglePinVideo,
   announce,
   onClose,
 }: ParticipantOptionsProps) {
@@ -427,8 +455,42 @@ function ParticipantOptions({
     peer.kickVotes === 1 ? m.card_votes_one() : m.card_votes_many({ count: peer.kickVotes });
 
   // Options for this participant, in display order. Self gets the mic level
-  // (and, in a video room with our camera on, "Describe my video").
+  // (and, in a video room with our camera on, pin/describe "my video").
   const opts: OptionDef[] = [];
+
+  // Pin / unpin this peer's camera or screen (video rooms only). Offered while
+  // that picture is LIVE — or while it is the current pin even though it isn't,
+  // because a pin survives the camera going off and would otherwise become
+  // impossible to remove until they turned it back on.
+  const pinOption = (source: "camera" | "screen"): OptionDef | null => {
+    if (!onTogglePinVideo) return null;
+    const on = isPinned(pinnedVideo, peer.peerId, source);
+    const live = source === "camera" ? peer.hasVideo : peer.hasScreen;
+    if (!on && !live) return null;
+    return {
+      id: source === "camera" ? "pin-video" : "pin-screen",
+      kind: "toggle",
+      // No aria-pressed (role=option doesn't support it): like Mute/Unmute the
+      // label itself carries the state.
+      ariaLabel: isSelf
+        ? on
+          ? m.card_unpin_my_video()
+          : m.card_pin_my_video()
+        : source === "screen"
+          ? on
+            ? m.card_unpin_screen({ name })
+            : m.card_pin_screen({ name })
+          : on
+            ? m.card_unpin_video({ name })
+            : m.card_pin_video({ name }),
+      activate: () => onTogglePinVideo(peer.peerId, source),
+    };
+  };
+  const pushPin = (source: "camera" | "screen") => {
+    const opt = pinOption(source);
+    if (opt) opts.push(opt);
+  };
+
   if (isSelf) {
     if (hasMic) {
       opts.push({
@@ -443,6 +505,7 @@ function ParticipantOptions({
         }),
       });
     }
+    pushPin("camera");
     if (onDescribeVideo && peer.hasVideo) {
       opts.push({
         id: "describe-video",
@@ -508,6 +571,9 @@ function ParticipantOptions({
         activate: () => onStopStream(peer.peerId),
       });
     }
+    // Video room: pin their camera / screen to the stage (local view only).
+    pushPin("camera");
+    pushPin("screen");
     // Video room: have Claude describe a snapshot of their camera / screen.
     // Only offered while that picture is actually live.
     if (onDescribeVideo && peer.hasVideo) {
@@ -665,6 +731,11 @@ function ParticipantOptions({
             const stopStream = opt.id === "stop-stream";
             const describeVideo = opt.id === "describe-video";
             const describeScreen = opt.id === "describe-screen";
+            const pinVideo = opt.id === "pin-video";
+            const pinScreen = opt.id === "pin-screen";
+            const pinOn =
+              (pinVideo && isPinned(pinnedVideo, peer.peerId, "camera")) ||
+              (pinScreen && isPinned(pinnedVideo, peer.peerId, "screen"));
             const destructive = removeCaster || stopStream;
             return (
               <li
@@ -681,15 +752,17 @@ function ParticipantOptions({
                 className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
                   kickOn
                     ? "bg-red-600 text-white"
-                    : muteOn
+                    : pinOn
                       ? "bg-sonic-accent/20 text-sonic-accent"
-                      : destructive
-                        ? isActive
-                          ? "bg-red-600/20 text-red-300"
-                          : "text-red-400"
-                        : isActive
-                          ? "bg-sonic-accent/15 text-sonic-50"
-                          : "text-sonic-200"
+                      : muteOn
+                        ? "bg-sonic-accent/20 text-sonic-accent"
+                        : destructive
+                          ? isActive
+                            ? "bg-red-600/20 text-red-300"
+                            : "text-red-400"
+                          : isActive
+                            ? "bg-sonic-accent/15 text-sonic-50"
+                            : "text-sonic-200"
                 }`}
               >
                 {opt.kind === "slider" ? (
@@ -734,6 +807,27 @@ function ParticipantOptions({
                   <>
                     <CircleStop className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">{m.card_stop_stream_label()}</span>
+                  </>
+                ) : pinVideo || pinScreen ? (
+                  <>
+                    {pinOn ? (
+                      <PinOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <Pin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="truncate">
+                      {isSelf
+                        ? pinOn
+                          ? m.card_unpin_my_video()
+                          : m.card_pin_my_video()
+                        : pinScreen
+                          ? pinOn
+                            ? m.card_unpin_screen_label()
+                            : m.card_pin_screen_label()
+                          : pinOn
+                            ? m.card_unpin_video_label()
+                            : m.card_pin_video_label()}
+                    </span>
                   </>
                 ) : describeVideo || describeScreen ? (
                   <>

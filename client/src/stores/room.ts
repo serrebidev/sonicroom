@@ -230,6 +230,30 @@ export interface VideoTile {
   source: "camera" | "screen";
 }
 
+// A pinned video (video rooms only): one peer's camera or screen blown up to
+// fill the stage, everyone else demoted to a thumbnail strip. Purely a LOCAL
+// view choice — never signaled, so pinning someone changes nothing for them.
+//
+// Pinned by (peerId, source), NOT by producerId: a camera turned off and back
+// on is a BRAND NEW producer, and pinning the producer would silently drop the
+// pin every time. While the pinned picture is off the stage just falls back to
+// the grid and the pin waits; it fills the screen again by itself when the
+// camera returns. The pin is only cleared outright when the peer leaves
+// (removePeer) or we do (reset).
+export interface PinnedVideo {
+  peerId: string;
+  source: "camera" | "screen";
+}
+
+// Whether `pin` targets exactly this peer's camera/screen.
+export function isPinned(
+  pin: PinnedVideo | null,
+  peerId: string,
+  source: "camera" | "screen",
+): boolean {
+  return pin != null && pin.peerId === peerId && pin.source === source;
+}
+
 function loadChatAnnounceMode(): ChatAnnounceMode {
   const v = loadString(CHAT_ANNOUNCE_KEY);
   return v === "assertive" || v === "tts" || v === "off" ? v : "polite";
@@ -410,6 +434,8 @@ interface RoomState {
   isVideoOn: boolean;
   videoTiles: Map<string, VideoTile>;
   localVideoSeq: number;
+  // The locally pinned camera/screen, or null (the default: an even grid).
+  pinnedVideo: PinnedVideo | null;
   videoGuidanceEnabled: boolean;
   claudeApiKey: string;
 
@@ -477,6 +503,9 @@ interface RoomState {
   addVideoTile: (tile: VideoTile) => void;
   removeVideoTile: (producerId: string) => void;
   clearVideoTiles: () => void;
+  setPinnedVideo: (pin: PinnedVideo | null) => void;
+  // Pin that camera/screen, or unpin it if it is already the pinned one.
+  togglePinnedVideo: (peerId: string, source: "camera" | "screen") => void;
   bumpLocalVideo: () => void;
   setVideoGuidanceEnabled: (enabled: boolean) => void;
   setVideoBackground: (choice: BackgroundChoice) => void;
@@ -553,6 +582,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   isVideoOn: false,
   videoTiles: new Map(),
   localVideoSeq: 0,
+  pinnedVideo: null,
   videoGuidanceEnabled: loadVideoGuidance(),
   claudeApiKey: loadString(CLAUDE_API_KEY_KEY),
   videoBackgroundImage: loadString(VIDEO_BACKGROUND_IMAGE_KEY),
@@ -569,7 +599,20 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     set({ locale });
   },
   setConnected: (connected) => set({ connected }),
-  setRoom: (roomName, displayName, localPeerId) => set({ roomName, displayName, localPeerId }),
+  setRoom: (roomName, displayName, localPeerId) =>
+    set((st) => ({
+      roomName,
+      displayName,
+      localPeerId,
+      // A reconnect rejoins under a NEW socket id, so a pin on OUR own camera
+      // would otherwise point at the old, dead id and never resolve again.
+      // (A pin on someone ELSE who reconnected is cleaned up by the rejoin's
+      // peer reconciliation, which removePeer's their old id.)
+      pinnedVideo:
+        st.pinnedVideo && st.localPeerId != null && st.pinnedVideo.peerId === st.localPeerId
+          ? { ...st.pinnedVideo, peerId: localPeerId }
+          : st.pinnedVideo,
+    })),
   setMode: (mode) => set({ mode }),
   setHasMic: (hasMic) => set({ hasMic }),
   setMuted: (isMuted) => set({ isMuted }),
@@ -660,6 +703,14 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       return { videoTiles };
     }),
   clearVideoTiles: () => set((s) => (s.videoTiles.size === 0 ? s : { videoTiles: new Map() })),
+  // NOT cleared by clearVideoTiles: a mode rebuild / reconnect drops every tile
+  // and re-consumes the same producers moments later, and the pin must survive
+  // that the same way it survives a camera blink.
+  setPinnedVideo: (pin) => set({ pinnedVideo: pin }),
+  togglePinnedVideo: (peerId, source) =>
+    set((s) => ({
+      pinnedVideo: isPinned(s.pinnedVideo, peerId, source) ? null : { peerId, source },
+    })),
   bumpLocalVideo: () => set((s) => ({ localVideoSeq: s.localVideoSeq + 1 })),
   setVideoGuidanceEnabled: (videoGuidanceEnabled) => {
     saveString(VIDEO_GUIDANCE_KEY, String(videoGuidanceEnabled));
@@ -799,14 +850,17 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     set((state) => {
       const peers = new Map(state.peers);
       peers.delete(peerId);
+      // A pin on someone who LEFT is dead, not waiting: drop it (unlike a camera
+      // going off, which keeps the pin so it restores when they come back).
+      const pinned = state.pinnedVideo?.peerId === peerId ? { pinnedVideo: null } : null;
       // Drop a departed peer from the transient talkers highlight so a stale
       // badge can't linger (the tile is gone anyway).
       if (peerId in state.speakerBadges) {
         const speakerBadges = { ...state.speakerBadges };
         delete speakerBadges[peerId];
-        return { peers, speakerBadges };
+        return { peers, speakerBadges, ...pinned };
       }
-      return { peers };
+      return { peers, ...pinned };
     }),
 
   setPeerSpeaking: (peerId, speaking) =>
@@ -932,6 +986,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       isVideoOn: false,
       videoTiles: new Map(),
       localVideoSeq: 0,
+      pinnedVideo: null,
       peers: new Map(),
       speakerBadges: {},
       messages: [],

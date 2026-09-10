@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Headphones, Users, Loader2, Circle, MessageSquare, Radio, Video } from "lucide-react";
-import { useRoomStore } from "../stores/room";
+import { useRoomStore, isPinned } from "../stores/room";
 import { useMediasoup } from "../hooks/useMediasoup";
 import { formatMessage, messageContent } from "../lib/chat";
 import { getInstanceName } from "../lib/branding";
@@ -119,6 +119,9 @@ export function Room() {
   // Bumped to (re)focus the chat composer even when the panel is already open —
   // used to hand focus to the call after the knock-to-join modal closes.
   const [chatFocusSignal, setChatFocusSignal] = useState(0);
+  // Bumped by the E shortcut to toggle the video stage's fullscreen — the stage
+  // owns the element, this handler only asks.
+  const [videoFullscreenSignal, setVideoFullscreenSignal] = useState(0);
   const joinedRef = useRef(false);
   const knownPeersRef = useRef<Set<string>>(new Set());
   // How many messages had arrived last time chat was open, to badge unread.
@@ -167,6 +170,31 @@ export function Room() {
     else setAudioSourceOpen(true);
   }, [stopFileStream]);
 
+  // Pin/unpin a camera or screen to the video stage. Local only — nothing is
+  // signaled, so the person you pin never knows. Announced transiently (like
+  // local mute / volume): it changes only YOUR view, so it isn't a room event
+  // and doesn't belong in the chat timeline.
+  const togglePinVideo = useCallback((peerId: string, source: "camera" | "screen") => {
+    const s = useRoomStore.getState();
+    const on = isPinned(s.pinnedVideo, peerId, source);
+    s.togglePinnedVideo(peerId, source);
+    const self = peerId === s.localPeerId;
+    const name = self ? "" : (s.peers.get(peerId)?.displayName ?? "");
+    s.announce(
+      self
+        ? on
+          ? m.announce_unpinned_self()
+          : m.announce_pinned_self()
+        : source === "screen"
+          ? on
+            ? m.announce_unpinned_screen({ name })
+            : m.announce_pinned_screen({ name })
+          : on
+            ? m.announce_unpinned_video({ name })
+            : m.announce_pinned_video({ name }),
+    );
+  }, []);
+
   const localPeerId = useRoomStore((s) => s.localPeerId);
   const displayName = useRoomStore((s) => s.displayName);
   const peers = useRoomStore((s) => s.peers);
@@ -201,6 +229,8 @@ export function Room() {
   // Room type (server truth) + our own camera state, for the self row.
   const roomIsVideo = useRoomStore((s) => s.roomIsVideo);
   const isVideoOn = useRoomStore((s) => s.isVideoOn);
+  // Which camera/screen is pinned to the video stage (local view choice).
+  const pinnedVideo = useRoomStore((s) => s.pinnedVideo);
 
   // Reflect the room name in the document/tab title while in (or joining) the
   // room, restoring the default when we leave.
@@ -372,6 +402,11 @@ export function Room() {
         // Video rooms only: toggle our camera. In an audio room V is left alone.
         e.preventDefault();
         toggleVideo();
+      } else if ((e.key === "e" || e.key === "E") && useRoomStore.getState().roomIsVideo) {
+        // Video rooms only: expand the video stage to fullscreen (Escape, or E
+        // again, leaves it). Video rooms only, so E stays free in audio rooms.
+        e.preventDefault();
+        setVideoFullscreenSignal((n) => n + 1);
       }
     };
 
@@ -560,16 +595,27 @@ export function Room() {
 
       {/* Participants grid + optional chat side panel */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* A video room lays out as a COLUMN that fills the window: the stage
+            takes every pixel left over after the (self-scrolling, capped)
+            participant list, so one camera is one big picture rather than a
+            thumbnail floating in an empty page. An audio room is untouched. */}
         <main
-          className={`flex min-w-0 flex-1 overflow-y-auto p-6 ${
-            roomIsVideo ? "flex-col items-center gap-6" : "items-center justify-center"
+          className={`flex min-w-0 flex-1 ${
+            roomIsVideo
+              ? "flex-col items-center gap-3 overflow-hidden p-3 sm:p-4"
+              : "items-center justify-center overflow-y-auto p-6"
           }`}
         >
           {/* Video room: the video grid sits in the foreground, above the list.
               Lazy chunk — never loaded in an audio room. */}
           {roomIsVideo && (
             <Suspense fallback={null}>
-              <VideoStage getLocalStream={getLocalVideoStream} getStream={getVideoStream} />
+              <VideoStage
+                getLocalStream={getLocalVideoStream}
+                getStream={getVideoStream}
+                onTogglePin={togglePinVideo}
+                fullscreenSignal={videoFullscreenSignal}
+              />
             </Suspense>
           )}
           {/* Self + everyone (and every stream) as one keyboard-navigable
@@ -605,6 +651,9 @@ export function Room() {
               announce={announce}
               speakerBadges={speakerBadges}
               onDescribeVideo={roomIsVideo ? describeVideo : undefined}
+              pinnedVideo={pinnedVideo}
+              onTogglePinVideo={roomIsVideo ? togglePinVideo : undefined}
+              maxHeightClass={roomIsVideo ? "max-h-[30vh] shrink-0" : "max-h-[70vh]"}
             />
           )}
         </main>

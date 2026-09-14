@@ -4,6 +4,8 @@
   "language_label": "Idioma",
 
   "footer_powered_by": "Con tecnología de SonicRoom",
+  "footer_manual": "Guía para lectores de pantalla",
+  "footer_manual_title": "Cómo usar SonicRoom con un lector de pantalla: configurar el modo foco y todos los atajos de teclado (se abre en una pestaña nueva)",
 
   "lobby_tagline": "Conferencia de audio estéreo de latencia ultrabaja",
   "lobby_room_name_label": "Nombre de la sala",

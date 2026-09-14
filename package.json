@@ -9,7 +9,8 @@
     "start": "pnpm --filter server start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "manual": "docs/manual/build.sh"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

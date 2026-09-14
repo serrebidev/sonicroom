@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>SonicRoom — le manuel pour lecteurs d’écran</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #16181d;
+      --muted: #4a4f5a;
+      --accent: #1451b4;
+      --accent-fg: #ffffff;
+      --rule: #c9ced8;
+      --panel: #f1f3f7;
+      --code-bg: #eceff4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1116;
+        --fg: #eceff4;
+        --muted: #b3bac6;
+        --accent: #7ab5ff;
+        --accent-fg: #0f1116;
+        --rule: #3a4150;
+        --panel: #191d25;
+        --code-bg: #232833;
+      }
+    }
+
+    html {
+      font-size: 112.5%;
+      /* Painted on <html> as well as <body> so the gutters either side of the
+         centred column match the page rather than showing the UA canvas. */
+      background: var(--bg);
+      color: var(--fg);
+    }
+    body {
+      margin: 0 auto;
+      padding: 2rem 1.25rem 6rem;
+      max-width: 46rem;
+      background: var(--bg);
+      color: var(--fg);
+      font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+      line-height: 1.65;
+      overflow-wrap: break-word;
+    }
+
+    a {
+      color: var(--accent);
+    }
+    a:focus-visible,
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    header#title-block-header {
+      border-bottom: 2px solid var(--rule);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    h1.title {
+      font-size: 1.9rem;
+      line-height: 1.25;
+      margin: 0 0 0.35rem;
+    }
+    p.subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      font-weight: 400;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.25;
+      margin: 2.25rem 0 0.75rem;
+    }
+    h1 {
+      font-size: 1.6rem;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 0.35rem;
+    }
+    h2 {
+      font-size: 1.25rem;
+    }
+    h3 {
+      font-size: 1.08rem;
+    }
+
+    nav#TOC {
+      background: var(--panel);
+      border: 1px solid var(--rule);
+      border-radius: 0.6rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    nav#TOC h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    nav#TOC ul {
+      padding-left: 1.2rem;
+      margin-bottom: 0;
+    }
+    nav#TOC li {
+      margin: 0.2rem 0;
+    }
+
+    .manual-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+      align-items: baseline;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 0.9rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .manual-nav strong {
+      font-weight: 600;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0 1.5rem;
+      font-size: 0.98rem;
+    }
+    caption {
+      text-align: left;
+      color: var(--muted);
+      padding-bottom: 0.35rem;
+    }
+    th,
+    td {
+      border: 1px solid var(--rule);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    thead th {
+      background: var(--panel);
+    }
+    tbody tr:nth-child(even) td {
+      background: color-mix(in srgb, var(--panel) 55%, transparent);
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.1em 0.35em;
+      border-radius: 0.25rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--rule);
+      border-radius: 0.5rem;
+      padding: 0.85rem 1rem;
+      overflow-x: auto;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0;
+      padding: 0.5rem 1rem;
+      border-left: 4px solid var(--accent);
+      background: var(--panel);
+      color: var(--fg);
+    }
+    blockquote p {
+      margin: 0.25rem 0;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid var(--rule);
+      margin: 2.5rem 0;
+    }
+
+    ol,
+    ul {
+      padding-left: 1.4rem;
+    }
+    li {
+      margin: 0.3rem 0;
+    }
+
+    @media print {
+      body {
+        max-width: none;
+      }
+      nav#TOC,
+      .manual-nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+<nav class="manual-nav" aria-label="Navigation du manuel">
+  <a href="/">Retour à SonicRoom</a>
+  <span><strong>Autres langues :</strong>
+    <a href="./en.html" hreflang="en" lang="en">English</a>
+    <a href="./es.html" hreflang="es" lang="es">Español</a>
+  </span>
+</nav>
+<header id="title-block-header">
+<h1 class="title">SonicRoom — le manuel pour lecteurs d’écran</h1>
+<p class="subtitle">Comment régler votre lecteur d’écran, comment
+fonctionne le clavier et tous les raccourcis</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Sommaire</h2>
+<ul>
+<li><a href="#à-lire-avant-tout-le-reste"
+id="toc-à-lire-avant-tout-le-reste">À lire avant tout le reste</a></li>
+<li><a href="#régler-votre-lecteur-décran"
+id="toc-régler-votre-lecteur-décran">Régler votre lecteur d’écran</a>
+<ul>
+<li><a href="#nvda" id="toc-nvda">NVDA</a></li>
+<li><a href="#jaws" id="toc-jaws">JAWS</a></li>
+<li><a href="#narrateur-windows" id="toc-narrateur-windows">Narrateur
+(Windows)</a></li>
+<li><a href="#voiceover-macos" id="toc-voiceover-macos">VoiceOver
+(macOS)</a></li>
+<li><a href="#orca-linux" id="toc-orca-linux">Orca (Linux)</a></li>
+<li><a href="#iphone-ipad-et-android"
+id="toc-iphone-ipad-et-android">iPhone, iPad et Android</a></li>
+<li><a href="#un-test-de-dix-secondes"
+id="toc-un-test-de-dix-secondes">Un test de dix secondes</a></li>
+</ul></li>
+<li><a href="#comment-le-clavier-fonctionne-partout-dans-sonicroom"
+id="toc-comment-le-clavier-fonctionne-partout-dans-sonicroom">Comment le
+clavier fonctionne partout dans SonicRoom</a></li>
+<li><a href="#le-hall" id="toc-le-hall">Le hall</a></li>
+<li><a href="#le-salon-partie-par-partie"
+id="toc-le-salon-partie-par-partie">Le salon, partie par partie</a>
+<ul>
+<li><a href="#en-tête" id="toc-en-tête">En-tête</a></li>
+<li><a href="#liste-des-participants"
+id="toc-liste-des-participants">Liste des participants</a></li>
+<li><a href="#options-dun-participant"
+id="toc-options-dun-participant">Options d’un participant</a></li>
+<li><a href="#panneau-de-chat" id="toc-panneau-de-chat">Panneau de
+chat</a></li>
+<li><a href="#la-barre-des-commandes-audio"
+id="toc-la-barre-des-commandes-audio">La barre des commandes
+audio</a></li>
+<li><a href="#pied-de-page" id="toc-pied-de-page">Pied de page</a></li>
+</ul></li>
+<li><a href="#tous-les-raccourcis-clavier"
+id="toc-tous-les-raccourcis-clavier">Tous les raccourcis clavier</a>
+<ul>
+<li><a href="#lettres-seules" id="toc-lettres-seules">Lettres
+seules</a></li>
+<li><a href="#avec-alt" id="toc-avec-alt">Avec Alt</a></li>
+<li><a href="#navigation-et-fermeture"
+id="toc-navigation-et-fermeture">Navigation et fermeture</a></li>
+</ul></li>
+<li><a href="#savoir-ce-qui-se-passe"
+id="toc-savoir-ce-qui-se-passe">Savoir ce qui se passe</a></li>
+<li><a href="#parler-et-écouter" id="toc-parler-et-écouter">Parler et
+écouter</a></li>
+<li><a href="#envoyer-du-son-dans-le-salon"
+id="toc-envoyer-du-son-dans-le-salon">Envoyer du son dans le salon</a>
+<ul>
+<li><a href="#son-dun-écran-ou-dun-onglet-a"
+id="toc-son-dun-écran-ou-dun-onglet-a">Son d’un écran ou d’un onglet
+(<code>A</code>)</a></li>
+<li><a href="#un-fichier-un-lien-ou-un-fichier-du-serveur-f"
+id="toc-un-fichier-un-lien-ou-un-fichier-du-serveur-f">Un fichier, un
+lien ou un fichier du serveur (<code>F</code>)</a></li>
+</ul></li>
+<li><a href="#enregistrer-et-diffuser-en-direct"
+id="toc-enregistrer-et-diffuser-en-direct">Enregistrer et diffuser en
+direct</a></li>
+<li><a href="#appels-video" id="toc-appels-video">Appels vidéo</a></li>
+<li><a href="#salons-publics-frapper-a-la-porte-et-voter"
+id="toc-salons-publics-frapper-a-la-porte-et-voter">Salons publics,
+frapper à la porte et voter</a></li>
+<li><a href="#notes-partagées" id="toc-notes-partagées">Notes
+partagées</a></li>
+<li><a href="#options-à-mettre-dans-la-barre-dadresse"
+id="toc-options-à-mettre-dans-la-barre-dadresse">Options à mettre dans
+la barre d’adresse</a></li>
+<li><a href="#quand-quelque-chose-ne-marche-pas"
+id="toc-quand-quelque-chose-ne-marche-pas">Quand quelque chose ne marche
+pas</a></li>
+<li><a href="#référence-clavier-sur-une-page"
+id="toc-référence-clavier-sur-une-page">Référence clavier sur une
+page</a></li>
+</ul>
+</nav>
+<h1 id="à-lire-avant-tout-le-reste">À lire avant tout le reste</h1>
+<p><strong>SonicRoom est une application, pas une page web.</strong></p>
+<p>Cette seule phrase explique presque tous les problèmes que
+rencontrent les gens. SonicRoom s’exécute dans un navigateur, mais rien
+à l’intérieur ne se comporte comme un article qu’on lit. Il n’y a pas de
+document à parcourir. Il y a des barres d’outils, des listes et des
+boîtes de dialogue, et cela se pilote comme on pilote un logiciel de
+bureau : <strong>la tabulation passe d’une partie à l’autre, les flèches
+se déplacent à l’intérieur d’une partie</strong>.</p>
+<p>Les lecteurs d’écran ne le savent pas tout seuls. Tels qu’ils sont
+livrés, NVDA, JAWS, le Narrateur et Orca placent devant vous une
+<em>copie virtuelle</em> de la page et interceptent vos touches, si bien
+que <code>H</code> saute à un titre et <code>B</code> à un bouton. C’est
+exactement ce qu’il faut sur un site d’actualité, et exactement ce qu’il
+ne faut pas ici, car dans SonicRoom <code>M</code> coupe votre micro,
+<code>R</code> lance un enregistrement et <code>W</code> vous dit qui
+vient de parler. Si votre lecteur d’écran avale ces touches, elles
+n’atteindront jamais l’application.</p>
+<p>La première chose à faire — avant même de rejoindre un salon — est
+donc de mettre votre lecteur d’écran dans le mode où l’application
+reçoit vos frappes. Chaque lecteur d’écran l’appelle autrement. La
+section suivante explique comment.</p>
+<p>Si vous ne retenez qu’une chose : <strong>quand une lettre seule ne
+fait rien, c’est que vous êtes dans le mauvais mode.</strong></p>
+<hr />
+<h1 id="régler-votre-lecteur-décran">Régler votre lecteur d’écran</h1>
+<h2 id="nvda">NVDA</h2>
+<p>NVDA appelle ses deux modes <strong>mode navigation</strong> et
+<strong>mode formulaire</strong>.</p>
+<ul>
+<li>Le mode navigation est le mode de lecture. Les lettres seules sont
+des commandes de déplacement et n’atteignent jamais la page.</li>
+<li>Le mode formulaire transmet chaque frappe directement à
+l’application. C’est ce mode-là qu’il faut à SonicRoom.</li>
+</ul>
+<p><strong>On bascule avec <code>NVDA</code> +
+<code>Espace</code>.</strong> Vous entendez un son grave et bref en
+entrant en mode formulaire, et un son plus aigu en revenant au mode
+navigation. Certaines voix annoncent aussi « mode formulaire » et « mode
+navigation ».</p>
+<p>NVDA passe déjà tout seul en mode formulaire quand vous arrivez sur
+une zone d’édition ou un contrôle du même genre, donc vous y serez
+souvent sans l’avoir demandé. Ce qu’il ne fera <strong>pas</strong> tout
+seul, c’est basculer quand vous êtes posé sur un simple bouton — et
+c’est justement le moment où vous voulez appuyer sur <code>M</code> ou
+<code>R</code>. Appuyez sur <code>NVDA</code> + <code>Espace</code> et
+restez en mode formulaire pendant tout l’appel.</p>
+<p>Si vous voulez que NVDA soit plus zélé, ouvrez <strong>menu NVDA →
+Préférences → Paramètres → Mode navigation</strong> (ou appuyez sur
+<code>NVDA</code> + <code>Ctrl</code> + <code>B</code>) et activez
+<em>Passage automatique en mode formulaire au changement du focus</em>
+et <em>Passage automatique en mode formulaire au déplacement du
+curseur</em>.</p>
+<h2 id="jaws">JAWS</h2>
+<p>JAWS appelle son mode de lecture le <strong>curseur virtuel</strong>
+(parfois « curseur virtuel PC ») et son mode de transmission le
+<strong>mode formulaire</strong>.</p>
+<p><strong>Ce qui est recommandé pour SonicRoom, c’est de désactiver
+complètement le curseur virtuel : appuyez sur <code>touche JAWS</code> +
+<code>Z</code></strong> (la touche JAWS est <code>Insert</code> par
+défaut, ou <code>Verr. Maj</code> en disposition portable). JAWS annonce
+« curseur virtuel PC désactivé ». À partir de là, toutes vos touches
+vont à SonicRoom.</p>
+<p>Vous <em>pouvez</em> vous reposer sur le mode formulaire automatique
+— JAWS y entre quand vous appuyez sur <code>Entrée</code> sur un
+contrôle et en sort avec le <code>+</code> du pavé numérique. Cela
+fonctionne, mais deux choses vous gênent ici : les commandes à une
+lettre de SonicRoom ne sont pas attachées à des contrôles de formulaire,
+donc le mode formulaire automatique ne se déclenchera pas pour elles ;
+et SonicRoom se sert d’<code>Échap</code> pour de vraies actions (fermer
+le chat, fermer une boîte de dialogue, arrêter un fichier en cours de
+lecture), touche que le mode formulaire peut intercepter.</p>
+<p>Désactiver le curseur virtuel avec <code>touche JAWS</code> +
+<code>Z</code> évite les deux problèmes. Réappuyez dessus pour le
+retrouver en quittant l’appel.</p>
+<h2 id="narrateur-windows">Narrateur (Windows)</h2>
+<p>Le Narrateur appelle son mode de lecture le <strong>mode
+Scan</strong>. <strong>Désactivez-le</strong> avec
+<code>Verr. Maj</code> + <code>Espace</code>. Le Narrateur annonce «
+Scan désactivé ». Le mode Scan désactivé, la tabulation et les flèches
+se comportent comme le décrit ce manuel et les lettres seules atteignent
+l’application.</p>
+<h2 id="voiceover-macos">VoiceOver (macOS)</h2>
+<p>Le piège équivalent sous VoiceOver s’appelle la <strong>Navigation
+rapide</strong>. Quand elle est activée, les flèches sont des commandes
+VoiceOver et n’atteignent jamais la page.</p>
+<p><strong>Désactivez-la en appuyant simultanément sur les flèches
+gauche et droite.</strong> VoiceOver annonce « Navigation rapide
+désactivée ».</p>
+<p>Ensuite :</p>
+<ul>
+<li><code>Tab</code> et <code>Maj</code> + <code>Tab</code> passent
+d’une partie de l’application à l’autre.</li>
+<li>Les flèches se déplacent dans une barre d’outils ou une liste, comme
+décrit plus bas.</li>
+<li>Les lettres seules (<code>M</code>, <code>A</code>, <code>R</code>,
+<code>W</code>…) atteignent SonicRoom tant que le focus clavier n’est
+pas dans un champ de texte.</li>
+</ul>
+<p><code>VO</code> dans les raccourcis signifie <code>Contrôle</code> +
+<code>Option</code>. Il vous faudra peut-être <code>VO</code> +
+<code>Maj</code> + <code>Flèche bas</code> pour interagir avec le groupe
+de contenu web avant que VoiceOver ne suive le focus dans
+l’application.</p>
+<h2 id="orca-linux">Orca (Linux)</h2>
+<p>Orca dispose d’un <strong>mode navigation</strong> et d’un
+<strong>mode focus</strong> dans le contenu web, comme NVDA. Orca
+bascule tout seul en mode focus sur les contrôles de formulaire ; pour
+basculer à la main, appuyez sur <code>modificateur Orca</code> +
+<code>A</code> (le modificateur Orca est <code>Insert</code> en
+disposition bureau et <code>Verr. Maj</code> en disposition
+portable).</p>
+<h2 id="iphone-ipad-et-android">iPhone, iPad et Android</h2>
+<p>SonicRoom fonctionne avec VoiceOver et TalkBack, et tous les boutons,
+listes et dialogues sont étiquetés. Les raccourcis à une lettre
+demandent un clavier physique : sur un écran tactile, servez-vous des
+boutons — tout ce que fait un raccourci a un bouton quelque part dans la
+barre d’outils ou la liste des participants.</p>
+<p>Deux choses diffèrent sous iOS : Safari ne sait pas afficher la vidéo
+en plein écran (l’application le dit à voix haute plutôt que de laisser
+un bouton mort), et le moteur audio ne démarre qu’après une première
+touche sur l’écran, ce dont SonicRoom se charge à votre premier
+appui.</p>
+<h2 id="un-test-de-dix-secondes">Un test de dix secondes</h2>
+<p>Rejoignez un salon tout seul, assurez-vous que le focus n’est
+<strong>pas</strong> dans la zone de chat, et appuyez sur
+<code>M</code>. Si vous entendez le son de coupure micro et « Micro
+coupé », vous êtes prêt. Si votre lecteur d’écran parle d’un titre,
+d’une liste ou dit « pas d’élément suivant », vous êtes encore en mode
+lecture : revenez en arrière et basculez.</p>
+<hr />
+<h1 id="comment-le-clavier-fonctionne-partout-dans-sonicroom">Comment le
+clavier fonctionne partout dans SonicRoom</h1>
+<p>Trois règles couvrent toute l’application.</p>
+<p><strong>1. La tabulation passe d’une partie à l’autre. Les flèches se
+déplacent à l’intérieur d’une partie.</strong></p>
+<p>Une barre d’outils de onze boutons est <strong>un seul</strong> arrêt
+de tabulation, pas onze. Une liste de vingt participants est un seul
+arrêt. C’est délibéré : vous traversez toute l’application en cinq ou
+six tabulations au lieu de quarante, et c’est ainsi que fonctionnent les
+logiciels de bureau depuis toujours. Cela veut aussi dire qu’appuyer sur
+<code>Tab</code> dans une barre d’outils ne vous emmène
+<strong>pas</strong> au bouton suivant : c’est la
+<code>Flèche droite</code> qui le fait.</p>
+<p><strong>2. Barres d’outils : <code>Flèche gauche</code> et
+<code>Flèche droite</code>.</strong></p>
+<p>SonicRoom a deux barres d’outils, toutes deux en bas de l’appel : les
+commandes audio (toujours) et les commandes vidéo (appels vidéo
+seulement). Dans l’une comme dans l’autre :</p>
+<table>
+<colgroup>
+<col style="width: 27%" />
+<col style="width: 72%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Touche</th>
+<th>Effet</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Flèche droite</code></td>
+<td>Bouton suivant (revient au premier après le dernier)</td>
+</tr>
+<tr class="even">
+<td><code>Flèche gauche</code></td>
+<td>Bouton précédent (revient au dernier avant le premier)</td>
+</tr>
+<tr class="odd">
+<td><code>Début</code></td>
+<td>Premier bouton</td>
+</tr>
+<tr class="even">
+<td><code>Fin</code></td>
+<td>Dernier bouton</td>
+</tr>
+<tr class="odd">
+<td><code>Entrée</code> ou <code>Espace</code></td>
+<td>Actionner le bouton où vous êtes</td>
+</tr>
+<tr class="even">
+<td><code>Tab</code></td>
+<td>Sortir complètement de la barre d’outils</td>
+</tr>
+</tbody>
+</table>
+<p><strong>3. Listes : <code>Flèche haut</code> et
+<code>Flèche bas</code>, puis <code>Entrée</code>.</strong></p>
+<p>La liste des participants, l’historique du chat, la liste des salons
+publics dans le hall et l’explorateur de fichiers du serveur sont toutes
+des listes du même type :</p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Touche</th>
+<th>Effet</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Flèche bas</code> / <code>Flèche haut</code></td>
+<td>Élément suivant / précédent</td>
+</tr>
+<tr class="even">
+<td><code>Début</code> / <code>Fin</code></td>
+<td>Premier / dernier élément</td>
+</tr>
+<tr class="odd">
+<td><code>Entrée</code> ou <code>Espace</code></td>
+<td>Ouvrir ou activer l’élément</td>
+</tr>
+<tr class="even">
+<td><code>Échap</code> ou <code>Retour arrière</code></td>
+<td>Revenir d’un niveau (options d’un participant, explorateur de
+fichiers)</td>
+</tr>
+</tbody>
+</table>
+<p>Votre lecteur d’écran annonce chaque élément au fur et à mesure, avec
+son état : micro coupé, en train de parler, partage sa vidéo, etc.</p>
+<p><strong>Les curseurs de réglage</strong> (votre niveau de micro, le
+volume de quelqu’un d’autre) se trouvent dans la liste des options d’un
+participant. Sur un curseur, la <code>Flèche gauche</code> et la
+<code>Flèche droite</code> changent la valeur et annoncent le nouveau
+pourcentage ; <code>Début</code> et <code>Fin</code> vont au minimum et
+au maximum. Les flèches haut et bas gardent leur rôle habituel : passer
+à l’option suivante.</p>
+<p><strong><code>Échap</code> ferme les choses.</strong> Le panneau de
+chat, les réglages audio, les réglages de diffusion, le sélecteur de
+source audio, la zone de clé d’API, le lecteur de fichier et le plein
+écran vidéo se ferment tous avec <code>Échap</code>, et le focus
+retourne au contrôle depuis lequel vous les aviez ouverts. Seule
+exception : la boîte « quelqu’un veut entrer », à laquelle il faut
+répondre.</p>
+<hr />
+<h1 id="le-hall">Le hall</h1>
+<p>Le hall est le premier écran. C’est un formulaire ordinaire, donc
+vous pouvez le lire en mode navigation si vous préférez — mais la liste
+des salons publics a besoin des flèches, donc le mode formulaire reste
+plus commode.</p>
+<p>Dans l’ordre, de haut en bas :</p>
+<ol type="1">
+<li><strong>Langue</strong> — une liste déroulante. En changer
+réétiquette tout immédiatement, dans le hall comme en appel, sans
+rechargement.</li>
+<li><strong>Nom du salon</strong> — lettres, chiffres, traits d’union et
+tirets bas, jusqu’à 64 caractères. Tout le reste est retiré au fil de la
+frappe. Si personne n’est dans un salon de ce nom, le taper le
+crée.</li>
+<li><strong>Type de salon</strong> — deux boutons radio, <strong>Appel
+audio</strong> et <strong>Appel vidéo</strong>. L’audio est toujours la
+valeur par défaut. On choisit avec les flèches. Ce choix est définitif
+pour toute la vie du salon, et il décide si des caméras existent, tout
+simplement.</li>
+<li><strong>Arrière-plan vidéo</strong> — n’apparaît que si vous avez
+choisi <em>Appel vidéo</em>. Voir <a href="#appels-video">Appels
+vidéo</a>.</li>
+<li><strong>Nom affiché</strong> — le nom que tout le monde entendra
+quand vous entrez, parlez ou envoyez un message.</li>
+<li><strong>Salons publics</strong> — la liste des salons actuellement
+ouverts à tous, avec qui se trouve dans chacun. Affichée seulement s’il
+en existe au moins un. Allez sur un salon avec les flèches et appuyez
+sur <code>Entrée</code> : son nom est rempli pour vous et le focus
+revient au nom affiché, il ne vous reste qu’à taper votre nom.</li>
+<li><strong>Niveau du micro</strong> — un bouton
+<strong>Tester</strong>, un curseur de <strong>niveau du micro</strong>
+et un vumètre en direct. Appuyez sur Tester : vous vous entendez
+(utilisez un casque) et votre lecteur d’écran vous signale les passages
+entre <em>silencieux</em>, <em>faible</em>, <em>correct</em> et
+<em>élevé</em>. Montez le curseur jusqu’à ce qu’il annonce correct. Ce
+niveau est repris dans l’appel. Cela vaut la peine de le faire une fois
+: énormément de micros d’ordinateur portable sont beaucoup trop faibles
+d’origine.</li>
+<li><strong>Désactiver le P2P</strong> — une case à cocher. À deux,
+SonicRoom vous relie normalement en direct. Cochez ceci pour toujours
+passer par le serveur. Presque personne n’en a besoin.</li>
+<li><strong>Rendre ce salon public</strong> — une case à cocher. Le
+salon est listé publiquement et les règles de « frapper à la porte » et
+de vote d’exclusion décrites plus bas s’appliquent. Dès que quelqu’un
+rend un salon public, il le reste jusqu’à ce que tout le monde soit
+parti ; décocher la case ensuite n’y change rien.</li>
+<li><strong>Rejoindre sans microphone</strong> — une case à cocher. Vous
+écoutez et utilisez le chat écrit, et le navigateur ne demande jamais
+l’autorisation du micro. Si vous n’avez pas de micro, ou si vous refusez
+l’autorisation, vous vous retrouvez de toute façon dans ce mode.</li>
+<li><strong>Rejoindre le salon</strong> — le bouton de validation.
+<code>Entrée</code> depuis n’importe quel champ de texte fonctionne
+aussi.</li>
+</ol>
+<hr />
+<h1 id="le-salon-partie-par-partie">Le salon, partie par partie</h1>
+<h2 id="en-tête">En-tête</h2>
+<p>Annonce le nom du salon et le nom de cette instance de SonicRoom,
+puis les badges qui s’appliquent — <strong>VIDÉO</strong> pour un appel
+vidéo, <strong>REC</strong> pendant l’enregistrement,
+<strong>LIVE</strong> pendant une diffusion vers l’extérieur —, puis le
+nombre de personnes présentes, puis le bouton <strong>chat</strong>
+(dont le nom porte aussi le nombre de messages non lus), et enfin la
+liste déroulante de langue.</p>
+<h2 id="liste-des-participants">Liste des participants</h2>
+<p>Le cœur de l’application. C’est <strong>une</strong> liste qui
+contient <strong>vous d’abord, puis tous les autres</strong>, puis une
+ligne pour chaque chose supplémentaire envoyée dans le salon : un
+diffuseur de musique, le son d’un écran partagé, un fichier que
+quelqu’un diffuse, un micro supplémentaire.</p>
+<p>Chaque ligne se lit comme le nom de la personne suivi de ce qui est
+vrai à cet instant, par exemple :</p>
+<blockquote>
+<p>Ana (vous), micro coupé, partage sa vidéo, appuyez sur Entrée pour
+ouvrir les options de ce participant</p>
+</blockquote>
+<p>Les fragments possibles sont : <em>vous</em>, <em>texte
+seulement</em> (a rejoint sans micro), <em>micro coupé</em>,
+<em>parle</em>, <em>partage sa vidéo</em>, <em>partage son écran</em>,
+<em>épinglé</em>, <em>coupé par vous</em>, et un décompte de voix quand
+un vote d’exclusion est en cours contre cette personne.</p>
+<p>Appuyez sur <code>Entrée</code> sur une ligne pour ouvrir les options
+de cette personne. Cela remplace la liste par une seconde liste, et
+<code>Échap</code> ou <code>Retour arrière</code> vous ramène.</p>
+<h2 id="options-dun-participant">Options d’un participant</h2>
+<p>Ce que vous y trouvez dépend de la ligne que vous avez ouverte.</p>
+<p><strong>Sur votre propre ligne :</strong></p>
+<ul>
+<li><strong>Votre niveau de micro</strong> — un curseur.
+<code>Gauche</code>/<code>Droite</code> pour changer,
+<code>Début</code>/<code>Fin</code> pour le minimum et le maximum. C’est
+un gain appliqué avant que votre voix ne quitte votre machine : cela
+change donc ce que tout le monde entend.</li>
+<li><strong>Décrire ma vidéo</strong> et <strong>Épingler ma
+vidéo</strong> — appels vidéo uniquement.</li>
+</ul>
+<p><strong>Sur la ligne de quelqu’un d’autre :</strong></p>
+<ul>
+<li><strong>Volume de <em>nom</em></strong> — un curseur. Ne change que
+ce que <em>vous</em> entendez.</li>
+<li><strong>Couper <em>nom</em> pour moi</strong> / <strong>Réactiver
+<em>nom</em> pour moi</strong> — la personne est muette pour vous seul.
+Elle n’en est pas informée. L’intitulé bascule pour dire ce que fera le
+prochain appui.</li>
+<li><strong>Épingler la vidéo de <em>nom</em></strong> /
+<strong>Épingler l’écran de <em>nom</em></strong> — appels vidéo
+uniquement, et c’est purement un changement sur votre écran ; la
+personne épinglée n’en sait jamais rien.</li>
+<li><strong>Décrire la vidéo de <em>nom</em></strong> / <strong>Décrire
+l’écran de <em>nom</em></strong> — appels vidéo uniquement. Voir <a
+href="#appels-video">Appels vidéo</a>.</li>
+<li><strong>Exclure <em>nom</em></strong> — uniquement dans les salons
+publics à trois personnes ou plus. Voir <a
+href="#salons-publics-frapper-a-la-porte-et-voter">Salons publics,
+frapper à la porte et voter</a>.</li>
+<li><strong>Exclure le diffuseur</strong> — retire une source qui
+diffuse de la musique.</li>
+<li><strong>Arrêter ce flux</strong> — arrête un fichier partagé, le son
+d’un écran partagé ou un micro supplémentaire.</li>
+</ul>
+<h2 id="panneau-de-chat">Panneau de chat</h2>
+<p>Il s’ouvre avec le bouton chat de l’en-tête. Le panneau est disposé
+avec <strong>l’historique d’abord et la zone de saisie ensuite</strong>,
+à dessein, pour que vous arriviez sur ce qui a été dit et non sur un
+champ vide.</p>
+<ul>
+<li>La liste des messages est une liste :
+<code>Haut</code>/<code>Bas</code>,
+<code>Début</code>/<code>Fin</code>.</li>
+<li><code>Ctrl</code> + <code>C</code> (ou <code>Cmd</code> +
+<code>C</code>) sur un message le copie.</li>
+<li>Dans la zone de saisie, <code>Entrée</code> envoie et
+<code>Maj</code> + <code>Entrée</code> insère un retour à la ligne.</li>
+<li><strong>Annoncer les nouveaux messages</strong> est une liste
+déroulante dans l’en-tête du panneau, avec quatre réglages :
+<em>Poli</em> (annoncé à la prochaine pause de votre lecteur d’écran),
+<em>Assertif</em> (interrompt), <em>À voix haute</em> (la voix du
+navigateur lui-même, pour qui n’utilise pas de lecteur d’écran) et
+<em>Désactivé</em>.</li>
+<li><code>Échap</code> ferme le panneau et remet le focus sur le bouton
+chat.</li>
+</ul>
+<p>Vous n’êtes pas obligé de laisser le panneau ouvert. Tout ce qui se
+passe dans le salon est aussi écrit dans l’historique du chat en plus
+d’être annoncé, et <code>Alt</code> plus un chiffre le relit d’où que
+vous soyez — voir <a href="#savoir-ce-qui-se-passe">Savoir ce qui se
+passe</a>.</p>
+<h2 id="la-barre-des-commandes-audio">La barre des commandes audio</h2>
+<p>En bas de la fenêtre. Un seul arrêt de tabulation ;
+<code>Gauche</code>/<code>Droite</code> pour la parcourir. Dans l’ordre
+:</p>
+<table>
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 6%" />
+<col style="width: 78%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Bouton</th>
+<th>Raccourci</th>
+<th>Ce qu’il fait</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Couper le micro</td>
+<td><code>M</code></td>
+<td>Vous coupe et vous réactive. Désactivé, mais toujours lisible, si
+vous avez rejoint sans micro.</td>
+</tr>
+<tr class="even">
+<td>Partager l’audio</td>
+<td><code>A</code></td>
+<td>Partage le son d’un écran ou d’un onglet. Le navigateur demande
+lequel, et il faut cocher sa case de partage du son.</td>
+</tr>
+<tr class="odd">
+<td>Diffuser de l’audio</td>
+<td><code>F</code></td>
+<td>Ouvre le sélecteur de source : un fichier de votre ordinateur, un
+lien, ou un fichier stocké sur le serveur.</td>
+</tr>
+<tr class="even">
+<td>Atténuation automatique</td>
+<td><code>D</code></td>
+<td>Active ou désactive la baisse automatique de la musique quand
+quelqu’un parle, <strong>pour tout le salon</strong>.</td>
+</tr>
+<tr class="odd">
+<td>Enregistrer l’appel</td>
+<td><code>R</code></td>
+<td>Démarre et arrête un enregistrement de tout le monde, côté
+serveur.</td>
+</tr>
+<tr class="even">
+<td>Télécharger</td>
+<td>—</td>
+<td>Apparaît dès qu’un enregistrement existe. Télécharge tout l’appel
+mixé.</td>
+</tr>
+<tr class="odd">
+<td>Pistes</td>
+<td>—</td>
+<td>Apparaît dès qu’un enregistrement existe. Télécharge un zip avec un
+fichier par personne, alignés et complétés à la même durée.</td>
+</tr>
+<tr class="even">
+<td>Diffusion en direct</td>
+<td>—</td>
+<td>Ouvre le panneau où vous saisissez les informations d’un serveur
+Icecast et lancez la diffusion de l’appel vers l’extérieur.</td>
+</tr>
+<tr class="odd">
+<td>Qui parle</td>
+<td><code>W</code></td>
+<td>Annonce qui parle en ce moment ou vient de parler, avec des
+numéros.</td>
+</tr>
+<tr class="even">
+<td>Notes partagées</td>
+<td><code>Alt</code> + <code>N</code></td>
+<td>Ouvre le bloc-notes partagé du salon dans un nouvel onglet. Présent
+seulement si cette instance a la fonction configurée.</td>
+</tr>
+<tr class="odd">
+<td>Réglages audio</td>
+<td>—</td>
+<td>Choix du micro et des haut-parleurs, traitement de la voix, voix
+haute-fidélité, micros supplémentaires.</td>
+</tr>
+<tr class="even">
+<td>Quitter</td>
+<td>—</td>
+<td>Quitte l’appel et revient au hall.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="pied-de-page">Pied de page</h2>
+<p>Un lien vers le projet SonicRoom, et le lien vers ce manuel.</p>
+<hr />
+<h1 id="tous-les-raccourcis-clavier">Tous les raccourcis clavier</h1>
+<p>Ils fonctionnent partout dans l’appel <strong>tant que le focus
+clavier n’est pas dans une zone de texte</strong> et que votre lecteur
+d’écran laisse passer les touches. Ils sont suspendus tant qu’une boîte
+« quelqu’un veut entrer » est ouverte, car il faut d’abord y
+répondre.</p>
+<h2 id="lettres-seules">Lettres seules</h2>
+<table>
+<colgroup>
+<col style="width: 8%" />
+<col style="width: 92%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Touche</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>M</code></td>
+<td>Couper / réactiver votre micro</td>
+</tr>
+<tr class="even">
+<td><code>A</code></td>
+<td>Démarrer / arrêter le partage du son d’un écran ou d’un onglet</td>
+</tr>
+<tr class="odd">
+<td><code>F</code></td>
+<td>Ouvrir le sélecteur « Diffuser de l’audio »</td>
+</tr>
+<tr class="even">
+<td><code>D</code></td>
+<td>Atténuation automatique activée / désactivée pour tout le salon</td>
+</tr>
+<tr class="odd">
+<td><code>R</code></td>
+<td>Démarrer / arrêter l’enregistrement</td>
+</tr>
+<tr class="even">
+<td><code>W</code></td>
+<td>Qui parle — annonce les dernières personnes à avoir parlé,
+numérotées</td>
+</tr>
+<tr class="odd">
+<td><code>V</code></td>
+<td>Caméra activée / désactivée — <strong>appels vidéo
+uniquement</strong></td>
+</tr>
+<tr class="even">
+<td><code>E</code></td>
+<td>Vidéo en plein écran — <strong>appels vidéo uniquement</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>V</code> et <code>E</code> ne font rien dans un appel audio :
+ces lettres y restent libres.</p>
+<h2 id="avec-alt">Avec Alt</h2>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 67%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Touche</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Alt</code> + <code>1</code> … <code>Alt</code> +
+<code>9</code></td>
+<td>Relit les derniers messages. <code>1</code> est le plus récent,
+<code>2</code> le précédent, et ainsi de suite.</td>
+</tr>
+<tr class="even">
+<td><code>Alt</code> + <code>0</code></td>
+<td>Relit le dixième message le plus récent.</td>
+</tr>
+<tr class="odd">
+<td>Le même <code>Alt</code> + chiffre deux fois de suite</td>
+<td>Copie ce message dans le presse-papiers.</td>
+</tr>
+<tr class="even">
+<td><code>Alt</code> + <code>N</code></td>
+<td>Ouvre les notes partagées du salon dans un nouvel onglet.</td>
+</tr>
+</tbody>
+</table>
+<p>La relecture <code>Alt</code> + chiffre est le seul jeu de raccourcis
+qui <strong>fonctionne aussi pendant que vous tapez dans la zone de
+chat</strong>, et il marche que le panneau soit ouvert ou fermé. Il lit
+les touches numériques physiques : <strong>cela fonctionne donc en
+AZERTY</strong>, où les chiffres demandent normalement la touche Maj,
+comme sur n’importe quelle autre disposition.</p>
+<h2 id="navigation-et-fermeture">Navigation et fermeture</h2>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Touche</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Tab</code> / <code>Maj</code> + <code>Tab</code></td>
+<td>D’une partie de l’application à l’autre</td>
+</tr>
+<tr class="even">
+<td><code>Gauche</code> / <code>Droite</code></td>
+<td>Parcourir une barre d’outils ; régler un curseur</td>
+</tr>
+<tr class="odd">
+<td><code>Haut</code> / <code>Bas</code></td>
+<td>Parcourir une liste</td>
+</tr>
+<tr class="even">
+<td><code>Début</code> / <code>Fin</code></td>
+<td>Premier / dernier ; minimum / maximum</td>
+</tr>
+<tr class="odd">
+<td><code>Entrée</code> / <code>Espace</code></td>
+<td>Activer ce sur quoi vous êtes</td>
+</tr>
+<tr class="even">
+<td><code>Échap</code></td>
+<td>Fermer le panneau, la boîte de dialogue ou le plein écran</td>
+</tr>
+<tr class="odd">
+<td><code>Retour arrière</code></td>
+<td>Sortir des options ; remonter d’un dossier</td>
+</tr>
+<tr class="even">
+<td><code>Entrée</code> dans la zone de saisie</td>
+<td>Envoyer</td>
+</tr>
+<tr class="odd">
+<td><code>Maj</code> + <code>Entrée</code> dans la zone de saisie</td>
+<td>Retour à la ligne</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl</code> / <code>Cmd</code> + <code>C</code> sur un
+message</td>
+<td>Le copier</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="savoir-ce-qui-se-passe">Savoir ce qui se passe</h1>
+<p>SonicRoom est bâti autour d’une règle : <strong>tout ce qui est
+annoncé au salon peut être relu ensuite.</strong></p>
+<p>Chaque événement du salon — quelqu’un est arrivé, quelqu’un a coupé
+son micro, un enregistrement a commencé, un fichier s’est lancé,
+quelqu’un a été exclu — est annoncé par une région active <em>et</em>
+écrit dans l’historique du chat comme message système. Rien n’est
+annoncé une fois puis perdu. Si votre lecteur d’écran était occupé, si
+vous étiez en train de taper, ou si cela vous a simplement échappé,
+appuyez sur <code>Alt</code> + <code>1</code> et remontez le fil.</p>
+<p>Trois choses sont annoncées mais volontairement <em>non</em> écrites
+dans le chat, parce qu’elles concernent votre vue à vous et non le salon
+: vos changements de volume locaux, le fait de couper quelqu’un pour
+vous seul, et l’épinglage d’une vidéo. Personne d’autre n’est concerné,
+elles n’ont donc rien à faire dans une chronologie partagée.</p>
+<p><strong>Signaux sonores.</strong> De brefs sons accompagnent la
+coupure et la réactivation du micro, l’arrivée et le départ de
+quelqu’un, un nouveau message, le début et la fin d’un partage,
+quelqu’un qui frappe à la porte, et une caméra qui s’allume ou s’éteint.
+Ils sont locaux — le salon ne les entend jamais — et sont conçus pour se
+distinguer de la parole.</p>
+<p><strong>« Qui parle » (<code>W</code>).</strong> Les voix vont et
+viennent, et un lecteur d’écran ne peut pas les suivre. Appuyez sur
+<code>W</code> et SonicRoom nomme les personnes qui parlent ou viennent
+de parler, numérotées « 1. Ana, 2. Luis, 3. Marta », de la plus récente
+à la plus ancienne. Les mêmes numéros apparaissent brièvement sur leurs
+vignettes, donc une personne voyante à côté de vous voit la même
+liste.</p>
+<hr />
+<h1 id="parler-et-écouter">Parler et écouter</h1>
+<p><strong>Coupez-vous</strong> avec <code>M</code>, ou le premier
+bouton de la barre. La coupure ne touche que votre voix. Si vous
+diffusez par ailleurs un fichier, le son d’un écran partagé ou des
+micros supplémentaires, tout cela continue : on les arrête en les
+arrêtant, pas en se coupant.</p>
+<p><strong>Votre propre niveau</strong> est le curseur de votre ligne
+dans la liste des participants, ainsi que celui du hall. Montez-le si on
+vous dit qu’on vous entend mal.</p>
+<p><strong>Le niveau de quelqu’un d’autre</strong> est le curseur de
+<em>sa</em> ligne dans la liste des participants. Celui-là ne change que
+ce que vous entendez.</p>
+<p><strong>L’atténuation automatique (<code>D</code>)</strong> fait
+baisser la musique dès que quelqu’un parle et la fait remonter quand il
+s’arrête. Elle est active par défaut et s’applique à tout le salon : la
+désactiver la désactive pour tout le monde. Annoncé dans les deux
+sens.</p>
+<p><strong>Les réglages audio</strong> (l’engrenage de la barre)
+contiennent :</p>
+<ul>
+<li><strong>Microphone</strong> et <strong>Haut-parleurs</strong> — des
+listes déroulantes de périphériques. Les changements s’appliquent
+immédiatement, en plein appel, et sont mémorisés. Les noms des
+périphériques n’apparaissent qu’une fois l’autorisation du micro
+accordée.</li>
+<li><strong>Traitement de la voix</strong> — annulation d’écho,
+réduction de bruit et mise à niveau automatique. Actif par défaut.
+Désactivez-le si vous envoyez de la musique ou jouez d’un instrument,
+car il vous contrariera.</li>
+<li><strong>Voix haute-fidélité (stéréo)</strong> — envoie de la stéréo
+à un débit plus élevé. Inactif par défaut, car la plupart des micros
+sont mono et cela coûte de la bande passante à tous les autres. Cela
+s’applique à votre <strong>prochain</strong> appel, pas à celui en
+cours.</li>
+<li><strong>Micros supplémentaires à diffuser</strong> — une liste de
+cases à cocher, une par périphérique d’entrée autre que votre micro
+principal, chacune avec une paire de boutons radio <strong>Mono</strong>
+/ <strong>Stéréo</strong>. Cochez-en un et il est envoyé dans le salon
+comme un flux à part entière, à côté de votre voix, et apparaît comme
+une ligne à lui dans la liste des participants de chacun. C’est ainsi
+qu’on envoie une table de mixage, un instrument ou un câble audio
+virtuel. Vous couper ne les coupe pas ; pour les arrêter,
+décochez-les.</li>
+</ul>
+<hr />
+<h1 id="envoyer-du-son-dans-le-salon">Envoyer du son dans le salon</h1>
+<h2 id="son-dun-écran-ou-dun-onglet-a">Son d’un écran ou d’un onglet
+(<code>A</code>)</h2>
+<p>Appuyez sur <code>A</code> : le navigateur ouvre son propre sélecteur
+— une boîte de dialogue du système, pas de SonicRoom, que votre lecteur
+d’écran traite donc comme une fenêtre séparée. Choisissez un écran, une
+fenêtre ou un onglet <strong>et cochez la case qui partage son
+son</strong> ; sans cette case, le partage est muet. Chrome et Edge s’en
+sortent le mieux ; la prise en charge du partage du son système par
+Firefox est limitée ou absente selon la plateforme.</p>
+<p>Le son partagé contourne le traitement et le limiteur de votre micro,
+pour que la musique garde sa dynamique. Dans un appel audio, l’image est
+jetée et seul le son est envoyé. <code>A</code> de nouveau arrête le
+partage.</p>
+<h2 id="un-fichier-un-lien-ou-un-fichier-du-serveur-f">Un fichier, un
+lien ou un fichier du serveur (<code>F</code>)</h2>
+<p><code>F</code> ouvre la boîte <strong>Diffuser de l’audio</strong>,
+qui propose trois sources :</p>
+<ul>
+<li><strong>Choisir sur l’ordinateur</strong> — un sélecteur de
+fichiers.</li>
+<li><strong>URL audio</strong> — une zone d’édition. Collez n’importe
+quel lien public : un MP3 direct, une radio en ligne, ou une page d’un
+site de vidéo ou de musique, dont le serveur extrait le son pour
+vous.</li>
+<li><strong>Fichiers du serveur</strong> — une arborescence de dossiers
+audio stockés sur le serveur. Parcourez-la avec les flèches,
+<code>Entrée</code> sur un dossier pour y entrer, <code>Entrée</code>
+sur un fichier pour le lire, <code>Retour arrière</code> pour remonter
+d’un dossier. Les noms longs sont tronqués visuellement mais lus en
+entier.</li>
+</ul>
+<p>Dès que quelque chose est lancé, une petite fenêtre <strong>Diffusion
+de fichier</strong> apparaît et le focus se pose sur son bouton
+lecture/pause : <code>Espace</code> met donc en pause immédiatement.
+Elle a aussi un curseur <strong>votre volume</strong>, qui ne change que
+votre propre écoute — le salon entend toujours le fichier à plein niveau
+— et un bouton d’arrêt. <code>Échap</code> n’importe où dans cette
+fenêtre arrête la diffusion et la ferme.</p>
+<p>Réappuyer sur <code>F</code> pendant une lecture rouvre le sélecteur
+et permet de changer de source sans relancer la diffusion.</p>
+<hr />
+<h1 id="enregistrer-et-diffuser-en-direct">Enregistrer et diffuser en
+direct</h1>
+<p><strong>L’enregistrement (<code>R</code>)</strong> se fait sur le
+serveur : il capture donc tout le monde en pleine qualité, quoi que
+fasse votre machine. Le démarrage et l’arrêt sont annoncés à tout le
+salon et un badge <strong>REC</strong> apparaît dans l’en-tête —
+personne n’est enregistré sans en être averti.</p>
+<p>Dès qu’un enregistrement existe, deux boutons de plus apparaissent
+dans la barre :</p>
+<ul>
+<li><strong>Télécharger</strong> — tout l’appel mixé en un seul fichier.
+Vous pouvez l’utiliser pendant que l’enregistrement tourne encore : il
+télécharge tout ce qui a été capté jusque-là et l’enregistrement
+continue.</li>
+<li><strong>Pistes</strong> — un zip avec un fichier par personne,
+chacun complété et aligné dans le temps pour qu’ils se superposent une
+fois déposés dans un éditeur audio.</li>
+</ul>
+<p>Dans un appel vidéo, le téléchargement de l’appel entier est un
+fichier vidéo avec toutes les caméras et tous les écrans en grille ;
+dans un appel audio, c’est un fichier audio, comme toujours.</p>
+<p><strong>La diffusion en direct</strong> (le bouton radio de la barre)
+envoie tout l’appel mixé vers un serveur Icecast que vous indiquez. Le
+panneau demande l’hôte, le port, le point de montage, l’utilisateur, le
+mot de passe, le format et le débit, et les mémorise dans ce navigateur.
+Ces informations ne sont jamais montrées au reste du salon : tout ce
+qu’il reçoit, c’est un badge <strong>LIVE</strong> et l’annonce que la
+diffusion a commencé, et par qui.</p>
+<hr />
+<h1 id="appels-video">Appels vidéo</h1>
+<p>Un salon n’est un appel vidéo que s’il a été créé comme tel — le
+bouton radio <strong>Appel vidéo</strong> dans le hall, sur lequel on ne
+peut plus revenir ensuite. Dans un appel audio, rien de tout cela
+n’existe : pas de caméra, pas de <code>V</code>, pas de <code>E</code>,
+et partager votre écran n’envoie toujours que son son.</p>
+<p><strong>Tout le monde entre caméra éteinte</strong>, à chaque fois.
+Rien n’allume votre caméra sauf vous.</p>
+<ul>
+<li><strong><code>V</code></strong> allume et éteint votre caméra. Tout
+le monde en est informé, à voix haute et dans l’historique du chat.</li>
+<li><strong><code>E</code></strong> fait occuper tout l’écran à la zone
+vidéo ; <code>E</code> de nouveau ou <code>Échap</code> en sort. Annoncé
+dans les deux sens. Sous Safari iOS, qui ne connaît pas le plein écran
+d’un élément de page, SonicRoom le dit au lieu de ne rien faire.</li>
+<li><strong>L’épinglage</strong> fait remplir la zone vidéo par une
+caméra ou un écran, pour vous seul. C’est dans les options de chaque
+participant (« Épingler la vidéo de <em>nom</em> »), ce n’est signalé à
+personne, et la personne épinglée n’en est pas informée. Si elle éteint
+sa caméra, l’épinglage est conservé et attend : on vous dit qu’il
+attend, et on vous le redit quand l’image revient.</li>
+</ul>
+<p><strong>L’aide au cadrage du visage</strong> est le bouton situé à
+côté de celui de la caméra, actif par défaut. Pendant que votre caméra
+est allumée, SonicRoom observe votre propre image et énonce de courtes
+corrections — « déplacez-vous vers votre droite », « montez », « vous
+êtes bien cadré », « votre visage n’est pas visible dans le cadre » —
+sur une région active assertive, pour qu’elles interrompent au lieu de
+s’empiler. Les directions sont données de votre point de vue, pas de
+celui de l’image. La même indication est répétée toutes les trois
+secondes tant qu’elle reste valable, « bien cadré » est dit une fois
+quand vous y êtes, puis c’est le silence. Coupez-la avec le même bouton
+une fois que vous avez fini de vous placer.</p>
+<p><strong>« Décrire la vidéo de <em>nom</em> »</strong> se trouve dans
+les options de chaque participant, y compris les vôtres. Cela prend une
+seule image et demande à Claude de la décrire en quelques phrases, en
+lisant le texte visible, dans la langue où est réglée l’interface. La
+description est consignée dans le chat comme tout le reste, donc
+<code>Alt</code> + <code>1</code> la relit.</p>
+<p>Cela demande <strong>votre propre clé d’API Claude</strong>, saisie
+avec le bouton clé de la barre vidéo. Elle est conservée uniquement dans
+ce navigateur et la requête part de votre navigateur directement vers
+Claude : elle ne passe jamais par le serveur SonicRoom.</p>
+<p><strong>Les arrière-plans vidéo</strong> se choisissent dans le
+<strong>hall</strong>, sous le bouton radio <em>Appel vidéo</em>, et
+jamais pendant l’appel — ainsi l’image est fixée avant que quoi que ce
+soit ne parte. Les choix sont : aucun arrière-plan, flou, l’une des six
+images fournies, ou une image à vous. Tout se fait dans votre navigateur
+: le salon ne reçoit jamais que l’image finie, jamais votre véritable
+environnement. Si votre navigateur n’en est pas capable, SonicRoom le
+dit à voix haute et envoie votre caméra telle quelle plutôt que
+d’échouer en silence.</p>
+<hr />
+<h1 id="salons-publics-frapper-a-la-porte-et-voter">Salons publics,
+frapper à la porte et voter</h1>
+<p><strong>Il n’y a ni modérateurs ni propriétaire dans
+SonicRoom.</strong> Personne ne peut exclure qui que ce soit tout seul.
+En échange, les salons publics ont deux règles collectives.</p>
+<p><strong>Frapper à la porte.</strong> Quand un salon est public et que
+quelqu’un de nouveau demande à entrer, tous ceux qui sont déjà là
+entendent des coups frappés et reçoivent une boîte de dialogue nommant
+la personne, avec les boutons <strong>Autoriser</strong> et
+<strong>Refuser</strong> (et <strong>Tout autoriser</strong> /
+<strong>Tout refuser</strong> quand plusieurs attendent). Le focus va
+droit au premier bouton Autoriser, et la tabulation tourne en boucle
+dans la boîte. On ne peut pas la fermer avec <code>Échap</code> : c’est
+la seule boîte à laquelle il faut répondre. N’importe qui peut répondre
+; c’est la première réponse qui compte. Refuser quelqu’un lui interdit
+aussi de revenir dans ce salon.</p>
+<p>Pendant ce temps, la personne qui frappe entend « En attente que
+quelqu’un dans le salon vous laisse entrer… » et dispose d’un bouton
+Annuler.</p>
+<p><strong>Voter pour exclure.</strong> Uniquement dans les salons
+publics, et uniquement à <strong>trois personnes ou plus</strong>. En
+dessous de trois, l’option n’est même pas proposée : elle ne peut donc
+jamais servir à une personne contre une autre. Le seuil est <em>au moins
+la moitié</em>, la personne concernée comprise : 2 voix sur 3, 2 sur 4,
+3 sur 5.</p>
+<p>L’option est dans la liste des options de chaque participant. Son
+intitulé porte le décompte en cours — « Exclure Ana (2 voix) » — et
+chaque vote et chaque retrait est annoncé à tout le salon, avec les
+noms. La choisir de nouveau retire votre voix. Comme le seuil dépend du
+nombre de personnes présentes, un départ peut être ce qui fait basculer
+un vote déjà entamé.</p>
+<hr />
+<h1 id="notes-partagées">Notes partagées</h1>
+<p>Si cette instance de SonicRoom a les notes configurées, la barre
+comporte un bouton <strong>Notes partagées</strong>, et <code>Alt</code>
++ <code>N</code> fait la même chose. Cela ouvre un unique bloc-notes
+collaboratif pour le salon <strong>dans un nouvel onglet du
+navigateur</strong> — jamais dans un cadre à l’intérieur de l’appel,
+votre lecteur d’écran a donc affaire à un document éditable tout à fait
+ordinaire.</p>
+<p>Le premier appui crée la note ; celui de tous les autres ouvre la
+même, et son existence est annoncée et consignée dans le chat avec le
+lien. Revenez à l’onglet SonicRoom et l’appel est toujours en cours.</p>
+<hr />
+<h1 id="options-à-mettre-dans-la-barre-dadresse">Options à mettre dans
+la barre d’adresse</h1>
+<p>Tout ce qui suit le <code>?</code> dans un lien de salon règle une
+option, et plusieurs peuvent être combinées avec <code>&amp;</code>.</p>
+<table>
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 85%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Option</th>
+<th>Effet</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>?displayName=Ana</code></td>
+<td>Rejoint sous ce nom, sans passer par le hall</td>
+</tr>
+<tr class="even">
+<td><code>?video=on</code></td>
+<td>En fait un appel vidéo</td>
+</tr>
+<tr class="odd">
+<td><code>?public=true</code></td>
+<td>Rend le salon public</td>
+</tr>
+<tr class="even">
+<td><code>?mic=off</code></td>
+<td>Rejoint sans micro : écoute et chat seulement</td>
+</tr>
+<tr class="odd">
+<td><code>?p2p=off</code></td>
+<td>Passe toujours par le serveur, même à deux</td>
+</tr>
+<tr class="even">
+<td><code>?lang=fr</code></td>
+<td>Force la langue de l’interface (<code>en</code>, <code>es</code>,
+<code>fr</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>?ios=on</code></td>
+<td>Force le chemin audio iOS sur n’importe quel navigateur
+(contournement pour des problèmes de son tenaces)</td>
+</tr>
+</tbody>
+</table>
+<p>Par exemple, un lien qui dépose quelqu’un directement dans un appel
+vidéo en français sous le nom « Ana » :</p>
+<pre><code>https://votre-instance.example/room/studio?video=on&amp;lang=fr&amp;displayName=Ana</code></pre>
+<hr />
+<h1 id="quand-quelque-chose-ne-marche-pas">Quand quelque chose ne marche
+pas</h1>
+<p><strong>Une lettre seule n’écrit rien et ne fait rien.</strong> Votre
+lecteur d’écran est en mode lecture et avale la touche.
+<code>NVDA</code> + <code>Espace</code>, <code>touche JAWS</code> +
+<code>Z</code>, <code>Verr. Maj</code> + <code>Espace</code> pour le
+Narrateur, ou désactivez la navigation rapide sous VoiceOver. C’est de
+très loin le problème le plus fréquent.</p>
+<p><strong>La lettre s’écrit dans la zone de chat.</strong> Le focus est
+dans la zone de saisie. C’est voulu : il faut bien pouvoir taper la
+lettre M dans un message. Appuyez sur <code>Échap</code> pour fermer le
+chat, ou sortez de la zone avec la tabulation, puis réessayez.
+<code>Alt</code> + chiffre est le seul raccourci qui fonctionne encore
+depuis la zone de saisie.</p>
+<p><strong>La tabulation ne m’emmène pas au bouton suivant de la
+barre.</strong> Ce n’est pas son rôle. Toute la barre est un seul arrêt
+; utilisez la <code>Flèche droite</code>. La tabulation sort de la
+barre.</p>
+<p><strong><code>Alt</code> + un chiffre dit « Aucun message 1
+».</strong> Rien n’a encore été dit dans le salon. Les événements du
+salon comptent comme des messages : la première arrivée le remplira.</p>
+<p><strong>Je n’entends personne.</strong> Vérifiez la liste
+<strong>Haut-parleurs</strong> dans les réglages audio : les navigateurs
+ne suivent pas toujours le périphérique par défaut du système. Vérifiez
+ensuite que vous n’avez pas coupé cette personne pour vous : sa ligne
+dirait « coupé par vous ».</p>
+<p><strong>On me dit qu’on m’entend très mal.</strong> Montez
+<strong>votre niveau de micro</strong> dans votre propre ligne de la
+liste des participants, ou servez-vous du bouton Tester du hall, qui
+annonce la plage de niveau au fur et à mesure du réglage.</p>
+<p><strong>Mon micro supplémentaire n’a pas démarré.</strong> SonicRoom
+demande exactement ce périphérique-là plutôt que d’accepter un
+remplaçant : s’il est occupé par un autre logiciel ou débranché, cela
+échoue au lieu d’envoyer discrètement votre micro principal en double.
+Fermez ce qui occupait le périphérique et recochez-le.</p>
+<p><strong>Je partage un écran et il n’y a pas de son.</strong> La case
+audio de la boîte de partage du navigateur n’a pas été cochée. Cette
+boîte appartient au navigateur, pas à SonicRoom. Essayez Chrome ou Edge
+si le vôtre ne propose même pas l’option.</p>
+<p><strong>« Décrire la vidéo » me demande d’ajouter une clé
+d’API.</strong> Cette fonction utilise votre propre clé d’API Claude,
+saisie avec le bouton clé de la barre vidéo. Elle n’est conservée que
+dans ce navigateur.</p>
+<hr />
+<h1 id="référence-clavier-sur-une-page">Référence clavier sur une
+page</h1>
+<table>
+<colgroup>
+<col style="width: 38%" />
+<col style="width: 61%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Touche</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>M</code></td>
+<td>Couper / réactiver le micro</td>
+</tr>
+<tr class="even">
+<td><code>A</code></td>
+<td>Partager / arrêter de partager le son d’un écran ou d’un onglet</td>
+</tr>
+<tr class="odd">
+<td><code>F</code></td>
+<td>Diffuser de l’audio : ouvre le sélecteur de source</td>
+</tr>
+<tr class="even">
+<td><code>D</code></td>
+<td>Atténuation automatique (tout le salon)</td>
+</tr>
+<tr class="odd">
+<td><code>R</code></td>
+<td>Démarrer / arrêter l’enregistrement</td>
+</tr>
+<tr class="even">
+<td><code>W</code></td>
+<td>Qui parle</td>
+</tr>
+<tr class="odd">
+<td><code>V</code></td>
+<td>Caméra (appels vidéo)</td>
+</tr>
+<tr class="even">
+<td><code>E</code></td>
+<td>Vidéo en plein écran (appels vidéo)</td>
+</tr>
+<tr class="odd">
+<td><code>Alt</code> + <code>1</code>…<code>9</code>,
+<code>0</code></td>
+<td>Relire les dix derniers messages, du plus récent au plus ancien</td>
+</tr>
+<tr class="even">
+<td>Le même <code>Alt</code> + chiffre deux fois</td>
+<td>Copier ce message</td>
+</tr>
+<tr class="odd">
+<td><code>Alt</code> + <code>N</code></td>
+<td>Notes partagées dans un nouvel onglet</td>
+</tr>
+<tr class="even">
+<td><code>Tab</code> / <code>Maj</code> + <code>Tab</code></td>
+<td>D’une partie de l’application à l’autre</td>
+</tr>
+<tr class="odd">
+<td><code>Gauche</code> / <code>Droite</code></td>
+<td>Parcourir une barre ; régler un curseur</td>
+</tr>
+<tr class="even">
+<td><code>Haut</code> / <code>Bas</code></td>
+<td>Parcourir une liste</td>
+</tr>
+<tr class="odd">
+<td><code>Début</code> / <code>Fin</code></td>
+<td>Premier / dernier ; minimum / maximum</td>
+</tr>
+<tr class="even">
+<td><code>Entrée</code> / <code>Espace</code></td>
+<td>Activer</td>
+</tr>
+<tr class="odd">
+<td><code>Échap</code></td>
+<td>Fermer un panneau, une boîte de dialogue ou le plein écran</td>
+</tr>
+<tr class="even">
+<td><code>Retour arrière</code></td>
+<td>Sortir des options ; remonter d’un dossier</td>
+</tr>
+<tr class="odd">
+<td><code>Entrée</code> dans la zone de saisie</td>
+<td>Envoyer</td>
+</tr>
+<tr class="even">
+<td><code>Maj</code> + <code>Entrée</code> dans la zone de saisie</td>
+<td>Retour à la ligne</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl</code> / <code>Cmd</code> + <code>C</code> sur un
+message</td>
+<td>Le copier</td>
+</tr>
+<tr class="even">
+<td><code>NVDA</code> + <code>Espace</code></td>
+<td>NVDA : mode navigation ↔︎ mode formulaire</td>
+</tr>
+<tr class="odd">
+<td><code>touche JAWS</code> + <code>Z</code></td>
+<td>JAWS : curseur virtuel désactivé / activé</td>
+</tr>
+<tr class="even">
+<td><code>Verr. Maj</code> + <code>Espace</code></td>
+<td>Narrateur : mode Scan désactivé / activé</td>
+</tr>
+<tr class="odd">
+<td><code>Gauche</code> + <code>Droite</code> ensemble</td>
+<td>VoiceOver : navigation rapide désactivée / activée</td>
+</tr>
+<tr class="even">
+<td><code>modificateur Orca</code> + <code>A</code></td>
+<td>Orca : mode navigation ↔︎ mode focus</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

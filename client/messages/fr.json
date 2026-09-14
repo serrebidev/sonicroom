@@ -4,6 +4,8 @@
   "language_label": "Langue",
 
   "footer_powered_by": "Propulsé par SonicRoom",
+  "footer_manual": "Guide pour lecteurs d'écran",
+  "footer_manual_title": "Comment utiliser SonicRoom avec un lecteur d'écran : régler le mode formulaire et tous les raccourcis clavier (s'ouvre dans un nouvel onglet)",
 
   "lobby_tagline": "Conférence audio stéréo à latence ultra-faible",
   "lobby_room_name_label": "Nom du salon",

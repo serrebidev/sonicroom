@@ -4,6 +4,8 @@
   "language_label": "Language",
 
   "footer_powered_by": "Powered by SonicRoom",
+  "footer_manual": "Screen reader guide",
+  "footer_manual_title": "How to use SonicRoom with a screen reader: setting up focus mode and every keyboard shortcut (opens in a new tab)",
 
   "lobby_tagline": "Ultra-low-latency stereo audio conferencing",
   "lobby_room_name_label": "Room Name",

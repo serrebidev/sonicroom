@@ -12,7 +12,7 @@ import { AudioSourceDialog } from "./AudioSourceDialog";
 import { Chat } from "./Chat";
 import { JoinRequests } from "./JoinRequests";
 import { LanguageSelect } from "./LanguageSelect";
-import { Footer, PoweredBy } from "./Footer";
+import { Footer, FooterLinks } from "./Footer";
 import { isVideoRoomParam } from "../lib/video/room-type";
 import { m } from "../paraglide/messages.js";
 
@@ -686,7 +686,7 @@ export function Room() {
           onOpenNotes={openNotes}
           onLeave={handleLeave}
         />
-        <PoweredBy />
+        <FooterLinks />
       </footer>
 
       {/* Screen reader announcements (peer join/leave, recording, etc.).

@@ -1,5 +1,6 @@
 import type { ProducerInfo } from "../../recording.js";
 import type { ConnectionContext } from "../context.js";
+import { allowed } from "../../moderation-util.js";
 
 // --- Recording (room-wide; forces SFU so the server can see the media) ---
 export function registerRecordingHandlers(ctx: ConnectionContext) {
@@ -12,6 +13,11 @@ export function registerRecordingHandlers(ctx: ConnectionContext) {
         return;
       }
       const room = session.currentRoom;
+      // Moderated room: recording may be admins-only or off.
+      if (!allowed(room.moderation, room.admins.has(socket.id), "recording")) {
+        cb({ ok: false, error: "forbidden" });
+        return;
+      }
 
       if (recordingManager.isRecording(room.name)) {
         cb({ ok: true, recordingId: recordingManager.getRecording(room.name)!.id });
@@ -60,6 +66,10 @@ export function registerRecordingHandlers(ctx: ConnectionContext) {
         return;
       }
       const room = session.currentRoom;
+      if (!allowed(room.moderation, room.admins.has(socket.id), "recording")) {
+        cb({ ok: false, error: "forbidden" });
+        return;
+      }
       // Finalize (not discard): captures stop, but the file stays
       // downloadable until its TTL / a new recording / room exit.
       const rec = await recordingManager.finalize(room.name);

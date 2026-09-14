@@ -38,6 +38,10 @@ import {
   announce_peer_stream_stopped,
   announce_your_stream_stopped,
   announce_you_were_kicked,
+  announce_peer_kicked_by,
+  announce_you_were_kicked_by,
+  announce_moderated_room,
+  announce_moderated_room_you,
   announce_no_mic,
   announce_notes_failed,
   announce_video_on,
@@ -68,7 +72,9 @@ import {
   registerMuteHandlers,
   registerChatHandlers,
   registerNotesHandlers,
+  registerAdminHandlers,
 } from "../lib/socket/room-event-handlers";
+import type { ModerationPolicy } from "../lib/moderation";
 import {
   getSharedAudioContext,
   hasSharedAudioContext,
@@ -189,6 +195,10 @@ export function useMediasoup() {
   // pushed join-approved/-denied handlers resolve/reject it so the blocked join
   // flow continues (re-join) or fails (denied).
   const admissionRef = useRef<{ resolve: () => void; reject: (e: unknown) => void } | null>(null);
+  // Moderated rooms: the local half of a forced mute (set once `mute` exists —
+  // see below) and whether we've announced "moderated room" this session.
+  const forcedMuteRef = useRef<(by: string) => void>(() => {});
+  const moderatedAnnouncedRef = useRef(false);
   // VIDEO rooms only: the camera/screen/incoming-tile controller. Null in every
   // audio room — it's created by dynamically importing lib/video/video-media the
   // first time a join response says `isVideo` (so audio rooms never even load
@@ -758,7 +768,15 @@ export function useMediasoup() {
     async (
       roomName: string,
       displayName: string,
-      opts?: { disableP2p?: boolean; isPublic?: boolean; noMic?: boolean; video?: boolean },
+      opts?: {
+        disableP2p?: boolean;
+        isPublic?: boolean;
+        noMic?: boolean;
+        video?: boolean;
+        // Create the room as a MODERATED room with this policy (ignored by the
+        // server if the room already exists). See lib/moderation.ts.
+        moderation?: ModerationPolicy | null;
+      },
     ) => {
       // Acquire stereo audio + build the outgoing graph BEFORE connecting so
       // it's ready the moment we (re)join. The mic, AudioContext and outgoing
@@ -855,6 +873,11 @@ export function useMediasoup() {
           // Shared-notes feature availability + this room's note URL (if any).
           notesEnabled?: boolean;
           notesUrl?: string | null;
+          // MODERATED room: its policy (null otherwise), whether we're an admin,
+          // and the admin list.
+          moderation?: ModerationPolicy | null;
+          isAdmin?: boolean;
+          admins?: Array<{ peerId: string; displayName: string }>;
         };
         const joinPayload = {
           roomName,
@@ -864,6 +887,8 @@ export function useMediasoup() {
           isPublic: opts?.isPublic,
           // Make this a VIDEO call (sticky server-side). Absent for audio rooms.
           video: opts?.video,
+          // Create a MODERATED room (only honoured when this join creates it).
+          moderation: opts?.moderation ?? undefined,
           joinToken,
           // On a reconnect mid-share, re-pin SFU so the share rebuilds.
           sharing: store.getState().isSharingAudio,
@@ -945,6 +970,21 @@ export function useMediasoup() {
         // clear on a (re)join — votes are keyed by socket id, which changes.
         for (const { targetId, votes } of joinRes.kickVotes ?? []) {
           store.getState().setPeerKickVote(targetId, votes, false);
+        }
+        // MODERATED room: policy + admins (after the peer list, so each row's
+        // admin flag lands). Announced once per session, not on every rejoin.
+        const admins = joinRes.admins ?? [];
+        store.getState().setModeration(joinRes.moderation ?? null);
+        store.getState().setAdmins(admins.map((a) => a.peerId));
+        if (joinRes.moderation && !moderatedAnnouncedRef.current) {
+          moderatedAnnouncedRef.current = true;
+          store.getState().announceEvent(
+            joinRes.isAdmin
+              ? announce_moderated_room_you()
+              : announce_moderated_room({
+                  admins: admins.map((a) => a.displayName).join(", ") || "—",
+                }),
+          );
         }
 
         // Producers queued before this ack (stale modeRef during a rejoin) are
@@ -1158,10 +1198,12 @@ export function useMediasoup() {
           peerId,
           displayName,
           reason,
+          by,
         }: {
           peerId: string;
           displayName: string;
-          reason?: "vote" | "caster";
+          reason?: "vote" | "caster" | "admin";
+          by?: string | null;
         }) => {
           const name = store.getState().peers.get(peerId)?.displayName ?? displayName;
           // Tear down their media exactly like a leave.
@@ -1177,7 +1219,9 @@ export function useMediasoup() {
             .announceEvent(
               reason === "caster"
                 ? announce_caster_removed({ name })
-                : announce_peer_kicked({ name }),
+                : reason === "admin" && by
+                  ? announce_peer_kicked_by({ name, by })
+                  : announce_peer_kicked({ name }),
             );
           playCue(getSharedAudioContext(), "leave");
         },
@@ -1185,9 +1229,11 @@ export function useMediasoup() {
 
       // WE were voted out. Show the dedicated "removed" screen (Room.tsx) and
       // stop the socket so it doesn't auto-reconnect into the now-banned room.
-      socket.on("you-were-kicked", () => {
+      socket.on("you-were-kicked", ({ by }: { reason?: string; by?: string | null } = {}) => {
         store.getState().setKicked(true);
-        store.getState().announceEvent(announce_you_were_kicked());
+        store
+          .getState()
+          .announceEvent(by ? announce_you_were_kicked_by({ by }) : announce_you_were_kicked());
         playCue(getSharedAudioContext(), "leave");
         socket.disconnect();
       });
@@ -1554,6 +1600,8 @@ export function useMediasoup() {
 
       // Remote mute/unmute + incoming chat handlers. See room-event-handlers.ts.
       registerMuteHandlers(socket, surfaceToggle);
+      // Moderated rooms: admin-set changes + forced mutes (never fire elsewhere).
+      registerAdminHandlers(socket, (by) => forcedMuteRef.current(by));
       registerChatHandlers(socket, chatHintGivenRef);
 
       // Resolve once the first connect → join → media setup has completed (or
@@ -1621,6 +1669,19 @@ export function useMediasoup() {
     if (store.getState().isMuted) await unmute();
     else await mute();
   }, [mute, unmute, store]);
+
+  // An admin muted US for everyone (moderated room): apply the local half of a
+  // mute — track off, producer paused, store — WITHOUT the producer-pause emit
+  // (the server already paused it and flagged us muted) and without the
+  // "you muted" announcement (the handler announces who did it). Reached from
+  // the socket handler through a ref, since it's registered inside join()
+  // before `mute` exists.
+  forcedMuteRef.current = () => {
+    const track = localStreamRef.current?.getAudioTracks()[0];
+    if (track) track.enabled = false;
+    if (modeRef.current === "sfu" && producerRef.current) producerRef.current.pause();
+    store.getState().setMuted(true);
+  };
 
   const toggleDeafen = useCallback(() => {
     store.getState().setDeafened(!store.getState().isDeafened);
@@ -2081,6 +2142,7 @@ export function useMediasoup() {
     socketRef.current?.disconnect();
     socketRef.current = null;
     deviceRef.current = null;
+    moderatedAnnouncedRef.current = false;
     store.getState().reset();
   }, [teardownP2p, teardownSfu, graph, extraMics, store]);
 
@@ -2137,6 +2199,45 @@ export function useMediasoup() {
     [emit],
   );
 
+  // --- MODERATED rooms only (the server refuses each of these elsewhere).
+  // None updates local state optimistically: the server broadcasts the
+  // authoritative result (admins-changed / peer-muted / all-muted /
+  // peer-kicked), which every client — including us — renders and announces.
+  // A rejection (not allowed, rate-limited, …) thunks. ---
+  // Name / revoke a co-admin.
+  const setAdmin = useCallback(
+    (targetId: string, admin: boolean) => {
+      emit("set-admin", { targetId, admin }).catch(() => {
+        playCue(getSharedAudioContext(), "thunk");
+      });
+    },
+    [emit],
+  );
+  // Mute one participant for everyone (soft: they can unmute themselves).
+  const mutePeer = useCallback(
+    (targetId: string) => {
+      emit("mute-peer", { targetId }).catch(() => {
+        playCue(getSharedAudioContext(), "thunk");
+      });
+    },
+    [emit],
+  );
+  // Mute everyone else at once.
+  const muteAll = useCallback(() => {
+    emit("mute-all", {}).catch(() => {
+      playCue(getSharedAudioContext(), "thunk");
+    });
+  }, [emit]);
+  // Remove a participant at once (no vote).
+  const kickPeer = useCallback(
+    (targetId: string) => {
+      emit("kick-peer", { targetId }).catch(() => {
+        playCue(getSharedAudioContext(), "thunk");
+      });
+    },
+    [emit],
+  );
+
   // --- Video rooms only. Each is a no-op when the controller was never loaded
   // (i.e. in an audio room), so the UI can call them unconditionally. ---
   // Our camera on/off (the V shortcut / the video toolbar button).
@@ -2182,6 +2283,10 @@ export function useMediasoup() {
     voteKick,
     kickCaster,
     stopPeerStream,
+    setAdmin,
+    mutePeer,
+    muteAll,
+    kickPeer,
     mute,
     unmute,
     toggleMute,

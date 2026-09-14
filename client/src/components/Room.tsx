@@ -1,6 +1,15 @@
 import { useEffect, useCallback, useRef, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Headphones, Users, Loader2, Circle, MessageSquare, Radio, Video } from "lucide-react";
+import {
+  Headphones,
+  Users,
+  Loader2,
+  Circle,
+  MessageSquare,
+  Radio,
+  Video,
+  ShieldCheck,
+} from "lucide-react";
 import { useRoomStore, isPinned } from "../stores/room";
 import { useMediasoup } from "../hooks/useMediasoup";
 import { formatMessage, messageContent } from "../lib/chat";
@@ -14,6 +23,7 @@ import { JoinRequests } from "./JoinRequests";
 import { LanguageSelect } from "./LanguageSelect";
 import { Footer, FooterLinks } from "./Footer";
 import { isVideoRoomParam } from "../lib/video/room-type";
+import { allowed, kickMode, loadRoomPolicy, voteIsAdminsOnly } from "../lib/moderation";
 import { m } from "../paraglide/messages.js";
 
 // VIDEO rooms only: the video grid and the video toolbar are separate lazy
@@ -104,6 +114,10 @@ export function Room() {
     voteKick,
     kickCaster,
     stopPeerStream,
+    setAdmin,
+    mutePeer,
+    muteAll,
+    kickPeer,
     announceSpeakers,
     openNotes,
     toggleVideo,
@@ -226,6 +240,11 @@ export function Room() {
   // ourselves were just voted out (shows the "removed" screen).
   const roomIsPublic = useRoomStore((s) => s.roomIsPublic);
   const kicked = useRoomStore((s) => s.kicked);
+  // MODERATED room: its policy (null in an ordinary room) and whether we're an
+  // admin. Every admin control below is gated on these; the server enforces
+  // them too, so hiding is a courtesy, not the security.
+  const moderation = useRoomStore((s) => s.moderation);
+  const isAdmin = useRoomStore((s) => s.isAdmin);
   // Room type (server truth) + our own camera state, for the self row.
   const roomIsVideo = useRoomStore((s) => s.roomIsVideo);
   const isVideoOn = useRoomStore((s) => s.isVideoOn);
@@ -272,7 +291,15 @@ export function Room() {
     // re-asserts it even without the URL param.
     if (disableP2p && p2pStorageKey) sessionStorage.setItem(p2pStorageKey, "1");
 
-    join(roomName, name, { disableP2p, isPublic: makePublic, noMic, video: videoRequested })
+    // A moderated room's policy comes from the lobby via sessionStorage (keyed
+    // by room name); the server honours it only if this join creates the room.
+    join(roomName, name, {
+      disableP2p,
+      isPublic: makePublic,
+      noMic,
+      video: videoRequested,
+      moderation: loadRoomPolicy(roomName),
+    })
       .then(() => setJoinState("joined"))
       .catch((err) => {
         setJoinState("error");
@@ -377,23 +404,32 @@ export function Room() {
       // variants handled below get produced.)
       if (e.ctrlKey || e.altKey || e.metaKey) return;
 
+      // Moderated room: a shortcut whose action this peer may not perform says
+      // so (bare announce — a local refusal, not a room event) and does nothing.
+      const { moderation: policy, isAdmin: admin, announce: say } = useRoomStore.getState();
+      const may = (action: Parameters<typeof allowed>[2]) => {
+        if (allowed(policy, admin, action)) return true;
+        say(m.announce_not_allowed());
+        return false;
+      };
+
       if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         toggleMute();
       } else if (e.key === "a" || e.key === "A") {
         e.preventDefault();
-        toggleAudioShare();
+        if (may("shareAudio")) toggleAudioShare();
       } else if (e.key === "f" || e.key === "F") {
         // Open the audio-source chooser.
         e.preventDefault();
-        setAudioSourceOpen(true);
+        if (may("streamAudio")) setAudioSourceOpen(true);
       } else if (e.key === "d" || e.key === "D") {
         // Toggle room-wide auto-ducking.
         e.preventDefault();
-        toggleDucking();
+        if (may("ducking")) toggleDucking();
       } else if (e.key === "r" || e.key === "R") {
         e.preventDefault();
-        toggleRecording();
+        if (may("recording")) toggleRecording();
       } else if (e.key === "w" || e.key === "W") {
         // Announce + briefly number the people talking now / who talked recently.
         e.preventDefault();
@@ -510,7 +546,23 @@ export function Room() {
   // private room) below 3 votable people. Votable = humans only: everyone except
   // media-source tiles (music casters and extra-mic streams), plus ourself (+1).
   const votableCount = peerList.filter((p) => !p.isMusic && !p.isMicStream).length + 1;
-  const kickEnabled = roomIsPublic && votableCount >= 3;
+  // MODERATED room: the kick policy decides whether WE vote (among admins or
+  // among everyone — the electorate the threshold counts) or remove directly;
+  // an ordinary room keeps vote-to-kick in public rooms only.
+  const myKickMode = moderation ? kickMode(moderation, isAdmin) : null;
+  const electorate =
+    moderation && voteIsAdminsOnly(moderation)
+      ? peerList.filter((p) => p.isAdmin && !p.isMusic && !p.isMicStream).length + (isAdmin ? 1 : 0)
+      : votableCount;
+  const kickEnabled = moderation
+    ? myKickMode === "vote" && electorate >= 3
+    : roomIsPublic && votableCount >= 3;
+  const kickDirect = myKickMode === "direct";
+  // The rest of the moderated-room gates (all true in an ordinary room).
+  const canMutePeer = moderation != null && allowed(moderation, isAdmin, "mutePeer");
+  const canMuteAll = moderation != null && allowed(moderation, isAdmin, "muteAll");
+  const canSetAdmin = moderation != null && moderation.multipleAdmins && isAdmin;
+  const canApproveJoins = allowed(moderation, isAdmin, "approveJoins");
 
   return (
     <div className="flex min-h-dvh flex-col bg-sonic-900">
@@ -528,6 +580,16 @@ export function Room() {
             >
               <Video className="h-3 w-3" aria-hidden="true" />
               {m.room_video_badge()}
+            </span>
+          )}
+          {moderation && (
+            <span
+              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-300"
+              title={m.room_moderated_badge_title()}
+            >
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+              {m.room_moderated_badge()}
+              <span className="sr-only">, {m.room_moderated_badge_title()}</span>
             </span>
           )}
           {isRecording && (
@@ -637,6 +699,7 @@ export function Room() {
                 localMuted: false,
                 hasVideo: isVideoOn,
                 hasScreen: false,
+                isAdmin,
               }}
               peerList={peerList}
               hasMic={hasMic}
@@ -648,6 +711,14 @@ export function Room() {
               onToggleKick={(id) => voteKick(id, !peers.get(id)?.iVotedKick)}
               onKickCaster={kickCaster}
               onStopStream={stopPeerStream}
+              moderated={moderation != null}
+              isAdmin={isAdmin}
+              kickDirect={kickDirect}
+              onKickDirect={kickPeer}
+              canMutePeer={canMutePeer}
+              onMutePeer={mutePeer}
+              canSetAdmin={canSetAdmin}
+              onSetAdmin={setAdmin}
               announce={announce}
               speakerBadges={speakerBadges}
               onDescribeVideo={roomIsVideo ? describeVideo : undefined}
@@ -659,7 +730,20 @@ export function Room() {
         </main>
 
         {chatOpen && (
-          <Chat onSend={sendChatMessage} onClose={closeChat} focusSignal={chatFocusSignal} />
+          <Chat
+            onSend={sendChatMessage}
+            onClose={closeChat}
+            focusSignal={chatFocusSignal}
+            // Moderated room: chat may be admins-only or off — the panel stays
+            // (announcements live there), only the composer goes.
+            composer={
+              allowed(moderation, isAdmin, "chat")
+                ? "on"
+                : moderation?.chat === "admins"
+                  ? "admins-only"
+                  : "off"
+            }
+          />
         )}
       </div>
 
@@ -685,6 +769,14 @@ export function Room() {
           onAnnounceSpeakers={announceSpeakers}
           onOpenNotes={openNotes}
           onLeave={handleLeave}
+          // Moderated room: controls this peer may not use are not rendered.
+          canShare={allowed(moderation, isAdmin, "shareAudio")}
+          canStreamAudio={allowed(moderation, isAdmin, "streamAudio")}
+          canDuck={allowed(moderation, isAdmin, "ducking")}
+          canRecord={allowed(moderation, isAdmin, "recording")}
+          canLiveStream={allowed(moderation, isAdmin, "liveStreaming")}
+          canMuteAll={canMuteAll}
+          onMuteAll={muteAll}
         />
         <FooterLinks />
       </footer>
@@ -709,7 +801,9 @@ export function Room() {
 
       {/* Knock-to-join: allow/deny people asking to enter this public room.
           Self-hides when nobody is waiting. */}
-      <JoinRequests onDecide={decideJoinRequest} onCleared={onJoinRequestsCleared} />
+      {canApproveJoins && (
+        <JoinRequests onDecide={decideJoinRequest} onCleared={onJoinRequestsCleared} />
+      )}
 
       {audioSourceOpen && (
         <AudioSourceDialog

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { ChatMessage } from "../lib/chat";
 import { getLocale, setLocale as applyParaglideLocale, type Locale } from "../lib/i18n";
 import { isIOS } from "../lib/microphone";
+import type { ModerationPolicy } from "../lib/moderation";
 import {
   normalizeBackgroundChoice,
   DEFAULT_BACKGROUND,
@@ -295,6 +296,10 @@ export interface PeerState {
   // the "Describe X's video / screen" options). Always false in audio rooms.
   hasVideo: boolean;
   hasScreen: boolean;
+  // MODERATED rooms only: this peer is one of the room's administrators (shown
+  // in the row + its accessible name; gates admin-on-admin actions). Always
+  // false in an ordinary room.
+  isAdmin: boolean;
 }
 
 export type RoomMode = "p2p" | "sfu";
@@ -414,6 +419,16 @@ interface RoomState {
   // "you were removed" screen; cleared on reset (leaving / next join).
   kicked: boolean;
 
+  // MODERATED room ("sala moderada"): the fixed privilege policy from the join
+  // response, or null for an ordinary private/public room (the default — every
+  // admin control is gated on it, so ordinary rooms are untouched). isAdmin:
+  // whether WE are an administrator; adminIds: who is (mirrored onto each
+  // PeerState.isAdmin). Seeded from the join response, updated by
+  // `admins-changed` broadcasts. See lib/moderation.ts.
+  moderation: ModerationPolicy | null;
+  isAdmin: boolean;
+  adminIds: string[];
+
   // Shared notes (NoteLab). notesEnabled: whether this instance has the feature
   // configured (server-side NOTELAB_URL) — gates the "Notes" button / Alt+N.
   // notesUrl: the room's collaborative note URL once anyone has opened it, else
@@ -496,6 +511,9 @@ interface RoomState {
   setAwaitingApproval: (awaiting: boolean) => void;
   setRoomIsPublic: (isPublic: boolean) => void;
   setKicked: (kicked: boolean) => void;
+  setModeration: (policy: ModerationPolicy | null) => void;
+  // Replace the admin set (ids); re-flags every peer + our own isAdmin.
+  setAdmins: (adminIds: string[]) => void;
   setNotesEnabled: (enabled: boolean) => void;
   setNotesUrl: (url: string | null) => void;
   setRoomIsVideo: (isVideo: boolean) => void;
@@ -576,6 +594,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   awaitingApproval: false,
   roomIsPublic: false,
   kicked: false,
+  moderation: null,
+  isAdmin: false,
+  adminIds: [],
   notesEnabled: false,
   notesUrl: null,
   roomIsVideo: false,
@@ -685,6 +706,21 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   setAwaitingApproval: (awaitingApproval) => set({ awaitingApproval }),
   setRoomIsPublic: (roomIsPublic) => set({ roomIsPublic }),
   setKicked: (kicked) => set({ kicked }),
+  setModeration: (moderation) => set({ moderation }),
+  setAdmins: (adminIds) =>
+    set((state) => {
+      const ids = new Set(adminIds);
+      const peers = new Map(state.peers);
+      for (const [id, peer] of peers) {
+        const isAdmin = ids.has(id);
+        if (peer.isAdmin !== isAdmin) peers.set(id, { ...peer, isAdmin });
+      }
+      return {
+        adminIds,
+        isAdmin: state.localPeerId != null && ids.has(state.localPeerId),
+        peers,
+      };
+    }),
   setNotesEnabled: (notesEnabled) => set({ notesEnabled }),
   setNotesUrl: (notesUrl) => set({ notesUrl }),
   setRoomIsVideo: (roomIsVideo) => set({ roomIsVideo }),
@@ -842,6 +878,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         localMuted: false,
         hasVideo: false,
         hasScreen: false,
+        isAdmin: state.adminIds.includes(peerId),
       });
       return { peers };
     }),
@@ -976,6 +1013,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       awaitingApproval: false,
       roomIsPublic: false,
       kicked: false,
+      moderation: null,
+      isAdmin: false,
+      adminIds: [],
       // Notes are per-room: drop the URL on leave. notesEnabled is re-seeded
       // from the next join response anyway, so resetting it is harmless.
       notesEnabled: false,

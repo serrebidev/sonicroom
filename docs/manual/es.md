@@ -595,8 +595,10 @@ lugar de fallar en silencio.
 
 # Salas públicas, llamar a la puerta y votar
 
-**En SonicRoom no hay moderadores ni dueños.** Nadie puede expulsar a nadie por
-su cuenta. A cambio, las salas públicas tienen dos reglas colectivas.
+**En las salas normales de SonicRoom no hay moderadores ni dueños.** Nadie
+puede expulsar a nadie por su cuenta. A cambio, las salas públicas tienen dos
+reglas colectivas. (Las **salas moderadas**, con administradores, son otra cosa:
+véase el capítulo siguiente.)
 
 **Llamar a la puerta.** Cuando una sala es pública y alguien nuevo pide entrar,
 todos los que ya están dentro oyen unos golpes y reciben un diálogo con el nombre
@@ -620,6 +622,67 @@ recuento en marcha — «Expulsar a Ana (2 votos)» — y cada voto y cada retir
 anuncia a toda la sala, con nombres. Elegirla otra vez retira tu voto. Como el
 umbral depende de cuánta gente hay, que alguien se vaya puede ser justo lo que
 haga que una votación ya iniciada llegue al límite.
+
+---
+
+# Salas moderadas (con administradores)
+
+Además de las salas privadas y públicas, que no tienen moderadores, puedes
+crear una **sala moderada**: una sala con **administradores**, pensada para
+tertulias y programas con presentador, donde alguien tiene que poder silenciar
+a quien se ha olvidado de mutearse o expulsar a un trol al instante. Todo lo
+que sigue solo existe en este tipo de sala; una sala normal no cambia en nada.
+
+**Crearla.** En el vestíbulo, marca la casilla **«Opciones de
+administrador»**. Se despliega un grupo llamado **«Privilegios de
+participantes»** con una casilla («Permitir varios administradores») y una
+lista desplegable por cada acción: grabar, compartir audio, emitir audio,
+activar o desactivar el atenuado automático, retransmitir en directo, aprobar la
+entrada de nuevos participantes, usar el chat, silenciar a un participante para
+todos, silenciar los micrófonos de todos y expulsar. En cada una eliges **Solo
+administradores**, **Todos** o **Nadie** (expulsar añade **con votación**). La
+última casilla oculta el enlace «Con tecnología de SonicRoom» dentro de la sala.
+Estas opciones se fijan al crear la sala y no cambian mientras exista; el
+navegador recuerda tu última configuración para la próxima vez.
+
+**Quién es administrador.** Quien crea la sala. Si has permitido varios
+administradores, en las opciones de cualquier participante encontrarás
+**«Nombrar administrador»** (y **«Quitar administrador»** para deshacerlo). Los
+administradores llevan la palabra «administrador» en su fila de la lista. Si el
+último administrador se va y queda gente dentro, la persona que más tiempo
+lleva en la sala pasa a ser administradora, y se anuncia. Si te recargas o
+pierdes la conexión, recuperas el cargo al volver.
+
+**La puerta.** En una sala moderada **siempre** se llama a la puerta, sea
+pública o no. La opción «Aprobar la entrada de nuevos participantes» decide
+quién oye los golpes y recibe el diálogo de Permitir / Rechazar: solo los
+administradores, o todos. Los administradores entran sin llamar.
+
+**Silenciar a alguien para todos.** En las opciones del participante:
+**«Silenciar para todos»**. Su micrófono se corta para toda la sala y se le
+anuncia quién lo ha hecho. Es un silencio _suave_: la persona puede volver a
+activar su micrófono con `M` cuando vaya a hablar (así se resuelve el clásico
+«se te oye hablar con la vecina» sin pedir la palabra). En la barra de
+controles, quien tenga permiso ve además **«Silenciar los micrófonos de
+todos»**, que hace lo mismo con todos los demás de golpe.
+
+**Expulsar.** Según la opción elegida: los administradores (o todos) expulsan
+directamente desde las opciones del participante con **«Expulsar de la sala»**,
+sin votación; o bien se vota como en una sala pública (con **al menos tres**
+votantes con derecho a voto; si solo votan los administradores, cuentan solo
+ellos). Nadie puede expulsarse a sí mismo. A un administrador solo puede
+silenciarlo o expulsarlo otro administrador.
+
+**Lo que no te dejan hacer, no aparece.** Si tu papel no permite grabar,
+compartir o emitir audio, cambiar el atenuado, retransmitir o escribir en el
+chat, ese botón no está en la barra y la letra correspondiente (`R`, `A`, `F`,
+`D`) responde «No puedes hacer eso en esta sala». El panel de chat sigue
+abriéndose aunque no puedas escribir, porque ahí siguen quedando todos los
+avisos.
+
+La sala lleva la insignia **MOD** en la cabecera, y al entrar se anuncia que es
+moderada y quiénes son los administradores. Todos los cambios (nombramientos,
+silencios, expulsiones) se anuncian y quedan en el chat.
 
 ---
 

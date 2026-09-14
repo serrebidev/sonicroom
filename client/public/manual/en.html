@@ -308,6 +308,9 @@ streaming</a></li>
 <li><a href="#public-rooms-knocking-and-voting"
 id="toc-public-rooms-knocking-and-voting">Public rooms, knocking and
 voting</a></li>
+<li><a href="#moderated-rooms-with-administrators"
+id="toc-moderated-rooms-with-administrators">Moderated rooms (with
+administrators)</a></li>
 <li><a href="#shared-notes" id="toc-shared-notes">Shared notes</a></li>
 <li><a href="#options-you-can-put-in-the-address-bar"
 id="toc-options-you-can-put-in-the-address-bar">Options you can put in
@@ -1090,9 +1093,11 @@ unchanged rather than quietly failing.</p>
 <hr />
 <h1 id="public-rooms-knocking-and-voting">Public rooms, knocking and
 voting</h1>
-<p><strong>There are no moderators in SonicRoom, and no owner.</strong>
-Nobody can remove anybody on their own. In exchange, public rooms have
-two collective rules.</p>
+<p><strong>There are no moderators in an ordinary SonicRoom room, and no
+owner.</strong> Nobody can remove anybody on their own. In exchange,
+public rooms have two collective rules. (<strong>Moderated
+rooms</strong>, which do have administrators, are a separate thing: see
+the next chapter.)</p>
 <p><strong>Knock to join.</strong> When a room is public and somebody
 new asks to come in, everybody already inside hears a knocking sound and
 gets a dialog naming the person, with <strong>Allow</strong> and
@@ -1114,6 +1119,68 @@ the running tally — “Kick Ana (2 votes)” — and every vote and withdrawal
 is announced to the whole room, with names. Choosing it again withdraws
 your vote. Because the threshold depends on how many people are present,
 somebody leaving can be what tips an existing vote over the line.</p>
+<hr />
+<h1 id="moderated-rooms-with-administrators">Moderated rooms (with
+administrators)</h1>
+<p>Besides private and public rooms, which have no moderators, you can
+create a <strong>moderated room</strong>: a room with
+<strong>administrators</strong>, meant for talk shows and hosted panels,
+where somebody has to be able to silence the person who forgot to mute
+or eject a troll at once. Everything below exists only in this kind of
+room; an ordinary room is unchanged.</p>
+<p><strong>Creating one.</strong> In the lobby, tick <strong>“Admin
+options”</strong>. A group called <strong>“Participant
+privileges”</strong> unfolds, with a checkbox (“Allow several
+administrators”) and one drop-down list per action: recording, sharing
+audio, streaming audio, turning auto-ducking on or off, live streaming,
+approving new participants, using the chat, muting a participant for
+everyone, muting everyone’s microphones, and removing participants. For
+each you pick <strong>Administrators only</strong>,
+<strong>Everyone</strong> or <strong>Nobody</strong> (removing also
+offers <strong>by vote</strong>). The last checkbox hides the “Powered
+by SonicRoom” link inside the room. These choices are fixed when the
+room is created and never change while it exists; the browser remembers
+your last configuration for next time.</p>
+<p><strong>Who is an administrator.</strong> Whoever creates the room.
+If you allowed several administrators, every participant’s options
+include <strong>“Make administrator”</strong> (and <strong>“Remove
+administrator”</strong> to undo it). Administrators carry the word
+“administrator” in their row of the list. If the last administrator
+leaves while people remain, the person who has been in the room longest
+becomes the administrator, and it is announced. If you reload or lose
+the connection, you get the role back when you return.</p>
+<p><strong>The door.</strong> In a moderated room newcomers
+<strong>always</strong> knock, public or not. The “Approve new
+participants” setting decides who hears the knock and gets the Allow /
+Deny dialog: administrators only, or everyone. Administrators walk in
+without knocking.</p>
+<p><strong>Muting somebody for everyone.</strong> In the participant’s
+options: <strong>“Mute for everyone”</strong>. Their microphone is cut
+for the whole room and they are told who did it. It is a <em>soft</em>
+mute: the person can turn their microphone back on with <code>M</code>
+when they mean to speak (which settles the classic “we can hear you
+talking to your neighbour” without a raise-hand flow). In the controls
+bar, whoever is allowed also sees <strong>“Mute everyone’s
+microphones”</strong>, which does the same to everybody else at
+once.</p>
+<p><strong>Removing people.</strong> Depending on the setting:
+administrators (or everyone) remove directly from the participant’s
+options with <strong>“Remove from room”</strong>, no vote; or the room
+votes as a public room does (with <strong>at least three</strong>
+eligible voters; if only administrators vote, only they count). Nobody
+can remove themselves. An administrator can only be muted or removed by
+another administrator.</p>
+<p><strong>What you may not do is not shown.</strong> If your role
+doesn’t allow recording, sharing or streaming audio, changing ducking,
+live streaming or writing in the chat, that button is not in the bar and
+the matching letter (<code>R</code>, <code>A</code>, <code>F</code>,
+<code>D</code>) answers “You can’t do that in this room”. The chat panel
+still opens even if you can’t write, because every announcement still
+lands there.</p>
+<p>The room carries the <strong>MOD</strong> badge in the header, and on
+entry it is announced as moderated along with who the administrators
+are. Every change (naming, mutes, removals) is announced and logged to
+the chat.</p>
 <hr />
 <h1 id="shared-notes">Shared notes</h1>
 <p>If this SonicRoom instance has notes configured, the toolbar has a

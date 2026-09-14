@@ -74,6 +74,7 @@ describe("peer map actions", () => {
       localMuted: false,
       hasVideo: false,
       hasScreen: false,
+      isAdmin: false,
     });
   });
 

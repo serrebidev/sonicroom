@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { allowed } from "../../moderation-util.js";
 import type { DtlsParameters, MediaKind, RtpCapabilities, RtpParameters } from "mediasoup/types";
 import { createWebRtcTransport } from "../../room-manager.js";
 import type { ProducerInfo } from "../../recording.js";
@@ -98,6 +99,17 @@ export function registerSfuHandlers(ctx: ConnectionContext) {
       }
       if ((kind === "video") !== isVideoSource) {
         cb({ ok: false, error: "kind_source_mismatch" });
+        return;
+      }
+      // Moderated room: the producer itself is gated too (start-share /
+      // start-file-stream / start-extra-mic are, but a client could skip them).
+      const isAdmin = currentRoom.admins.has(socket.id);
+      if (
+        (source === "share" && !allowed(currentRoom.moderation, isAdmin, "shareAudio")) ||
+        ((source === "file" || source === "mic") &&
+          !allowed(currentRoom.moderation, isAdmin, "streamAudio"))
+      ) {
+        cb({ ok: false, error: "forbidden" });
         return;
       }
 

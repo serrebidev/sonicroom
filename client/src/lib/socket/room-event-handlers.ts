@@ -23,6 +23,16 @@ import {
   announce_peer_unmuted,
   announce_chat_hint,
   announce_notes_opened,
+  announce_peer_muted_by,
+  announce_all_muted,
+  announce_admin_named,
+  announce_admin_revoked,
+  announce_admin_promoted,
+  announce_admin_joined,
+  announce_you_admin_named,
+  announce_you_admin_revoked,
+  announce_you_admin_promoted,
+  announce_you_were_muted,
 } from "../../paraglide/messages.js";
 
 const store = useRoomStore;
@@ -99,8 +109,16 @@ type SurfaceToggle = (key: string, value: boolean, emit: () => void) => void;
 // polite ARIA region. NOT logged to chat (announce, not announceEvent) — too noisy.
 // Coalesced per peer (surfaceToggle) so a peer mashing their mic only blips once.
 export function registerMuteHandlers(socket: Socket, surfaceToggle: SurfaceToggle) {
-  socket.on("peer-muted", ({ peerId }: { peerId: string }) => {
+  socket.on("peer-muted", ({ peerId, by }: { peerId: string; by?: string }) => {
     store.getState().setPeerMuted(peerId, true);
+    // Muted FOR everyone by someone else (moderated room): that's a room event,
+    // logged to chat by name — not the transient "X muted" of a self-mute.
+    if (by) {
+      const name = store.getState().peers.get(peerId)?.displayName ?? announce_a_participant();
+      store.getState().announceEvent(announce_peer_muted_by({ name, by }));
+      playCue(getSharedAudioContext(), "peer-mute");
+      return;
+    }
     surfaceToggle(`peer:${peerId}`, true, () => {
       const name = store.getState().peers.get(peerId)?.displayName ?? announce_a_participant();
       store.getState().announce(announce_peer_muted({ name }));
@@ -115,6 +133,65 @@ export function registerMuteHandlers(socket: Socket, surfaceToggle: SurfaceToggl
       store.getState().announce(announce_peer_unmuted({ name }));
       playCue(getSharedAudioContext(), "peer-unmute");
     });
+  });
+}
+
+// --- MODERATED rooms: admin-set changes, forced mutes. Never fire in an
+// ordinary room (the server has no admins there). `onForcedMute` is the
+// hook-owned local mute (track off + producer paused + store), applied when an
+// admin muted US — the server already paused our producer, so no emit. ---
+export interface AdminChange {
+  peerId: string;
+  displayName: string;
+  isAdmin: boolean;
+  reason: "named" | "revoked" | "promoted";
+  by: string | null;
+}
+export function registerAdminHandlers(socket: Socket, onForcedMute: (by: string) => void) {
+  socket.on(
+    "admins-changed",
+    ({
+      admins,
+      change,
+    }: {
+      admins: Array<{ peerId: string; displayName: string }>;
+      change: AdminChange;
+    }) => {
+      const s = store.getState();
+      s.setAdmins(admins.map((a) => a.peerId));
+      const me = change.peerId === s.localPeerId;
+      const name = change.displayName;
+      const by = change.by ?? "";
+      let text: string;
+      if (change.reason === "promoted") {
+        text = me ? announce_you_admin_promoted() : announce_admin_promoted({ name });
+      } else if (change.isAdmin) {
+        // Named by someone — or an admin (re)joined (no `by`).
+        text = change.by
+          ? me
+            ? announce_you_admin_named({ by })
+            : announce_admin_named({ name, by })
+          : me
+            ? announce_you_admin_promoted()
+            : announce_admin_joined({ name });
+      } else {
+        text = me ? announce_you_admin_revoked({ by }) : announce_admin_revoked({ name, by });
+      }
+      s.announceEvent(text);
+    },
+  );
+
+  // Someone muted OUR microphone for everyone. Soft: we may unmute again (M).
+  socket.on("you-were-muted", ({ by }: { by: string }) => {
+    onForcedMute(by);
+    store.getState().announceEvent(announce_you_were_muted({ by }));
+    playCue(getSharedAudioContext(), "mute");
+  });
+
+  // Someone muted everyone at once (each affected peer also got peer-muted /
+  // you-were-muted; this is the one room-level line for the log).
+  socket.on("all-muted", ({ by }: { by: string }) => {
+    store.getState().announceEvent(announce_all_muted({ by }));
   });
 }
 

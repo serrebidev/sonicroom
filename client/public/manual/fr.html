@@ -309,6 +309,9 @@ direct</a></li>
 <li><a href="#salons-publics-frapper-a-la-porte-et-voter"
 id="toc-salons-publics-frapper-a-la-porte-et-voter">Salons publics,
 frapper à la porte et voter</a></li>
+<li><a href="#salons-moderes-avec-administrateurs"
+id="toc-salons-moderes-avec-administrateurs">Salons modérés (avec
+administrateurs)</a></li>
 <li><a href="#notes-partagées" id="toc-notes-partagées">Notes
 partagées</a></li>
 <li><a href="#options-à-mettre-dans-la-barre-dadresse"
@@ -1156,9 +1159,11 @@ d’échouer en silence.</p>
 <hr />
 <h1 id="salons-publics-frapper-a-la-porte-et-voter">Salons publics,
 frapper à la porte et voter</h1>
-<p><strong>Il n’y a ni modérateurs ni propriétaire dans
-SonicRoom.</strong> Personne ne peut exclure qui que ce soit tout seul.
-En échange, les salons publics ont deux règles collectives.</p>
+<p><strong>Il n’y a ni modérateurs ni propriétaire dans un salon
+ordinaire de SonicRoom.</strong> Personne ne peut exclure qui que ce
+soit tout seul. En échange, les salons publics ont deux règles
+collectives. (Les <strong>salons modérés</strong>, qui ont des
+administrateurs, sont autre chose : voir le chapitre suivant.)</p>
 <p><strong>Frapper à la porte.</strong> Quand un salon est public et que
 quelqu’un de nouveau demande à entrer, tous ceux qui sont déjà là
 entendent des coups frappés et reçoivent une boîte de dialogue nommant
@@ -1185,6 +1190,73 @@ chaque vote et chaque retrait est annoncé à tout le salon, avec les
 noms. La choisir de nouveau retire votre voix. Comme le seuil dépend du
 nombre de personnes présentes, un départ peut être ce qui fait basculer
 un vote déjà entamé.</p>
+<hr />
+<h1 id="salons-moderes-avec-administrateurs">Salons modérés (avec
+administrateurs)</h1>
+<p>En plus des salons privés et publics, qui n’ont pas de modérateurs,
+vous pouvez créer un <strong>salon modéré</strong> : un salon avec des
+<strong>administrateurs</strong>, pensé pour les émissions et débats
+avec présentateur, où quelqu’un doit pouvoir couper le micro de la
+personne qui a oublié de le faire ou exclure un troll sur-le-champ. Tout
+ce qui suit n’existe que dans ce type de salon ; un salon ordinaire ne
+change en rien.</p>
+<p><strong>Le créer.</strong> Dans le vestibule, cochez <strong>«
+Options d’administrateur »</strong>. Un groupe nommé <strong>«
+Privilèges des participants »</strong> se déplie, avec une case («
+Autoriser plusieurs administrateurs ») et une liste déroulante par
+action : enregistrer, partager l’audio, diffuser de l’audio, activer ou
+désactiver l’atténuation automatique, diffuser en direct, approuver les
+nouveaux participants, utiliser le chat, couper le micro d’un
+participant pour tous, couper les micros de tout le monde et exclure.
+Pour chacune vous choisissez <strong>Administrateurs seulement</strong>,
+<strong>Tout le monde</strong> ou <strong>Personne</strong> (exclure
+propose aussi <strong>par vote</strong>). La dernière case masque le
+lien « Propulsé par SonicRoom » dans le salon. Ces choix sont fixés à la
+création du salon et ne changent plus tant qu’il existe ; le navigateur
+retient votre dernière configuration pour la prochaine fois.</p>
+<p><strong>Qui est administrateur.</strong> La personne qui crée le
+salon. Si vous avez autorisé plusieurs administrateurs, les options de
+chaque participant comprennent <strong>« Nommer administrateur
+»</strong> (et <strong>« Retirer administrateur »</strong> pour
+l’annuler). Les administrateurs portent le mot « administrateur » dans
+leur ligne de la liste. Si le dernier administrateur part alors qu’il
+reste des gens, la personne présente depuis le plus longtemps devient
+administratrice, et c’est annoncé. Si vous rechargez ou perdez la
+connexion, vous retrouvez le rôle en revenant.</p>
+<p><strong>La porte.</strong> Dans un salon modéré, les nouveaux venus
+frappent <strong>toujours</strong> à la porte, salon public ou non. Le
+réglage « Approuver les nouveaux participants » décide qui entend les
+coups et reçoit le dialogue Autoriser / Refuser : les administrateurs
+seulement, ou tout le monde. Les administrateurs entrent sans
+frapper.</p>
+<p><strong>Couper le micro de quelqu’un pour tous.</strong> Dans les
+options du participant : <strong>« Couper le micro pour tous »</strong>.
+Son micro est coupé pour tout le salon et on lui dit qui l’a fait. C’est
+une coupure <em>douce</em> : la personne peut réactiver son micro avec
+<code>M</code> quand elle veut parler (ce qui règle le classique « on
+t’entend parler avec ta voisine » sans lever la main). Dans la barre de
+contrôles, qui y est autorisé voit aussi <strong>« Couper les micros de
+tout le monde »</strong>, qui fait la même chose à tous les autres d’un
+coup.</p>
+<p><strong>Exclure.</strong> Selon le réglage : les administrateurs (ou
+tout le monde) excluent directement depuis les options du participant
+avec <strong>« Exclure du salon »</strong>, sans vote ; ou bien le salon
+vote comme un salon public (avec <strong>au moins trois</strong> votants
+éligibles ; si seuls les administrateurs votent, seuls eux comptent).
+Personne ne peut s’exclure soi-même. Un administrateur ne peut être
+coupé ou exclu que par un autre administrateur.</p>
+<p><strong>Ce que vous ne pouvez pas faire n’apparaît pas.</strong> Si
+votre rôle n’autorise pas d’enregistrer, de partager ou diffuser de
+l’audio, de changer l’atténuation, de diffuser en direct ou d’écrire
+dans le chat, ce bouton n’est pas dans la barre et la lettre
+correspondante (<code>R</code>, <code>A</code>, <code>F</code>,
+<code>D</code>) répond « Vous ne pouvez pas faire cela dans ce salon ».
+Le panneau de chat s’ouvre quand même si vous ne pouvez pas écrire, car
+toutes les annonces continuent d’y arriver.</p>
+<p>Le salon porte le badge <strong>MOD</strong> dans l’en-tête, et à
+l’entrée il est annoncé comme modéré, avec le nom des administrateurs.
+Chaque changement (nominations, coupures de micro, exclusions) est
+annoncé et consigné dans le chat.</p>
 <hr />
 <h1 id="notes-partagées">Notes partagées</h1>
 <p>Si cette instance de SonicRoom a les notes configurées, la barre

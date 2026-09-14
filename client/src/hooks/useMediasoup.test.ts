@@ -22,7 +22,13 @@ import {
   announce_mic_muted,
   announce_recording_started,
   announce_no_mic,
+  announce_you_were_muted,
+  announce_admin_named,
+  announce_you_admin_promoted,
+  announce_peer_kicked_by,
+  announce_you_were_kicked_by,
 } from "../paraglide/messages.js";
+import { DEFAULT_MODERATION_POLICY } from "../lib/moderation";
 
 // A microtask flush — the P2P offer/answer dance and produce acks resolve on
 // chained microtasks after a server event.
@@ -71,7 +77,7 @@ interface Harness {
 async function joinRoom(
   opts: {
     join?: Partial<JoinResponse>;
-    joinOpts?: { disableP2p?: boolean; isPublic?: boolean; noMic?: boolean };
+    joinOpts?: Parameters<Hook["join"]>[2];
     id?: string;
   } = {},
 ): Promise<Harness> {
@@ -815,6 +821,137 @@ describe("moderation", () => {
     await fire("you-were-kicked");
     expect(useRoomStore.getState().kicked).toBe(true);
     expect(socket().connected).toBe(false); // socket disconnected on kick
+    h.unmount();
+  });
+
+  it("sends the lobby's moderation policy on join and seeds policy + admins from the response", async () => {
+    const policy = { ...DEFAULT_MODERATION_POLICY, chat: "admins" as const };
+    const h = await sfuJoin([peerEntry("id-bob", [voiceProd("p1")]), peerEntry("id-carol")], {
+      moderation: policy,
+      isAdmin: true,
+      admins: [{ peerId: "id-self", displayName: "Alice" }],
+    });
+    // The policy rides the join payload (the server honours it only when the
+    // join creates the room).
+    h.unmount();
+    const h2 = await joinRoom({
+      join: {
+        mode: "sfu",
+        peers: [peerEntry("id-bob"), peerEntry("id-carol")],
+        moderation: policy,
+        isAdmin: false,
+        admins: [{ peerId: "id-bob", displayName: "Bob" }],
+      },
+      joinOpts: { moderation: policy },
+    });
+    const sentJoin = socket().sentEvents("join")[0] as { moderation?: unknown };
+    expect(sentJoin.moderation).toEqual(policy);
+    const s = useRoomStore.getState();
+    expect(s.moderation).toEqual(policy);
+    expect(s.isAdmin).toBe(false);
+    expect(s.peers.get("id-bob")?.isAdmin).toBe(true);
+    expect(s.peers.get("id-carol")?.isAdmin).toBe(false);
+    h2.unmount();
+  });
+
+  it("an ordinary room carries no policy", async () => {
+    const h = await joinRoom();
+    const sentJoin = socket().sentEvents("join")[0] as { moderation?: unknown };
+    expect(sentJoin.moderation).toBeUndefined();
+    expect(useRoomStore.getState().moderation).toBeNull();
+    h.unmount();
+  });
+
+  it("applies admins-changed to every row and announces it as a room event", async () => {
+    const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
+      moderation: DEFAULT_MODERATION_POLICY,
+      isAdmin: false,
+      admins: [{ peerId: "id-bob", displayName: "Bob" }],
+    });
+    await fire("admins-changed", {
+      admins: [
+        { peerId: "id-bob", displayName: "Bob" },
+        { peerId: "id-carol", displayName: "Carol" },
+      ],
+      change: {
+        peerId: "id-carol",
+        displayName: "Carol",
+        isAdmin: true,
+        reason: "named",
+        by: "Bob",
+      },
+    });
+    expect(useRoomStore.getState().peers.get("id-carol")?.isAdmin).toBe(true);
+    expect(systemMessages().map((m) => m.text)).toContain(
+      announce_admin_named({ name: "Carol", by: "Bob" }),
+    );
+    // We get promoted when the last admin leaves.
+    await fire("admins-changed", {
+      admins: [{ peerId: "id-self", displayName: "Alice" }],
+      change: {
+        peerId: "id-self",
+        displayName: "Alice",
+        isAdmin: true,
+        reason: "promoted",
+        by: null,
+      },
+    });
+    expect(useRoomStore.getState().isAdmin).toBe(true);
+    expect(useRoomStore.getState().peers.get("id-carol")?.isAdmin).toBe(false);
+    expect(systemMessages().map((m) => m.text)).toContain(announce_you_admin_promoted());
+    h.unmount();
+  });
+
+  it("a forced mute silences us locally without a producer-pause emit, and we can unmute", async () => {
+    const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
+      moderation: DEFAULT_MODERATION_POLICY,
+      isAdmin: false,
+      admins: [{ peerId: "id-bob", displayName: "Bob" }],
+    });
+    const pausesBefore = socket().sentEvents("producer-pause").length;
+    await fire("you-were-muted", { by: "Bob" });
+    expect(useRoomStore.getState().isMuted).toBe(true);
+    expect(producersOfSource("voice")[0]?.paused).toBe(true);
+    expect(socket().sentEvents("producer-pause").length).toBe(pausesBefore);
+    expect(systemMessages().map((m) => m.text)).toContain(announce_you_were_muted({ by: "Bob" }));
+    // Soft mute: the ordinary unmute path still works.
+    await runAct(() => h.result.current.toggleMute());
+    expect(useRoomStore.getState().isMuted).toBe(false);
+    expect(socket().sentEvents("producer-resume").length).toBeGreaterThan(0);
+    h.unmount();
+  });
+
+  it("emits the admin actions and announces admin removals by name", async () => {
+    const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
+      moderation: DEFAULT_MODERATION_POLICY,
+      isAdmin: true,
+      admins: [{ peerId: "id-self", displayName: "Alice" }],
+    });
+    await runAct(() => h.result.current.setAdmin("id-bob", true));
+    expect(socket().lastSent("set-admin")).toEqual({ targetId: "id-bob", admin: true });
+    await runAct(() => h.result.current.mutePeer("id-bob"));
+    expect(socket().lastSent("mute-peer")).toEqual({ targetId: "id-bob" });
+    await runAct(() => h.result.current.muteAll());
+    expect(socket().sentEvents("mute-all")).toHaveLength(1);
+    await runAct(() => h.result.current.kickPeer("id-carol"));
+    expect(socket().lastSent("kick-peer")).toEqual({ targetId: "id-carol" });
+
+    await fire("peer-kicked", {
+      peerId: "id-carol",
+      displayName: "Carol",
+      reason: "admin",
+      by: "Alice",
+    });
+    expect(useRoomStore.getState().peers.has("id-carol")).toBe(false);
+    expect(systemMessages().map((m) => m.text)).toContain(
+      // (the store's row name is the id — peerEntry() names peers after it)
+      announce_peer_kicked_by({ name: "id-carol", by: "Alice" }),
+    );
+    await fire("you-were-kicked", { reason: "admin", by: "Bob" });
+    expect(useRoomStore.getState().kicked).toBe(true);
+    expect(systemMessages().map((m) => m.text)).toContain(
+      announce_you_were_kicked_by({ by: "Bob" }),
+    );
     h.unmount();
   });
 

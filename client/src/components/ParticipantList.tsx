@@ -16,6 +16,9 @@ import {
   ScanEye,
   Pin,
   PinOff,
+  ShieldCheck,
+  ShieldOff,
+  MicOff as MicOffIcon,
 } from "lucide-react";
 import { isPinned, type PeerState, type PinnedVideo } from "../stores/room";
 import { m } from "../paraglide/messages.js";
@@ -61,6 +64,18 @@ interface ParticipantListProps {
   // smaller cap so the pictures keep the majority of the window; audio rooms
   // (where the list IS the UI) keep the roomy default.
   maxHeightClass?: string;
+  // MODERATED rooms only (all false/undefined in an ordinary room, so nothing
+  // admin-related is offered there): whether WE are an admin (admin-on-admin
+  // actions), and per the room's policy whether we may remove people directly
+  // (no vote), mute one participant for everyone, and name/revoke co-admins.
+  moderated?: boolean;
+  isAdmin?: boolean;
+  kickDirect?: boolean;
+  onKickDirect?: (peerId: string) => void;
+  canMutePeer?: boolean;
+  onMutePeer?: (peerId: string) => void;
+  canSetAdmin?: boolean;
+  onSetAdmin?: (peerId: string, admin: boolean) => void;
 }
 
 function getInitials(name: string): string {
@@ -102,6 +117,14 @@ export function ParticipantList({
   pinnedVideo = null,
   onTogglePinVideo,
   maxHeightClass = "max-h-[70vh]",
+  moderated = false,
+  isAdmin = false,
+  kickDirect = false,
+  onKickDirect,
+  canMutePeer = false,
+  onMutePeer,
+  canSetAdmin = false,
+  onSetAdmin,
 }: ParticipantListProps) {
   const rows = useMemo(() => [selfPeer, ...peerList], [selfPeer, peerList]);
   const isSelf = (peerId: string) => peerId === selfPeer.peerId;
@@ -158,6 +181,7 @@ export function ParticipantList({
     const textOnly = self && !hasMic;
     let label = peer.displayName;
     if (self) label += ` (${m.card_you()})`;
+    if (peer.isAdmin) label += `, ${m.card_admin_fragment()}`;
     if (textOnly) label += `, ${m.card_text_only()}`;
     else if (peer.isMuted) label += `, ${m.card_muted_fragment()}`;
     if (peer.isSpeaking) label += `, ${m.card_speaking_fragment()}`;
@@ -223,9 +247,37 @@ export function ParticipantList({
         onVolumeChange={onVolumeChange}
         onLocalMuteChange={onLocalMuteChange}
         showKick={
-          kickEnabled && !openPeer.isMusic && !openPeer.isMicStream && !isSelf(openPeer.peerId)
+          kickEnabled &&
+          !openPeer.isMusic &&
+          !openPeer.isMicStream &&
+          !isSelf(openPeer.peerId) &&
+          // Moderated room: admins are never a vote's target.
+          !(moderated && openPeer.isAdmin)
         }
         onToggleKick={onToggleKick}
+        // Moderated room. A human row only (never a caster/stream tile, never
+        // ourself); an admin may only be acted on by another admin.
+        showKickDirect={
+          kickDirect &&
+          !openPeer.isMusic &&
+          !openPeer.isMicStream &&
+          !isSelf(openPeer.peerId) &&
+          (!openPeer.isAdmin || isAdmin)
+        }
+        onKickDirect={onKickDirect}
+        showMuteForAll={
+          canMutePeer &&
+          !openPeer.isMusic &&
+          !openPeer.isMicStream &&
+          !isSelf(openPeer.peerId) &&
+          !openPeer.isMuted &&
+          (!openPeer.isAdmin || isAdmin)
+        }
+        onMutePeer={onMutePeer}
+        showSetAdmin={
+          canSetAdmin && !openPeer.isMusic && !openPeer.isMicStream && !isSelf(openPeer.peerId)
+        }
+        onSetAdmin={onSetAdmin}
         showKickCaster={openPeer.isCaster}
         onKickCaster={onKickCaster}
         // Any per-stream media tile — a share/file (isMusic, but not the caster) or
@@ -319,6 +371,13 @@ export function ParticipantList({
                     {m.card_you()}
                   </span>
                 )}
+                {/* Moderated room: admin badge (the aria-label says it too). */}
+                {peer.isAdmin && (
+                  <ShieldCheck
+                    className="ml-1.5 inline h-3.5 w-3.5 align-text-bottom text-amber-300"
+                    aria-hidden="true"
+                  />
+                )}
               </span>
               {(peer.localMuted || flaggedForKick) && (
                 <span className="truncate text-xs text-sonic-400">
@@ -387,6 +446,14 @@ interface ParticipantOptionsProps {
   // Share/file media tile only: offer an immediate "Stop this stream" action.
   showStopStream: boolean;
   onStopStream: (producerId: string) => void;
+  // Moderated rooms only: remove at once (no vote), mute for everyone, and
+  // name/revoke as co-admin. The list gates each per row.
+  showKickDirect?: boolean;
+  onKickDirect?: (peerId: string) => void;
+  showMuteForAll?: boolean;
+  onMutePeer?: (peerId: string) => void;
+  showSetAdmin?: boolean;
+  onSetAdmin?: (peerId: string, admin: boolean) => void;
   // Video rooms only: "Describe X's video / screen" (Claude). Undefined elsewhere.
   onDescribeVideo?: (peerId: string, source: "camera" | "screen") => void;
   // Video rooms only: "Pin / Unpin X's video / screen". Undefined elsewhere.
@@ -444,6 +511,12 @@ function ParticipantOptions({
   onKickCaster,
   showStopStream,
   onStopStream,
+  showKickDirect = false,
+  onKickDirect,
+  showMuteForAll = false,
+  onMutePeer,
+  showSetAdmin = false,
+  onSetAdmin,
   onDescribeVideo,
   pinnedVideo = null,
   onTogglePinVideo,
@@ -536,6 +609,25 @@ function ParticipantOptions({
         announce(next ? m.announce_local_muted({ name }) : m.announce_local_unmuted({ name }));
       },
     });
+    // Moderated room: mute this person for everyone (soft — they can unmute).
+    if (showMuteForAll && onMutePeer) {
+      opts.push({
+        id: "mute-for-all",
+        kind: "toggle",
+        ariaLabel: m.card_mute_for_all({ name }),
+        activate: () => onMutePeer(peer.peerId),
+      });
+    }
+    // Moderated room: name / revoke a co-admin. The label flips with the
+    // person's current role (role="option" can't carry aria-pressed).
+    if (showSetAdmin && onSetAdmin) {
+      opts.push({
+        id: "set-admin",
+        kind: "toggle",
+        ariaLabel: peer.isAdmin ? m.card_revoke_admin({ name }) : m.card_make_admin({ name }),
+        activate: () => onSetAdmin(peer.peerId, !peer.isAdmin),
+      });
+    }
     if (showKick) {
       opts.push({
         id: "kick",
@@ -550,6 +642,15 @@ function ParticipantOptions({
             ? m.card_kick_with_votes({ name, votes: votesPhrase })
             : m.card_kick({ name }),
         activate: () => onToggleKick(peer.peerId),
+      });
+    }
+    // Moderated room: remove this person at once (no vote).
+    if (showKickDirect && onKickDirect) {
+      opts.push({
+        id: "kick-now",
+        kind: "toggle",
+        ariaLabel: m.card_kick_now({ name }),
+        activate: () => onKickDirect(peer.peerId),
       });
     }
     // Caster (Ecobox): an immediate, non-vote removal — available in any room.
@@ -729,6 +830,9 @@ function ParticipantOptions({
             const kickOn = opt.id === "kick" && peer.iVotedKick;
             const removeCaster = opt.id === "remove-caster";
             const stopStream = opt.id === "stop-stream";
+            const kickNow = opt.id === "kick-now";
+            const muteForAll = opt.id === "mute-for-all";
+            const setAdmin = opt.id === "set-admin";
             const describeVideo = opt.id === "describe-video";
             const describeScreen = opt.id === "describe-screen";
             const pinVideo = opt.id === "pin-video";
@@ -736,7 +840,7 @@ function ParticipantOptions({
             const pinOn =
               (pinVideo && isPinned(pinnedVideo, peer.peerId, "camera")) ||
               (pinScreen && isPinned(pinnedVideo, peer.peerId, "screen"));
-            const destructive = removeCaster || stopStream;
+            const destructive = removeCaster || stopStream || kickNow;
             return (
               <li
                 key={opt.id}
@@ -807,6 +911,27 @@ function ParticipantOptions({
                   <>
                     <CircleStop className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">{m.card_stop_stream_label()}</span>
+                  </>
+                ) : kickNow ? (
+                  <>
+                    <UserX className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{m.card_kick_now_label()}</span>
+                  </>
+                ) : muteForAll ? (
+                  <>
+                    <MicOffIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{m.card_mute_for_all_label()}</span>
+                  </>
+                ) : setAdmin ? (
+                  <>
+                    {peer.isAdmin ? (
+                      <ShieldOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="truncate">
+                      {peer.isAdmin ? m.card_revoke_admin_label() : m.card_make_admin_label()}
+                    </span>
                   </>
                 ) : pinVideo || pinScreen ? (
                   <>

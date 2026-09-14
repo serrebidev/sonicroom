@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { CHAT_TEXT_MAX } from "../chat-util.js";
+import { moderationPolicySchema } from "../moderation-util.js";
 
 // --- Validation schemas ---
 export const roomNameSchema = z
@@ -78,4 +79,9 @@ export const joinSchema = z.object({
   // Identifies an already-admitted session so a reconnect/refresh skips the
   // knock gate, and is what an approval records as "admitted".
   joinToken: z.string().min(1).max(128).optional(),
+  // Create this room as a MODERATED room with this privilege policy (the
+  // lobby's "Admin options"). Honoured ONLY when this join CREATES the room —
+  // the creator becomes its admin; on an existing room it is ignored (the
+  // policy is fixed for the room's lifetime). See moderation-util.ts.
+  moderation: moderationPolicySchema.optional(),
 });

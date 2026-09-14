@@ -3,6 +3,7 @@ import type { Server, Socket } from "socket.io";
 import { removePeer, type Room, type Peer } from "../room-manager.js";
 import { decideMode } from "../recording-util.js";
 import { kickThreshold } from "../kick-util.js";
+import { voteIsAdminsOnly } from "../moderation-util.js";
 import { CHAT_HISTORY_MAX, type ChatMessage } from "../chat-util.js";
 import type { RecordingManager } from "../recording.js";
 import type { StreamManager } from "../streaming.js";
@@ -67,8 +68,52 @@ export function createRoomHelpers(
       // producers the server has to route, so the room is pinned from its
       // first join (before anyone turns a camera on) — no SFU↔P2P flap when
       // the first camera comes on or the last goes off.
-      room.isVideo
+      room.isVideo ||
+      // A MODERATED room is pinned too: "mute X for everyone" is enforced by
+      // the server pausing X's voice producer, which only exists on the SFU
+      // (P2P media never touches the server).
+      room.moderation != null
     );
+  }
+
+  // --- Moderated rooms: admins ---
+
+  function isAdmin(room: Room, peerId: string): boolean {
+    return room.admins.has(peerId);
+  }
+
+  // The current admins, for the join snapshot and the `admins-changed`
+  // broadcast (ids + names, so clients can announce by name).
+  function adminList(room: Room): { peerId: string; displayName: string }[] {
+    const out: { peerId: string; displayName: string }[] = [];
+    for (const id of room.admins) {
+      const p = room.peers.get(id);
+      if (p) out.push({ peerId: id, displayName: p.displayName });
+    }
+    return out;
+  }
+
+  // Tell the whole room the admin set changed: who changed (and how) plus the
+  // full current list, so every client re-flags its participant rows and
+  // announces the change through announceEvent (it's a room event).
+  function emitAdminsChanged(
+    room: Room,
+    change: {
+      peerId: string;
+      displayName: string;
+      isAdmin: boolean;
+      reason: "named" | "revoked" | "promoted";
+      by: string | null;
+    },
+  ) {
+    io.to(room.name).emit("admins-changed", { admins: adminList(room), change });
+  }
+
+  // Whether this peer may decide knock requests: anyone in an unmoderated
+  // public room (today's rule); in a moderated room, per its approveJoins.
+  function canApproveJoins(room: Room, peerId: string): boolean {
+    if (!room.moderation) return true;
+    return room.moderation.approveJoins === "everyone" || isAdmin(room, peerId);
   }
 
   // Auto-ducking: the room's AudioLevelObserver watches VOICE producers only
@@ -124,13 +169,20 @@ export function createRoomHelpers(
   // each participant's modal reflects who is waiting at the door right now. The
   // requesters themselves aren't in the socket.io room yet, so they never see
   // their own knock. Keyed by socket id, which is also the decision target.
+  // In a moderated room whose approveJoins is admins-only, only the admins get
+  // the queue (everyone else never sees the modal or hears the knock).
   function broadcastJoinRequests(room: Room) {
-    io.to(room.name).emit("join-requests", {
+    const payload = {
       requests: Array.from(room.pendingJoins.entries()).map(([id, p]) => ({
         id,
         displayName: p.displayName,
       })),
-    });
+    };
+    if (room.moderation && room.moderation.approveJoins === "admins") {
+      for (const adminId of room.admins) io.to(adminId).emit("join-requests", payload);
+      return;
+    }
+    io.to(room.name).emit("join-requests", payload);
   }
 
   // --- Vote-to-kick (public rooms only; no moderators) ---
@@ -142,6 +194,18 @@ export function createRoomHelpers(
     let n = 0;
     for (const id of room.peers.keys()) if (!room.casters.has(id)) n++;
     return n;
+  }
+
+  // How many people the kick threshold is computed over: every human in an
+  // ordinary public room or an "everyone votes" moderated room; only the admins
+  // when the moderated room's kick policy is a vote among admins.
+  function kickElectorateCount(room: Room): number {
+    if (room.moderation && voteIsAdminsOnly(room.moderation)) {
+      let n = 0;
+      for (const id of room.admins) if (room.peers.has(id) && !room.casters.has(id)) n++;
+      return n;
+    }
+    return votablePeerCount(room);
   }
 
   // Drop a departing peer from the kick tallies: their own pending removal vote
@@ -206,11 +270,15 @@ export function createRoomHelpers(
     room.fileStreamers.delete(peerId);
     room.extraMicStreamers.delete(peerId);
     cleanupKickVotes(room, peerId);
+    // An admin who leaves stops being one for this socket id (their token stays
+    // in adminTokens, so a reconnect brings the role back).
+    room.admins.delete(peerId);
 
     removePeer(room, peerId);
 
     if (room.peers.size > 0) {
       applyModeDecision(room);
+      promoteAdminIfNone(room);
     } else if (room.pendingJoins.size > 0) {
       // The room just emptied while someone was still knocking — their request
       // can never be answered now, so let them go (their client surfaces the
@@ -220,14 +288,47 @@ export function createRoomHelpers(
     }
   }
 
-  // Remove a peer the room voted out. Tells the room (`peer-kicked`) and the
-  // target (`you-were-kicked`), room-bans their IP so they can't immediately
-  // walk back in (the same soft ban a knock-deny applies), tears them down, then
-  // force-disconnects their socket. Emitting before disconnecting flushes the
-  // notice to them first; a server-initiated disconnect won't auto-reconnect.
-  // (A caster removal is NOT a vote-kick — it goes through kick-caster, which
-  // does NOT ban; `reason` lets the client tell the two announcements apart.)
-  function kickPeer(room: Room, targetId: string) {
+  // A MODERATED room must never be left without an admin while people are
+  // still inside (nobody could approve knocks, mute or kick any more): when
+  // the last admin leaves, the longest-present human is promoted and everyone
+  // is told. `room.peers` is insertion-ordered, so the first non-caster entry
+  // is the longest-present. The promoted admin's token is recorded so they
+  // keep the role across a reconnect. A promoted admin also needs any queue of
+  // pending knocks they may now be the only one able to decide.
+  function promoteAdminIfNone(room: Room) {
+    if (!room.moderation || room.admins.size > 0) return;
+    for (const [id, peer] of room.peers) {
+      if (room.casters.has(id)) continue;
+      room.admins.add(id);
+      if (peer.token) room.adminTokens.add(peer.token);
+      console.log(`[ws] ${peer.displayName} (${id}) promoted to admin of ${room.name}`);
+      emitAdminsChanged(room, {
+        peerId: id,
+        displayName: peer.displayName,
+        isAdmin: true,
+        reason: "promoted",
+        by: null,
+      });
+      if (room.pendingJoins.size > 0) broadcastJoinRequests(room);
+      return;
+    }
+  }
+
+  // Remove a peer the room voted out — or, in a moderated room, one an admin
+  // removed directly (`reason: "admin"`, with the remover's name). Tells the
+  // room (`peer-kicked`) and the target (`you-were-kicked`), room-bans their IP
+  // so they can't immediately walk back in (the same soft ban a knock-deny
+  // applies), tears them down, then force-disconnects their socket. Emitting
+  // before disconnecting flushes the notice to them first; a server-initiated
+  // disconnect won't auto-reconnect. (A caster removal is NOT a kick — it goes
+  // through kick-caster, which does NOT ban; `reason` lets the client tell the
+  // announcements apart.)
+  function kickPeer(
+    room: Room,
+    targetId: string,
+    reason: "vote" | "admin" = "vote",
+    by: string | null = null,
+  ) {
     const target = room.peers.get(targetId);
     if (!target) {
       room.kickVotes.delete(targetId);
@@ -235,14 +336,20 @@ export function createRoomHelpers(
     }
     if (target.ip) room.bannedIps.add(target.ip);
     room.admittedNames.delete(target.displayName);
+    // A removed admin loses the role for good (their token too), so they can't
+    // come back as an admin even if the ban doesn't catch them.
+    if (target.token) room.adminTokens.delete(target.token);
 
     io.to(room.name).except(targetId).emit("peer-kicked", {
       peerId: targetId,
       displayName: target.displayName,
-      reason: "vote",
+      reason,
+      by,
     });
-    io.to(targetId).emit("you-were-kicked", {});
-    console.log(`[ws] ${target.displayName} (${targetId}) kicked from ${room.name} by vote`);
+    io.to(targetId).emit("you-were-kicked", { reason, by });
+    console.log(
+      `[ws] ${target.displayName} (${targetId}) kicked from ${room.name} ${reason === "admin" ? `by ${by}` : "by vote"}`,
+    );
 
     teardownPeer(room, targetId, { announceLeft: false });
     io.sockets.sockets.get(targetId)?.disconnect(true);
@@ -254,7 +361,7 @@ export function createRoomHelpers(
   // after any vote change or membership change.
   function settleKicks(room: Room) {
     for (let guard = room.peers.size + 1; guard >= 0; guard--) {
-      const threshold = kickThreshold(votablePeerCount(room));
+      const threshold = kickThreshold(kickElectorateCount(room));
       let kicked = false;
       for (const [targetId, voters] of room.kickVotes) {
         if (voters.size >= threshold && room.peers.has(targetId)) {
@@ -274,10 +381,16 @@ export function createRoomHelpers(
     applyModeDecision,
     broadcastJoinRequests,
     votablePeerCount,
+    kickElectorateCount,
     cleanupKickVotes,
     teardownPeer,
     kickPeer,
     settleKicks,
+    isAdmin,
+    adminList,
+    emitAdminsChanged,
+    canApproveJoins,
+    promoteAdminIfNone,
   };
 }
 

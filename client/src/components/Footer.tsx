@@ -44,11 +44,15 @@ export function ManualLink() {
 }
 
 // The two footer links, used both by the standalone Footer below and by the
-// room's own controls footer (which must keep exactly one `contentinfo`).
+// room's own controls footer (which must keep exactly one `contentinfo`). A
+// MODERATED room created with "hide the Powered by link" drops the attribution
+// inside that room only (the store's policy is null everywhere else, so the
+// lobby and ordinary rooms always show it).
 export function FooterLinks() {
+  const hidePoweredBy = useRoomStore((s) => s.moderation?.hidePoweredBy ?? false);
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-      <PoweredBy />
+      {!hidePoweredBy && <PoweredBy />}
       <ManualLink />
     </div>
   );

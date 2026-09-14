@@ -566,8 +566,10 @@ failing.
 
 # Public rooms, knocking and voting
 
-**There are no moderators in SonicRoom, and no owner.** Nobody can remove anybody
-on their own. In exchange, public rooms have two collective rules.
+**There are no moderators in an ordinary SonicRoom room, and no owner.** Nobody
+can remove anybody on their own. In exchange, public rooms have two collective
+rules. (**Moderated rooms**, which do have administrators, are a separate thing:
+see the next chapter.)
 
 **Knock to join.** When a room is public and somebody new asks to come in,
 everybody already inside hears a knocking sound and gets a dialog naming the
@@ -590,6 +592,65 @@ tally — "Kick Ana (2 votes)" — and every vote and withdrawal is announced to
 whole room, with names. Choosing it again withdraws your vote. Because the
 threshold depends on how many people are present, somebody leaving can be what
 tips an existing vote over the line.
+
+---
+
+# Moderated rooms (with administrators)
+
+Besides private and public rooms, which have no moderators, you can create a
+**moderated room**: a room with **administrators**, meant for talk shows and
+hosted panels, where somebody has to be able to silence the person who forgot
+to mute or eject a troll at once. Everything below exists only in this kind of
+room; an ordinary room is unchanged.
+
+**Creating one.** In the lobby, tick **"Admin options"**. A group called
+**"Participant privileges"** unfolds, with a checkbox ("Allow several
+administrators") and one drop-down list per action: recording, sharing audio,
+streaming audio, turning auto-ducking on or off, live streaming, approving new
+participants, using the chat, muting a participant for everyone, muting
+everyone's microphones, and removing participants. For each you pick
+**Administrators only**, **Everyone** or **Nobody** (removing also offers **by
+vote**). The last checkbox hides the "Powered by SonicRoom" link inside the
+room. These choices are fixed when the room is created and never change while
+it exists; the browser remembers your last configuration for next time.
+
+**Who is an administrator.** Whoever creates the room. If you allowed several
+administrators, every participant's options include **"Make administrator"**
+(and **"Remove administrator"** to undo it). Administrators carry the word
+"administrator" in their row of the list. If the last administrator leaves while
+people remain, the person who has been in the room longest becomes the
+administrator, and it is announced. If you reload or lose the connection, you
+get the role back when you return.
+
+**The door.** In a moderated room newcomers **always** knock, public or not.
+The "Approve new participants" setting decides who hears the knock and gets the
+Allow / Deny dialog: administrators only, or everyone. Administrators walk in
+without knocking.
+
+**Muting somebody for everyone.** In the participant's options: **"Mute for
+everyone"**. Their microphone is cut for the whole room and they are told who
+did it. It is a _soft_ mute: the person can turn their microphone back on with
+`M` when they mean to speak (which settles the classic "we can hear you talking
+to your neighbour" without a raise-hand flow). In the controls bar, whoever is
+allowed also sees **"Mute everyone's microphones"**, which does the same to
+everybody else at once.
+
+**Removing people.** Depending on the setting: administrators (or everyone)
+remove directly from the participant's options with **"Remove from room"**, no
+vote; or the room votes as a public room does (with **at least three** eligible
+voters; if only administrators vote, only they count). Nobody can remove
+themselves. An administrator can only be muted or removed by another
+administrator.
+
+**What you may not do is not shown.** If your role doesn't allow recording,
+sharing or streaming audio, changing ducking, live streaming or writing in the
+chat, that button is not in the bar and the matching letter (`R`, `A`, `F`,
+`D`) answers "You can't do that in this room". The chat panel still opens even
+if you can't write, because every announcement still lands there.
+
+The room carries the **MOD** badge in the header, and on entry it is announced
+as moderated along with who the administrators are. Every change (naming,
+mutes, removals) is announced and logged to the chat.
 
 ---
 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Headphones, ArrowRight, Globe, DoorOpen, Video } from "lucide-react";
+import { Headphones, ArrowRight, Globe, DoorOpen, Video, ShieldCheck } from "lucide-react";
 import { MicPreview } from "./MicPreview";
 import { LanguageSelect } from "./LanguageSelect";
 import { BackgroundPicker } from "./BackgroundPicker";
@@ -10,6 +10,14 @@ import { getInstanceName, getDefaultDisplayName } from "../lib/branding";
 import { apiUrl } from "../lib/runtime-config";
 import { iosForcedByUrl } from "../lib/microphone";
 import { roomTypeFromParam, type RoomType } from "../lib/video/room-type";
+import {
+  loadLastPolicy,
+  saveRoomPolicy,
+  type KickPolicy,
+  type ModerationPolicy,
+  type Who,
+  type WhoNoNobody,
+} from "../lib/moderation";
 import { m } from "../paraglide/messages.js";
 
 function sanitize(input: string): string {
@@ -41,7 +49,29 @@ interface PublicRoom {
   name: string;
   participants: string[];
   isVideo?: boolean;
+  isModerated?: boolean;
 }
+
+// The "who may do it" comboboxes of the admin options, one per policy field.
+// `nobody` is only offered where the server accepts it (see moderation-util).
+type WhoField =
+  | "recording"
+  | "shareAudio"
+  | "streamAudio"
+  | "liveStreaming"
+  | "chat"
+  | "mutePeer"
+  | "muteAll";
+type WhoNoNobodyField = "ducking" | "approveJoins";
+const WHO_OPTIONS: readonly Who[] = ["admins", "everyone", "nobody"];
+const WHO_NO_NOBODY_OPTIONS: readonly WhoNoNobody[] = ["admins", "everyone"];
+const KICK_OPTIONS: readonly KickPolicy[] = [
+  "admins",
+  "admins_vote",
+  "everyone",
+  "everyone_vote",
+  "nobody",
+];
 
 // Poll the public room directory so the lobby list stays fresh — the visitor
 // isn't on a socket yet, so there's no push channel.
@@ -63,6 +93,13 @@ export function Lobby() {
   const [roomType, setRoomType] = useState<RoomType>(() =>
     roomTypeFromParam(searchParams.get("video")),
   );
+  // "Admin options": create a MODERATED room (you become its admin) with this
+  // privilege policy. Off by default; the policy itself starts from the last
+  // one this browser used, so a regular host doesn't re-pick every combobox.
+  const [moderated, setModerated] = useState(false);
+  const [policy, setPolicy] = useState<ModerationPolicy>(loadLastPolicy);
+  const setPolicyField = <K extends keyof ModerationPolicy>(key: K, value: ModerationPolicy[K]) =>
+    setPolicy((p) => ({ ...p, [key]: value }));
   const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
   // Roving active option in the public-room listbox (-1 = none yet), mirroring
   // the chat message list's keyboard model. Tracked by index and clamped as the
@@ -206,6 +243,9 @@ export function Lobby() {
 
       // Store display name for the Room component
       sessionStorage.setItem("sonicroom:displayName", trimmedName);
+      // Hand the moderated-room policy (or none) to the Room, keyed by room name
+      // — the server applies it only if this join actually creates the room.
+      saveRoomPolicy(sanitizedRoom, moderated ? policy : null);
       // Carry the room options into the room URL: `?p2p=off` pins the SFU and
       // `?public=true` lists the room in the lobby's public directory.
       const params = new URLSearchParams();
@@ -223,7 +263,54 @@ export function Lobby() {
       const qs = params.toString();
       navigate(`/room/${sanitizedRoom}${qs ? `?${qs}` : ""}`);
     },
-    [roomName, displayName, navigate, disableP2p, makePublic, joinWithoutMic, roomType],
+    [
+      roomName,
+      displayName,
+      navigate,
+      disableP2p,
+      makePublic,
+      joinWithoutMic,
+      roomType,
+      moderated,
+      policy,
+    ],
+  );
+
+  // One labelled combobox of the privileges fieldset.
+  const whoLabel = (v: string) =>
+    v === "admins"
+      ? m.lobby_who_admins()
+      : v === "everyone"
+        ? m.lobby_who_everyone()
+        : v === "nobody"
+          ? m.lobby_who_nobody()
+          : v === "admins_vote"
+            ? m.lobby_kick_admins_vote()
+            : m.lobby_kick_everyone_vote();
+  const whoSelect = (
+    key: WhoField | WhoNoNobodyField | "kick",
+    label: string,
+    options: readonly string[],
+    helpId?: string,
+  ) => (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={`priv-${key}`} className="text-sm text-sonic-200">
+        {label}
+      </label>
+      <select
+        id={`priv-${key}`}
+        value={policy[key]}
+        onChange={(e) => setPolicyField(key, e.target.value as never)}
+        aria-describedby={helpId}
+        className="w-full rounded-lg border border-sonic-600 bg-sonic-700 px-3 py-2 text-sm text-sonic-100 focus:border-sonic-accent focus:outline-none"
+      >
+        {options.map((v) => (
+          <option key={v} value={v}>
+            {whoLabel(v)}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 
   // Localized participant list ("a, b and c"), so the public room rows read
@@ -394,9 +481,10 @@ export function Lobby() {
                             participants: participantsText,
                           })
                         : m.lobby_public_room_empty({ name: room.name });
-                    const label = room.isVideo
+                    let label = room.isVideo
                       ? `${baseLabel}, ${m.lobby_public_room_video_fragment()}`
                       : baseLabel;
+                    if (room.isModerated) label += `, ${m.lobby_public_room_moderated_fragment()}`;
                     return (
                       <li
                         key={room.name}
@@ -425,6 +513,12 @@ export function Lobby() {
                             {room.isVideo && (
                               <Video
                                 className="h-3.5 w-3.5 shrink-0 text-sonic-accent"
+                                aria-hidden="true"
+                              />
+                            )}
+                            {room.isModerated && (
+                              <ShieldCheck
+                                className="h-3.5 w-3.5 shrink-0 text-amber-300"
                                 aria-hidden="true"
                               />
                             )}
@@ -492,6 +586,92 @@ export function Lobby() {
               <p id="make-public-sticky" className="mt-1 pl-[26px] text-xs italic text-sonic-400">
                 {m.lobby_make_public_sticky()}
               </p>
+            </div>
+
+            {/* Admin options — creates a MODERATED room: the creator is its
+                administrator and this policy (fixed for the room's lifetime)
+                says what participants may do. Ticking it unfolds the
+                privileges fieldset; the policy is handed to the Room via
+                sessionStorage on join (see lib/moderation.ts). */}
+            <div>
+              <label className="flex cursor-pointer select-none items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="admin-options"
+                  name="admin-options"
+                  checked={moderated}
+                  onChange={(e) => setModerated(e.target.checked)}
+                  aria-describedby="admin-options-help"
+                  aria-controls="admin-privileges"
+                  aria-expanded={moderated}
+                  className="mt-0.5 h-4 w-4 rounded border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                />
+                <span className="flex items-center gap-1.5 text-sm font-medium text-sonic-200">
+                  <ShieldCheck className="h-4 w-4 text-amber-300" aria-hidden="true" />
+                  {m.lobby_admin_options()}
+                </span>
+              </label>
+              <p id="admin-options-help" className="mt-1 pl-[26px] text-xs text-sonic-400">
+                {m.lobby_admin_options_help()}
+              </p>
+              {moderated && (
+                <fieldset
+                  id="admin-privileges"
+                  className="mt-3 space-y-3 rounded-lg border border-sonic-600 p-3"
+                >
+                  <legend className="px-1 text-sm font-medium text-sonic-200">
+                    {m.lobby_privileges_legend()}
+                  </legend>
+                  <div>
+                    <label className="flex cursor-pointer select-none items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        id="priv-multiple-admins"
+                        checked={policy.multipleAdmins}
+                        onChange={(e) => setPolicyField("multipleAdmins", e.target.checked)}
+                        aria-describedby="priv-multiple-admins-help"
+                        className="mt-0.5 h-4 w-4 rounded border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                      />
+                      <span className="text-sm text-sonic-200">
+                        {m.lobby_priv_multiple_admins()}
+                      </span>
+                    </label>
+                    <p
+                      id="priv-multiple-admins-help"
+                      className="mt-1 pl-[26px] text-xs text-sonic-400"
+                    >
+                      {m.lobby_priv_multiple_admins_help()}
+                    </p>
+                  </div>
+                  {whoSelect("recording", m.lobby_priv_recording(), WHO_OPTIONS)}
+                  {whoSelect("shareAudio", m.lobby_priv_share_audio(), WHO_OPTIONS)}
+                  {whoSelect("streamAudio", m.lobby_priv_stream_audio(), WHO_OPTIONS)}
+                  {whoSelect("ducking", m.lobby_priv_ducking(), WHO_NO_NOBODY_OPTIONS)}
+                  {whoSelect("liveStreaming", m.lobby_priv_live_streaming(), WHO_OPTIONS)}
+                  {whoSelect("approveJoins", m.lobby_priv_approve_joins(), WHO_NO_NOBODY_OPTIONS)}
+                  {whoSelect("chat", m.lobby_priv_chat(), WHO_OPTIONS)}
+                  {whoSelect("mutePeer", m.lobby_priv_mute_peer(), WHO_OPTIONS)}
+                  {whoSelect("muteAll", m.lobby_priv_mute_all(), WHO_OPTIONS)}
+                  {whoSelect("kick", m.lobby_priv_kick(), KICK_OPTIONS, "priv-kick-help")}
+                  <p id="priv-kick-help" className="text-xs text-sonic-400">
+                    {m.lobby_priv_kick_help()}
+                  </p>
+                  <div>
+                    <label className="flex cursor-pointer select-none items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        id="priv-hide-powered-by"
+                        checked={policy.hidePoweredBy}
+                        onChange={(e) => setPolicyField("hidePoweredBy", e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                      />
+                      <span className="text-sm text-sonic-200">
+                        {m.lobby_priv_hide_powered_by()}
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
+              )}
             </div>
 
             {/* Join without a microphone — for people who have no mic or can't /

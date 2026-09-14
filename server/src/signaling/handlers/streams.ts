@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ConnectionContext } from "../context.js";
+import { allowed } from "../../moderation-util.js";
 
 // --- Peer media-stream sources: audio share, local-file stream, extra mics,
 // title updates, and the room-wide auto-ducking toggle. Each share/file/mic
@@ -15,6 +16,8 @@ export function registerStreamHandlers(ctx: ConnectionContext) {
     if (!session.currentRoom || !session.currentPeer)
       return cb?.({ ok: false, error: "Not in a room" });
     const { currentRoom, currentPeer } = session;
+    if (!allowed(currentRoom.moderation, currentRoom.admins.has(socket.id), "shareAudio"))
+      return cb?.({ ok: false, error: "forbidden" });
     currentRoom.sharers.add(socket.id);
     socket.to(currentRoom.name).emit("share-started", {
       peerId: socket.id,
@@ -66,6 +69,8 @@ export function registerStreamHandlers(ctx: ConnectionContext) {
     if (!session.currentRoom || !session.currentPeer)
       return cb?.({ ok: false, error: "Not in a room" });
     const { currentRoom, currentPeer } = session;
+    if (!allowed(currentRoom.moderation, currentRoom.admins.has(socket.id), "streamAudio"))
+      return cb?.({ ok: false, error: "forbidden" });
     currentRoom.fileStreamers.add(socket.id);
     socket.to(currentRoom.name).emit("file-stream-started", {
       peerId: socket.id,
@@ -143,6 +148,8 @@ export function registerStreamHandlers(ctx: ConnectionContext) {
     if (!session.currentRoom || !session.currentPeer)
       return cb?.({ ok: false, error: "Not in a room" });
     const { currentRoom, currentPeer } = session;
+    if (!allowed(currentRoom.moderation, currentRoom.admins.has(socket.id), "streamAudio"))
+      return cb?.({ ok: false, error: "forbidden" });
     // Idempotent: a peer streaming several mics is a single set membership, so
     // announce only on their first one (the per-device tiles arrive separately
     // via new-producer).
@@ -214,6 +221,8 @@ export function registerStreamHandlers(ctx: ConnectionContext) {
     const { currentRoom, currentPeer } = session;
     const parsed = z.object({ enabled: z.boolean() }).safeParse(data);
     if (!parsed.success) return cb?.({ ok: false, error: "Invalid value" });
+    if (!allowed(currentRoom.moderation, currentRoom.admins.has(socket.id), "ducking"))
+      return cb?.({ ok: false, error: "forbidden" });
     currentRoom.duckingEnabled = parsed.data.enabled;
     io.to(currentRoom.name).emit("ducking-changed", {
       enabled: parsed.data.enabled,

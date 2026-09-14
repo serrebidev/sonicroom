@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Peer } from "../../room-manager.js";
 import type { ConnectionContext } from "../context.js";
+import { kickMode } from "../../moderation-util.js";
 
 // --- Collective moderation (no moderators): knock decisions, vote-to-kick, and
 // the immediate caster/stream removals (which are not vote-gated because a
@@ -21,6 +22,8 @@ export function registerModerationHandlers(ctx: ConnectionContext) {
     if (!parsed.success) return cb?.({ ok: false, error: "Invalid decision" });
 
     const room = session.currentRoom;
+    // Moderated room with admins-only approval: only an admin may decide.
+    if (!helpers.canApproveJoins(room, socket.id)) return cb?.({ ok: false, error: "forbidden" });
     const { requestId, allow } = parsed.data;
     const pending = room.pendingJoins.get(requestId);
     if (!pending) return cb?.({ ok: true }); // already resolved by someone else
@@ -56,10 +59,18 @@ export function registerModerationHandlers(ctx: ConnectionContext) {
     if (!session.currentRoom || !session.currentPeer)
       return cb?.({ ok: false, error: "Not in a room" });
     const room = session.currentRoom;
-    if (!room.isPublic) return cb?.({ ok: false, error: "not_public" });
-    // Defense-in-depth — the client also hides the controls below 3 votable
-    // peers (kickThreshold is Infinity there, so a vote could never land).
-    if (helpers.votablePeerCount(room) < 3) return cb?.({ ok: false, error: "too_small" });
+    if (room.moderation) {
+      // Moderated room: a vote only exists when the kick policy is a vote, and
+      // only the eligible set (admins, or everyone) may cast one. Admins are
+      // never a vote's target (an admin removes a rogue co-admin directly).
+      const mode = kickMode(room.moderation, room.admins.has(socket.id));
+      if (mode !== "vote") return cb?.({ ok: false, error: "forbidden" });
+    } else if (!room.isPublic) {
+      return cb?.({ ok: false, error: "not_public" });
+    }
+    // Defense-in-depth — the client also hides the controls below 3 eligible
+    // voters (kickThreshold is Infinity there, so a vote could never land).
+    if (helpers.kickElectorateCount(room) < 3) return cb?.({ ok: false, error: "too_small" });
 
     const parsed = z.object({ targetId: z.string(), vote: z.boolean() }).safeParse(data);
     if (!parsed.success) return cb?.({ ok: false, error: "Invalid vote" });
@@ -68,6 +79,8 @@ export function registerModerationHandlers(ctx: ConnectionContext) {
     if (targetId === socket.id) return cb?.({ ok: false, error: "self" });
     const target = room.peers.get(targetId);
     if (!target || room.casters.has(targetId)) return cb?.({ ok: false, error: "no_target" });
+    if (room.moderation && room.admins.has(targetId))
+      return cb?.({ ok: false, error: "no_target" });
 
     const voters = room.kickVotes.get(targetId);
     const alreadyVoted = voters?.has(socket.id) ?? false;

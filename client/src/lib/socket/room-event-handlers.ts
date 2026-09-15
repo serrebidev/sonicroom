@@ -32,6 +32,7 @@ import {
   announce_you_admin_revoked,
   announce_you_admin_promoted,
   announce_moderation_ended,
+  announce_notes_available,
   announce_you_were_muted,
 } from "../../paraglide/messages.js";
 
@@ -96,10 +97,15 @@ export function registerStreamingHandlers(socket: Socket) {
 // chat via announceEvent). Deduped so we don't re-announce a URL we already have
 // (e.g. a creator who got the URL from their own ack). ---
 export function registerNotesHandlers(socket: Socket) {
-  socket.on("notes-updated", ({ url, by }: { url: string; by?: string }) => {
+  // `by` names the creator; null means the note just became available to US
+  // (we were named admin in a room whose notes are admins-only, or the room
+  // stopped being moderated) — a different, listener-only announcement.
+  socket.on("notes-updated", ({ url, by }: { url: string; by?: string | null }) => {
     if (!url || store.getState().notesUrl === url) return;
     store.getState().setNotesUrl(url);
-    store.getState().announceEvent(announce_notes_opened({ name: by ?? "" }));
+    store
+      .getState()
+      .announceEvent(by ? announce_notes_opened({ name: by }) : announce_notes_available());
   });
 }
 

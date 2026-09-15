@@ -310,7 +310,12 @@ id="toc-public-rooms-knocking-and-voting">Public rooms, knocking and
 voting</a></li>
 <li><a href="#moderated-rooms-with-administrators"
 id="toc-moderated-rooms-with-administrators">Moderated rooms (with
-administrators)</a></li>
+administrators)</a>
+<ul>
+<li><a href="#reserved-rooms-a-room-you-were-given-in-advance"
+id="toc-reserved-rooms-a-room-you-were-given-in-advance">Reserved rooms
+(a room you were given in advance)</a></li>
+</ul></li>
 <li><a href="#shared-notes" id="toc-shared-notes">Shared notes</a></li>
 <li><a href="#options-you-can-put-in-the-address-bar"
 id="toc-options-you-can-put-in-the-address-bar">Options you can put in
@@ -1138,14 +1143,14 @@ options”</strong>. A group called <strong>“Participant
 privileges”</strong> unfolds, with a checkbox (“Allow several
 administrators”) and one drop-down list per action: recording, sharing
 audio, streaming audio, turning auto-ducking on or off, live streaming,
-approving new participants, using the chat, muting a participant for
-everyone, muting everyone’s microphones, and removing participants. For
-each you pick <strong>Administrators only</strong>,
-<strong>Everyone</strong> or <strong>Nobody</strong> (removing also
-offers <strong>by vote</strong>). The last checkbox hides the “Powered
-by SonicRoom” link inside the room. These choices are fixed when the
-room is created and never change while it exists; the browser remembers
-your last configuration for next time.</p>
+approving new participants, using the chat, opening the shared notes,
+muting a participant for everyone, muting everyone’s microphones, and
+removing participants. For each you pick <strong>Administrators
+only</strong>, <strong>Everyone</strong> or <strong>Nobody</strong>
+(removing also offers <strong>by vote</strong>). The last checkbox hides
+the “Powered by SonicRoom” link inside the room. These choices are fixed
+when the room is created and never change while it exists; the browser
+remembers your last configuration for next time.</p>
 <p><strong>Who is an administrator.</strong> Whoever creates the room.
 If you allowed several administrators, every participant’s options
 include <strong>“Make administrator”</strong> (and <strong>“Remove
@@ -1196,6 +1201,36 @@ lands there.</p>
 entry it is announced as moderated along with who the administrators
 are. Every change (naming, mutes, removals) is announced and logged to
 the chat.</p>
+<h2 id="reserved-rooms-a-room-you-were-given-in-advance">Reserved rooms
+(a room you were given in advance)</h2>
+<p>A room normally exists only while somebody is in it, and whoever
+arrives first creates it. That is a problem when you advertise a link
+ahead of time: anyone could open “your” room before you and become its
+administrator, or the moderated room could simply vanish the moment it
+empties. A <strong>reserved room</strong> fixes this. The operator of
+the instance reserves a room name for you and gives you <strong>two
+links</strong>:</p>
+<ul>
+<li>the <strong>host link</strong>, which contains a secret key. Keep it
+to yourself; whoever opens the room with it is its
+<strong>administrator</strong>, every time, even after leaving and
+coming back;</li>
+<li>the <strong>public link</strong>, the ordinary room address, which
+you advertise.</li>
+</ul>
+<p>Until you open the room with the host link, everyone else who follows
+the public link hears “This room is reserved and its host hasn’t opened
+it yet” and waits on that screen; they are let in automatically as soon
+as you arrive (and then knock like anybody joining a moderated room, so
+you decide who enters). A reserved room is always a moderated room, with
+the participant privileges the operator set when reserving it, and it
+<strong>stays moderated</strong> while you are away: nobody can take it
+over, and you come back as its administrator.</p>
+<p>The key is remembered by your browser for that tab, so you can reload
+the page or be sent to the lobby for your name without losing it, and it
+is removed from the address bar at once so that a copied link never
+carries it. If you lose the host link, ask the operator for a new one
+(the old one stops working).</p>
 <hr />
 <h1 id="shared-notes">Shared notes</h1>
 <p>If this SonicRoom instance has notes configured, the toolbar has a
@@ -1215,8 +1250,8 @@ the address bar</h1>
 several can be combined with <code>&amp;</code>.</p>
 <table>
 <colgroup>
-<col style="width: 17%" />
-<col style="width: 82%" />
+<col style="width: 16%" />
+<col style="width: 83%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -1254,6 +1289,11 @@ several can be combined with <code>&amp;</code>.</p>
 <td><code>?ios=on</code></td>
 <td>Forces the iOS audio path on any browser (a workaround for stubborn
 audio problems)</td>
+</tr>
+<tr class="even">
+<td><code>?host=…</code></td>
+<td>Opens a reserved room as its host (see “Reserved rooms”); removed
+from the address bar at once</td>
 </tr>
 </tbody>
 </table>

@@ -410,6 +410,10 @@ interface RoomState {
   //   to be let in, so the Room shows a "waiting" screen instead of the spinner.
   joinRequests: JoinRequest[];
   awaitingApproval: boolean;
+  // Set on OUR side while a RESERVED room we're joining hasn't been opened by
+  // its host yet (the server refused the join with `reserved`); the hook polls
+  // until the room is live and re-joins by itself. Drives the waiting screen.
+  awaitingHost: boolean;
 
   // Whether the current room is publicly listed. Gates the vote-to-kick UI
   // (only public rooms can vote-kick). Seeded from the join response and flipped
@@ -509,6 +513,7 @@ interface RoomState {
   announceChat: (message: string) => void;
   setJoinRequests: (requests: JoinRequest[]) => void;
   setAwaitingApproval: (awaiting: boolean) => void;
+  setAwaitingHost: (awaiting: boolean) => void;
   setRoomIsPublic: (isPublic: boolean) => void;
   setKicked: (kicked: boolean) => void;
   setModeration: (policy: ModerationPolicy | null) => void;
@@ -592,6 +597,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   chatAnnounceSeq: 0,
   joinRequests: [],
   awaitingApproval: false,
+  awaitingHost: false,
   roomIsPublic: false,
   kicked: false,
   moderation: null,
@@ -704,6 +710,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   announce: (message) => set((s) => ({ announcement: message, announceSeq: s.announceSeq + 1 })),
   setJoinRequests: (joinRequests) => set({ joinRequests }),
   setAwaitingApproval: (awaitingApproval) => set({ awaitingApproval }),
+  setAwaitingHost: (awaitingHost) => set({ awaitingHost }),
   setRoomIsPublic: (roomIsPublic) => set({ roomIsPublic }),
   setKicked: (kicked) => set({ kicked }),
   setModeration: (moderation) => set({ moderation }),
@@ -1011,6 +1018,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       chatAnnounceSeq: 0,
       joinRequests: [],
       awaitingApproval: false,
+      awaitingHost: false,
       roomIsPublic: false,
       kicked: false,
       moderation: null,

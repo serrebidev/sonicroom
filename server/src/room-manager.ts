@@ -124,6 +124,11 @@ export interface Room {
   // Join tokens of admins, so an admin who reconnects (new socket id) comes back
   // as an admin. Revoking removes the token again; ending moderation clears all.
   adminTokens: Set<string>;
+  // RESERVED room: opened from a reservation (reservations.ts) by its host.
+  // The policy came from the reservation, and the room STAYS moderated after
+  // the last admin leaves (endModerationIfNoAdmins skips it) — the host can
+  // come back as admin with the key at any time.
+  reserved: boolean;
   // Rolling chat history (bounded to CHAT_HISTORY_MAX) so late joiners receive
   // recent messages on join. Newest last.
   messages: ChatMessage[];
@@ -188,6 +193,7 @@ export async function getOrCreateRoom(roomName: string): Promise<Room> {
     moderation: null,
     admins: new Set(),
     adminTokens: new Set(),
+    reserved: false,
     messages: [],
     notesUrl: null,
   };

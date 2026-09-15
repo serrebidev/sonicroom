@@ -21,7 +21,10 @@ RestartSec=3
 # Hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/home/sonicroom
+# The only thing the server writes inside the tree: data/ (the room-reservations
+# store edited by the /admin UI and `pnpm reserve`). Create it owned by the
+# service user. Everything else (recordings, mixes) goes to the private /tmp.
+ReadWritePaths=/home/sonicroom/data
 ProtectHome=read-only
 PrivateTmp=true
 

@@ -17,6 +17,8 @@ export interface ModerationPolicy {
   liveStreaming: Who;
   approveJoins: WhoNoNobody;
   chat: Who;
+  // Open (= co-edit; the link is the access) the room's shared notes.
+  notes: Who;
   mutePeer: Who;
   muteAll: Who;
   kick: KickPolicy;
@@ -31,6 +33,7 @@ export type ModerationAction =
   | "liveStreaming"
   | "approveJoins"
   | "chat"
+  | "notes"
   | "mutePeer"
   | "muteAll";
 
@@ -44,6 +47,7 @@ export const DEFAULT_MODERATION_POLICY: ModerationPolicy = {
   liveStreaming: "admins",
   approveJoins: "admins",
   chat: "everyone",
+  notes: "everyone",
   mutePeer: "admins",
   muteAll: "admins",
   kick: "admins",
@@ -74,6 +78,7 @@ export function normalizePolicy(raw: unknown): ModerationPolicy {
     liveStreaming: pick("liveStreaming", WHO),
     approveJoins: pick("approveJoins", WHO_NO_NOBODY),
     chat: pick("chat", WHO),
+    notes: pick("notes", WHO),
     mutePeer: pick("mutePeer", WHO),
     muteAll: pick("muteAll", WHO),
     kick: pick("kick", KICK),

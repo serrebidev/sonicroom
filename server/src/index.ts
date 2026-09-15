@@ -15,9 +15,11 @@ import {
   transportOptions,
   announcedAddresses,
 } from "./mediasoup-config.js";
-import { setWorkers, getPublicRooms, getRoomInfo } from "./room-manager.js";
+import { setWorkers, getPublicRooms, getRoomInfo, getRooms } from "./room-manager.js";
 import { roomNameSchema } from "./signaling/schemas.js";
 import { createSignalingServer } from "./signaling.js";
+import { ReservationStore, reservationsFilePath } from "./reservations.js";
+import { createAdminRouter } from "./admin.js";
 import { RecordingManager, type SpawnedProcess } from "./recording.js";
 import { StreamManager } from "./streaming.js";
 import { createZipStream } from "./zip-stream.js";
@@ -74,7 +76,10 @@ async function main() {
 
   const recordingManager = new RecordingManager();
   const streamManager = new StreamManager();
-  createSignalingServer(httpServer, recordingManager, streamManager);
+  // Host-keyed room reservations (reservations.ts): a JSON file written by
+  // `pnpm reserve`, re-read on change; the server never writes it.
+  const reservations = new ReservationStore(reservationsFilePath());
+  createSignalingServer(httpServer, recordingManager, streamManager, reservations);
   // Health check
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", workers: workers.length });
@@ -102,11 +107,14 @@ async function main() {
       return;
     }
     const info = getRoomInfo(parsed.data);
+    // `reserved`: the name is held by a host (reservations.ts). On a 404 it
+    // tells an early visitor "wait for the host" apart from "nobody's here".
+    const reserved = reservations.has(parsed.data);
     if (!info) {
-      res.status(404).json({ exists: false, name: parsed.data, error: "Room not found" });
+      res.status(404).json({ exists: false, name: parsed.data, reserved, error: "Room not found" });
       return;
     }
-    res.json({ exists: true, ...info });
+    res.json({ exists: true, reserved, ...info });
   });
 
   // Audio sources for the in-call music/file streamer. The library is a
@@ -345,6 +353,26 @@ async function main() {
   // runtime config into the HTML.
   const clientDist = path.resolve(__dirname, "../../client/dist");
   const indexHtmlPath = path.join(clientDist, "index.html");
+
+  // Operator admin UI (/admin + /api/admin/*): reservations + live rooms. OFF
+  // unless ADMIN_UI_PASSWORD is set — then /admin falls through to the SPA
+  // below like any unknown route. Never linked from the client. See admin.ts.
+  const ADMIN_UI_PASSWORD = process.env.ADMIN_UI_PASSWORD?.trim();
+  if (ADMIN_UI_PASSWORD) {
+    app.use(
+      createAdminRouter({
+        password: ADMIN_UI_PASSWORD,
+        reservations,
+        filePath: reservationsFilePath(),
+        liveRooms: () =>
+          Array.from(getRooms().keys())
+            .map((name) => getRoomInfo(name))
+            .filter((r): r is NonNullable<typeof r> => r != null),
+        publicUrl: process.env.PUBLIC_URL?.trim() || undefined,
+      }),
+    );
+  }
+
   app.use(express.static(clientDist, { index: false }));
 
   // Inject this instance's operator-configurable runtime config into the served
@@ -391,6 +419,14 @@ async function main() {
 
   httpServer.listen(PORT, () => {
     console.log(`SonicRoom server listening on port ${PORT}`);
+    // Reads (and logs) the reservations file once at startup, so a missing or
+    // unreadable one is visible here rather than on the first join.
+    const rs = reservations.status();
+    if (rs.count === 0 && !rs.error)
+      console.log("[reservations] none (see `pnpm reserve` or /admin)");
+    console.log(
+      ADMIN_UI_PASSWORD ? "[admin] UI enabled at /admin" : "[admin] UI off (no ADMIN_UI_PASSWORD)",
+    );
     // Announcing the wrong address is the single most common reason media never
     // connects, so say out loud what ICE will hand out. Several addresses is
     // normal for a home instance (public + LAN) — see mediasoup-config.ts.

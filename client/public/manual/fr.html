@@ -311,7 +311,12 @@ id="toc-salons-publics-frapper-a-la-porte-et-voter">Salons publics,
 frapper à la porte et voter</a></li>
 <li><a href="#salons-moderes-avec-administrateurs"
 id="toc-salons-moderes-avec-administrateurs">Salons modérés (avec
-administrateurs)</a></li>
+administrateurs)</a>
+<ul>
+<li><a href="#salons-réservés-un-salon-quon-vous-a-attribué-à-lavance"
+id="toc-salons-réservés-un-salon-quon-vous-a-attribué-à-lavance">Salons
+réservés (un salon qu’on vous a attribué à l’avance)</a></li>
+</ul></li>
 <li><a href="#notes-partagées" id="toc-notes-partagées">Notes
 partagées</a></li>
 <li><a href="#options-à-mettre-dans-la-barre-dadresse"
@@ -1211,14 +1216,15 @@ Privilèges des participants »</strong> se déplie, avec une case («
 Autoriser plusieurs administrateurs ») et une liste déroulante par
 action : enregistrer, partager l’audio, diffuser de l’audio, activer ou
 désactiver l’atténuation automatique, diffuser en direct, approuver les
-nouveaux participants, utiliser le chat, couper le micro d’un
-participant pour tous, couper les micros de tout le monde et exclure.
-Pour chacune vous choisissez <strong>Administrateurs seulement</strong>,
-<strong>Tout le monde</strong> ou <strong>Personne</strong> (exclure
-propose aussi <strong>par vote</strong>). La dernière case masque le
-lien « Propulsé par SonicRoom » dans le salon. Ces choix sont fixés à la
-création du salon et ne changent plus tant qu’il existe ; le navigateur
-retient votre dernière configuration pour la prochaine fois.</p>
+nouveaux participants, utiliser le chat, ouvrir les notes partagées,
+couper le micro d’un participant pour tous, couper les micros de tout le
+monde et exclure. Pour chacune vous choisissez <strong>Administrateurs
+seulement</strong>, <strong>Tout le monde</strong> ou
+<strong>Personne</strong> (exclure propose aussi <strong>par
+vote</strong>). La dernière case masque le lien « Propulsé par SonicRoom
+» dans le salon. Ces choix sont fixés à la création du salon et ne
+changent plus tant qu’il existe ; le navigateur retient votre dernière
+configuration pour la prochaine fois.</p>
 <p><strong>Qui est administrateur.</strong> La personne qui crée le
 salon. Si vous avez autorisé plusieurs administrateurs, les options de
 chaque participant comprennent <strong>« Nommer administrateur
@@ -1272,6 +1278,38 @@ toutes les annonces continuent d’y arriver.</p>
 l’entrée il est annoncé comme modéré, avec le nom des administrateurs.
 Chaque changement (nominations, coupures de micro, exclusions) est
 annoncé et consigné dans le chat.</p>
+<h2 id="salons-réservés-un-salon-quon-vous-a-attribué-à-lavance">Salons
+réservés (un salon qu’on vous a attribué à l’avance)</h2>
+<p>Normalement un salon n’existe que tant que quelqu’un s’y trouve, et
+c’est la première personne arrivée qui le crée. C’est un problème quand
+vous annoncez un lien à l’avance : n’importe qui pourrait ouvrir « votre
+» salon avant vous et en devenir l’administrateur, ou le salon modéré
+pourrait tout simplement disparaître dès qu’il se vide. Un <strong>salon
+réservé</strong> règle cela. L’opérateur de l’instance réserve un nom de
+salon pour vous et vous donne <strong>deux liens</strong> :</p>
+<ul>
+<li>le <strong>lien d’hôte</strong>, qui contient une clé secrète.
+Gardez-le pour vous ; quiconque ouvre le salon avec ce lien en est
+l’<strong>administrateur</strong>, à chaque fois, même après être parti
+et revenu ;</li>
+<li>le <strong>lien public</strong>, l’adresse normale du salon, celle
+que vous annoncez.</li>
+</ul>
+<p>Tant que vous n’avez pas ouvert le salon avec le lien d’hôte, toute
+personne qui suit le lien public entend « Ce salon est réservé et son
+hôte ne l’a pas encore ouvert » et attend sur cet écran ; elle entre
+automatiquement dès votre arrivée (puis frappe à la porte comme
+quiconque rejoint un salon modéré, donc c’est vous qui décidez qui
+entre). Un salon réservé est toujours un salon modéré, avec les
+privilèges des participants fixés par l’opérateur lors de la
+réservation, et il <strong>reste modéré</strong> en votre absence :
+personne ne peut se l’approprier, et vous revenez en administrateur.</p>
+<p>Votre navigateur retient la clé pour cet onglet : vous pouvez
+recharger la page ou passer par le hall pour donner votre nom sans la
+perdre, et elle est retirée de la barre d’adresse immédiatement pour
+qu’un lien copié ne la contienne jamais. Si vous perdez le lien d’hôte,
+demandez-en un nouveau à l’opérateur (l’ancien cesse de
+fonctionner).</p>
 <hr />
 <h1 id="notes-partagées">Notes partagées</h1>
 <p>Si cette instance de SonicRoom a les notes configurées, la barre
@@ -1330,6 +1368,11 @@ option, et plusieurs peuvent être combinées avec <code>&amp;</code>.</p>
 <td><code>?ios=on</code></td>
 <td>Force le chemin audio iOS sur n’importe quel navigateur
 (contournement pour des problèmes de son tenaces)</td>
+</tr>
+<tr class="even">
+<td><code>?host=…</code></td>
+<td>Ouvre un salon réservé en tant qu’hôte (voir « Salons réservés ») ;
+retiré de la barre d’adresse aussitôt</td>
 </tr>
 </tbody>
 </table>

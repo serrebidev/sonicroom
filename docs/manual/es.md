@@ -639,8 +639,9 @@ administrador»**. Se despliega un grupo llamado **«Privilegios de
 participantes»** con una casilla («Permitir varios administradores») y una
 lista desplegable por cada acción: grabar, compartir audio, emitir audio,
 activar o desactivar el atenuado automático, retransmitir en directo, aprobar la
-entrada de nuevos participantes, usar el chat, silenciar a un participante para
-todos, silenciar los micrófonos de todos y expulsar. En cada una eliges **Solo
+entrada de nuevos participantes, usar el chat, abrir las notas compartidas,
+silenciar a un participante para todos, silenciar los micrófonos de todos y
+expulsar. En cada una eliges **Solo
 administradores**, **Todos** o **Nadie** (expulsar añade **con votación**). La
 última casilla oculta el enlace «Con tecnología de SonicRoom» dentro de la sala.
 Estas opciones se fijan al crear la sala y no cambian mientras exista; el
@@ -695,6 +696,35 @@ La sala lleva la insignia **MOD** en la cabecera, y al entrar se anuncia que es
 moderada y quiénes son los administradores. Todos los cambios (nombramientos,
 silencios, expulsiones) se anuncian y quedan en el chat.
 
+## Salas reservadas (una sala que te han dado de antemano)
+
+Normalmente una sala solo existe mientras hay alguien dentro, y la crea quien
+llega primero. Eso es un problema cuando anuncias un enlace con antelación:
+cualquiera podría abrir «tu» sala antes que tú y convertirse en su
+administrador, o la sala moderada podría desaparecer sin más en cuanto se
+vacíe. Una **sala reservada** lo resuelve. El operador de la instancia reserva
+un nombre de sala para ti y te da **dos enlaces**:
+
+- el **enlace de anfitrión**, que contiene una clave secreta. Guárdalo para ti;
+  quien abre la sala con él es su **administrador**, siempre, incluso después
+  de salir y volver;
+- el **enlace público**, la dirección normal de la sala, que es el que anuncias.
+
+Hasta que abras la sala con el enlace de anfitrión, quien siga el enlace
+público oye «Esta sala está reservada y su anfitrión aún no la ha abierto» y
+espera en esa pantalla; entra automáticamente en cuanto llegas (y entonces
+llama a la puerta como cualquiera que entra en una sala moderada, así que tú
+decides quién pasa). Una sala reservada es siempre una sala moderada, con los
+privilegios de participante que el operador fijó al reservarla, y **sigue
+siendo moderada** mientras no estás: nadie puede quedársela, y vuelves como su
+administrador.
+
+Tu navegador recuerda la clave en esa pestaña, así que puedes recargar la
+página o pasar por el vestíbulo para poner tu nombre sin perderla, y se quita
+de la barra de direcciones al momento para que un enlace copiado nunca la
+lleve. Si pierdes el enlace de anfitrión, pide al operador uno nuevo (el
+antiguo deja de funcionar).
+
 ---
 
 # Notas compartidas
@@ -716,15 +746,16 @@ pestaña de SonicRoom y la llamada sigue en marcha.
 Todo lo que va después de `?` en un enlace de sala fija una opción, y se pueden
 combinar varias con `&`.
 
-| Opción             | Efecto                                                                                          |
-| ------------------ | ----------------------------------------------------------------------------------------------- |
-| `?displayName=Ana` | Entra con este nombre, saltándose el vestíbulo                                                  |
-| `?video=on`        | La convierte en videollamada                                                                    |
-| `?public=true`     | Hace pública la sala                                                                            |
-| `?mic=off`         | Entra sin micrófono: solo escuchar y chat                                                       |
-| `?p2p=off`         | Pasa siempre por el servidor, incluso con dos personas                                          |
-| `?lang=es`         | Fuerza el idioma de la interfaz (`en`, `es`, `fr`)                                              |
-| `?ios=on`          | Fuerza la ruta de audio de iOS en cualquier navegador (un apaño para problemas de audio tercos) |
+| Opción             | Efecto                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| `?displayName=Ana` | Entra con este nombre, saltándose el vestíbulo                                                      |
+| `?video=on`        | La convierte en videollamada                                                                        |
+| `?public=true`     | Hace pública la sala                                                                                |
+| `?mic=off`         | Entra sin micrófono: solo escuchar y chat                                                           |
+| `?p2p=off`         | Pasa siempre por el servidor, incluso con dos personas                                              |
+| `?lang=es`         | Fuerza el idioma de la interfaz (`en`, `es`, `fr`)                                                  |
+| `?ios=on`          | Fuerza la ruta de audio de iOS en cualquier navegador (un apaño para problemas de audio tercos)     |
+| `?host=…`          | Abre una sala reservada como su anfitrión (ver «Salas reservadas»); se quita de la barra al momento |
 
 Por ejemplo, un enlace que mete a alguien directamente en una videollamada en
 francés como «Ana»:

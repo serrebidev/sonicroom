@@ -71,8 +71,35 @@ export function registerAdminHandlers(ctx: ConnectionContext) {
       reason: admin ? "named" : "revoked",
       by: session.currentPeer.displayName,
     });
-    // A newly named admin may now be the one who has to answer the door.
-    if (admin && room.pendingJoins.size > 0) helpers.broadcastJoinRequests(room);
+    // Everything the role unlocks (or takes away) is handed over / withdrawn
+    // right here, so the client never has to guess:
+    // - The door: a newly named admin may now be the one who has to answer
+    //   it (sent even when the queue is empty, so a stale list from an earlier
+    //   stint as admin is cleared); a revoked one loses the queue at once.
+    //   Only when approving is admins-only — otherwise nothing changed.
+    if (room.moderation.approveJoins === "admins") {
+      io.to(targetId).emit("join-requests", {
+        requests: admin
+          ? Array.from(room.pendingJoins.entries()).map(([id, p]) => ({
+              id,
+              displayName: p.displayName,
+            }))
+          : [],
+      });
+    }
+    // - The shared note: admins-only notes are handed to a new admin now
+    //   (a revoked admin keeps a link they already opened — a NoteLab link
+    //   can't be withdrawn — but their button goes with the role).
+    if (admin) helpers.sendNotesUrl(room, null, targetId);
+    // - Vote-kick: a new admin can no longer be a target (votes against them
+    //   are dropped); a revoked one's own votes stop counting when only admins
+    //   vote, and that electorate's threshold moved with its size — so settle
+    //   (a smaller electorate can tip an already-voted target).
+    if (room.moderation.kick === "admins_vote" || room.moderation.kick === "everyone_vote") {
+      if (admin) helpers.dropKickVotesAgainst(room, targetId);
+      else if (room.moderation.kick === "admins_vote") helpers.cleanupKickVotes(room, targetId);
+      helpers.settleKicks(room);
+    }
     cb?.({ ok: true });
   });
 

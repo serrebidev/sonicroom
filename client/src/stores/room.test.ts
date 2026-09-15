@@ -681,6 +681,13 @@ describe("simple setters", () => {
     expect(useRoomStore.getState().awaitingApproval).toBe(true);
   });
 
+  it("setAwaitingHost, cleared by reset", () => {
+    useRoomStore.getState().setAwaitingHost(true);
+    expect(useRoomStore.getState().awaitingHost).toBe(true);
+    useRoomStore.getState().reset();
+    expect(useRoomStore.getState().awaitingHost).toBe(false);
+  });
+
   it("setRoomIsPublic", () => {
     useRoomStore.getState().setRoomIsPublic(true);
     expect(useRoomStore.getState().roomIsPublic).toBe(true);

@@ -63,6 +63,7 @@ type WhoField =
   | "streamAudio"
   | "liveStreaming"
   | "chat"
+  | "notes"
   | "mutePeer"
   | "muteAll";
 type WhoNoNobodyField = "ducking" | "approveJoins";
@@ -653,6 +654,7 @@ export function Lobby() {
                   {whoSelect("liveStreaming", m.lobby_priv_live_streaming(), WHO_OPTIONS)}
                   {whoSelect("approveJoins", m.lobby_priv_approve_joins(), WHO_NO_NOBODY_OPTIONS)}
                   {whoSelect("chat", m.lobby_priv_chat(), WHO_OPTIONS)}
+                  {whoSelect("notes", m.lobby_priv_notes(), WHO_OPTIONS)}
                   {whoSelect("mutePeer", m.lobby_priv_mute_peer(), WHO_OPTIONS)}
                   {whoSelect("muteAll", m.lobby_priv_mute_all(), WHO_OPTIONS)}
                   {whoSelect("kick", m.lobby_priv_kick(), KICK_OPTIONS, "priv-kick-help")}

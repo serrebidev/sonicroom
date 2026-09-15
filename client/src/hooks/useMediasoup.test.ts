@@ -12,7 +12,7 @@ vi.mock("mediasoup-client", async () => {
   return { Device: mod.FakeDevice };
 });
 
-import { useMediasoup } from "./useMediasoup";
+import { useMediasoup, reservedRoomWait } from "./useMediasoup";
 import { useRoomStore } from "../stores/room";
 import { fakeServer, FakeServer, FakeSocket, type JoinResponse } from "../test/socket-mock";
 import { FakeRTCPeerConnection, FakeIceCandidate, resetWebRtcMock } from "../test/webrtc-mock";
@@ -1049,6 +1049,123 @@ describe("mic-less session", () => {
     expect(useRoomStore.getState().hasMic).toBe(false);
     expect(useRoomStore.getState().isMuted).toBe(true);
     h.unmount();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reserved rooms (host-keyed names)
+// ---------------------------------------------------------------------------
+describe("reserved rooms", () => {
+  const realFetch = globalThis.fetch;
+  beforeEach(() => {
+    reservedRoomWait.pollMs = 1;
+  });
+  afterEach(() => {
+    reservedRoomWait.pollMs = 3000;
+    globalThis.fetch = realFetch;
+  });
+
+  it("forwards the host key on join", async () => {
+    const h = await joinRoom({ joinOpts: { hostKey: "k-host" } });
+    const sentJoin = socket().sentEvents("join")[0] as { hostKey?: string };
+    expect(sentJoin.hostKey).toBe("k-host");
+    h.unmount();
+  });
+
+  it("waits for the host when refused with `reserved`, then joins by itself", async () => {
+    // The server refuses the first join (room not open yet). The room lookup
+    // says "not live" once, then live; the next join is accepted.
+    let joins = 0;
+    fakeServer.on("join", () => {
+      joins++;
+      return joins === 1 ? { ok: false, error: "reserved" } : fakeServer.joinResponse;
+    });
+    // The waiting flag is on for the whole wait (observed from inside the
+    // fake lookup, since with a 1 ms poll the wait is over before a test
+    // could look). Live from the third lookup on.
+    const lookups: string[] = [];
+    const awaitingSeen: boolean[] = [];
+    globalThis.fetch = (async (url: string) => {
+      lookups.push(String(url));
+      awaitingSeen.push(useRoomStore.getState().awaitingHost);
+      return { json: async () => ({ exists: lookups.length >= 3, reserved: true }) };
+    }) as unknown as typeof fetch;
+
+    const hook = renderHook(() => useMediasoup());
+    let joinPromise: Promise<void>;
+    await act(async () => {
+      joinPromise = hook.result.current.join("studio", "Alice");
+      // Where the join is expected to reject, park a handler now so the gap
+      // before the assertion below isn't an "unhandled rejection".
+      joinPromise.catch(() => {});
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await socket().connect("id-self");
+    });
+    await act(async () => {
+      await joinPromise!;
+    });
+    await flush();
+    expect(joins).toBe(2);
+    expect(lookups).toHaveLength(3);
+    expect(lookups[0]).toContain("/api/rooms/studio");
+    expect(awaitingSeen).toEqual([true, true, true]);
+    expect(useRoomStore.getState().awaitingHost).toBe(false);
+    expect(useRoomStore.getState().roomName).toBe("studio");
+    hook.unmount();
+  });
+
+  it("leave() while waiting cancels the poll and fails the join with `left`", async () => {
+    fakeServer.on("join", () => ({ ok: false, error: "reserved" }));
+    let lookups = 0;
+    globalThis.fetch = (async () => {
+      lookups++;
+      return { json: async () => ({ exists: false, reserved: true }) };
+    }) as unknown as typeof fetch;
+
+    const hook = renderHook(() => useMediasoup());
+    let joinPromise: Promise<void>;
+    await act(async () => {
+      joinPromise = hook.result.current.join("studio", "Alice");
+      // Where the join is expected to reject, park a handler now so the gap
+      // before the assertion below isn't an "unhandled rejection".
+      joinPromise.catch(() => {});
+      await Promise.resolve();
+    });
+    // NOT awaited: the fake socket's connect() resolves only once the join
+    // handler returns, which here is blocked waiting for the host.
+    await act(async () => {
+      void socket().connect("id-self");
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(useRoomStore.getState().awaitingHost).toBe(true));
+    await runAct(() => hook.result.current.leave());
+    await expect(joinPromise!).rejects.toThrow("left");
+    expect(useRoomStore.getState().awaitingHost).toBe(false);
+    const seen = lookups;
+    await new Promise((r) => setTimeout(r, 5));
+    expect(lookups).toBe(seen);
+    hook.unmount();
+  });
+
+  it("any other join error still rejects at once", async () => {
+    fakeServer.on("join", () => ({ ok: false, error: "banned" }));
+    const hook = renderHook(() => useMediasoup());
+    let joinPromise: Promise<void>;
+    await act(async () => {
+      joinPromise = hook.result.current.join("studio", "Alice");
+      // Where the join is expected to reject, park a handler now so the gap
+      // before the assertion below isn't an "unhandled rejection".
+      joinPromise.catch(() => {});
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await socket().connect("id-self");
+    });
+    await expect(joinPromise!).rejects.toThrow("banned");
+    expect(useRoomStore.getState().awaitingHost).toBe(false);
+    hook.unmount();
   });
 });
 

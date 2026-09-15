@@ -658,8 +658,8 @@ groupe nommé **« Privilèges des participants »** se déplie, avec une case
 (« Autoriser plusieurs administrateurs ») et une liste déroulante par action :
 enregistrer, partager l'audio, diffuser de l'audio, activer ou désactiver
 l'atténuation automatique, diffuser en direct, approuver les nouveaux
-participants, utiliser le chat, couper le micro d'un participant pour tous,
-couper les micros de tout le monde et exclure. Pour chacune vous choisissez
+participants, utiliser le chat, ouvrir les notes partagées, couper le micro
+d'un participant pour tous, couper les micros de tout le monde et exclure. Pour chacune vous choisissez
 **Administrateurs seulement**, **Tout le monde** ou **Personne** (exclure propose
 aussi **par vote**). La dernière case masque le lien « Propulsé par SonicRoom »
 dans le salon. Ces choix sont fixés à la création du salon et ne changent plus
@@ -717,6 +717,35 @@ Le salon porte le badge **MOD** dans l'en-tête, et à l'entrée il est annoncé
 comme modéré, avec le nom des administrateurs. Chaque changement (nominations,
 coupures de micro, exclusions) est annoncé et consigné dans le chat.
 
+## Salons réservés (un salon qu'on vous a attribué à l'avance)
+
+Normalement un salon n'existe que tant que quelqu'un s'y trouve, et c'est la
+première personne arrivée qui le crée. C'est un problème quand vous annoncez
+un lien à l'avance : n'importe qui pourrait ouvrir « votre » salon avant vous
+et en devenir l'administrateur, ou le salon modéré pourrait tout simplement
+disparaître dès qu'il se vide. Un **salon réservé** règle cela. L'opérateur de
+l'instance réserve un nom de salon pour vous et vous donne **deux liens** :
+
+- le **lien d'hôte**, qui contient une clé secrète. Gardez-le pour vous ;
+  quiconque ouvre le salon avec ce lien en est l'**administrateur**, à chaque
+  fois, même après être parti et revenu ;
+- le **lien public**, l'adresse normale du salon, celle que vous annoncez.
+
+Tant que vous n'avez pas ouvert le salon avec le lien d'hôte, toute personne
+qui suit le lien public entend « Ce salon est réservé et son hôte ne l'a pas
+encore ouvert » et attend sur cet écran ; elle entre automatiquement dès votre
+arrivée (puis frappe à la porte comme quiconque rejoint un salon modéré, donc
+c'est vous qui décidez qui entre). Un salon réservé est toujours un salon
+modéré, avec les privilèges des participants fixés par l'opérateur lors de la
+réservation, et il **reste modéré** en votre absence : personne ne peut se
+l'approprier, et vous revenez en administrateur.
+
+Votre navigateur retient la clé pour cet onglet : vous pouvez recharger la page
+ou passer par le hall pour donner votre nom sans la perdre, et elle est retirée
+de la barre d'adresse immédiatement pour qu'un lien copié ne la contienne
+jamais. Si vous perdez le lien d'hôte, demandez-en un nouveau à l'opérateur
+(l'ancien cesse de fonctionner).
+
 ---
 
 # Notes partagées
@@ -747,6 +776,7 @@ peuvent être combinées avec `&`.
 | `?p2p=off`         | Passe toujours par le serveur, même à deux                                                                |
 | `?lang=fr`         | Force la langue de l'interface (`en`, `es`, `fr`)                                                         |
 | `?ios=on`          | Force le chemin audio iOS sur n'importe quel navigateur (contournement pour des problèmes de son tenaces) |
+| `?host=…`          | Ouvre un salon réservé en tant qu'hôte (voir « Salons réservés ») ; retiré de la barre d'adresse aussitôt |
 
 Par exemple, un lien qui dépose quelqu'un directement dans un appel vidéo en
 français sous le nom « Ana » :

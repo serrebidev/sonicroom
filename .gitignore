@@ -48,3 +48,5 @@ coverage/
 *.pid
 *.seed
 *.pid.lock
+# Runtime data written by the server / CLI (reservations)
+/data/

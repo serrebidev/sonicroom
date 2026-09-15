@@ -3,7 +3,7 @@ import type { Server, Socket } from "socket.io";
 import { removePeer, type Room, type Peer } from "../room-manager.js";
 import { decideMode } from "../recording-util.js";
 import { kickThreshold } from "../kick-util.js";
-import { voteIsAdminsOnly } from "../moderation-util.js";
+import { allowed, voteIsAdminsOnly } from "../moderation-util.js";
 import { CHAT_HISTORY_MAX, type ChatMessage } from "../chat-util.js";
 import type { RecordingManager } from "../recording.js";
 import type { StreamManager } from "../streaming.js";
@@ -114,6 +114,26 @@ export function createRoomHelpers(
   function canApproveJoins(room: Room, peerId: string): boolean {
     if (!room.moderation) return true;
     return room.moderation.approveJoins === "everyone" || isAdmin(room, peerId);
+  }
+
+  // Whether this peer may open the room's shared notes (per the moderated
+  // room's `notes` setting; anyone in an ordinary room). Access to a note IS
+  // its link, so this also gates who is ever handed the URL.
+  function canOpenNotes(room: Room, peerId: string): boolean {
+    return allowed(room.moderation, isAdmin(room, peerId), "notes");
+  }
+
+  // Hand the room's note URL (if it has one) to every peer allowed to open it
+  // — or, with `only`, to that one peer (a freshly named admin). `by` names
+  // the creator for the announcement; null means "it just became available
+  // to you" (the client dedupes against a URL it already holds).
+  function sendNotesUrl(room: Room, by: string | null, only?: string) {
+    if (!room.notesUrl) return;
+    const payload = { url: room.notesUrl, by };
+    const targets = only ? [only] : [...room.peers.keys()];
+    for (const id of targets) {
+      if (canOpenNotes(room, id)) io.to(id).emit("notes-updated", payload);
+    }
   }
 
   // Auto-ducking: the room's AudioLevelObserver watches VOICE producers only
@@ -228,6 +248,21 @@ export function createRoomHelpers(
     }
   }
 
+  // Drop every vote AGAINST one peer and tell the room (tally back to 0) —
+  // for someone who just became an admin, since admins are never a vote's
+  // target. (cleanupKickVotes is the departed-VOTER counterpart.)
+  function dropKickVotesAgainst(room: Room, targetId: string) {
+    if (!room.kickVotes.delete(targetId)) return;
+    io.to(room.name).emit("kick-vote", {
+      targetId,
+      targetName: room.peers.get(targetId)?.displayName ?? "",
+      votes: 0,
+      voterId: null,
+      voterName: null,
+      action: "recount",
+    });
+  }
+
   // Remove one peer from the room and clean up everything they held — the shared
   // teardown for BOTH a normal disconnect and a vote-kick. `announceLeft` is
   // false for a kick (peers already got `peer-kicked` instead of `peer-left`).
@@ -301,13 +336,18 @@ export function createRoomHelpers(
   // there is no moderated room to be an admin of any more. Pending knockers
   // are re-broadcast because the set of people who may answer them has just
   // widened to everyone.
+  // A RESERVED room is the exception: its policy belongs to the reservation,
+  // not to whoever is inside, and the host can return as admin with the key
+  // at any time — so it stays moderated with (for now) no admin present.
   function endModerationIfNoAdmins(room: Room) {
-    if (!room.moderation || room.admins.size > 0) return;
+    if (!room.moderation || room.admins.size > 0 || room.reserved) return;
     room.moderation = null;
     room.adminTokens.clear();
     console.log(`[ws] last admin left ${room.name}: room is no longer moderated`);
     io.to(room.name).emit("moderation-ended", {});
     if (room.pendingJoins.size > 0) broadcastJoinRequests(room);
+    // Likewise the shared note, if it was admins-only until now.
+    sendNotesUrl(room, null);
   }
 
   // Remove a peer the room voted out — or, in a moderated room, one an admin
@@ -379,6 +419,7 @@ export function createRoomHelpers(
     votablePeerCount,
     kickElectorateCount,
     cleanupKickVotes,
+    dropKickVotesAgainst,
     teardownPeer,
     kickPeer,
     settleKicks,
@@ -386,6 +427,8 @@ export function createRoomHelpers(
     adminList,
     emitAdminsChanged,
     canApproveJoins,
+    canOpenNotes,
+    sendNotesUrl,
     endModerationIfNoAdmins,
   };
 }

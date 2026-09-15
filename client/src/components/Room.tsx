@@ -95,13 +95,29 @@ export function Room() {
   // Room type from the URL (`?video=on`, set by the lobby's "Video call" radio).
   // Only a REQUEST: the server's (sticky) answer is `roomIsVideo` in the store.
   const videoRequested = isVideoRoomParam(searchParams.get("video"));
+  // Host key of a RESERVED room, from the host link (`?host=KEY`). Kept per
+  // room in sessionStorage for this tab — so it survives the lobby round-trip
+  // for a name, a reload and a reconnect — and stripped from the URL below so
+  // a copied/shared address never carries it. The server treats whoever
+  // presents it as the room's host (opens the room, is its admin).
+  const hostStorageKey = roomName ? `sonicroom:hostKey:${roomName}` : null;
+  const hostKeyFromUrl = searchParams.get("host");
+  if (hostKeyFromUrl && hostStorageKey) sessionStorage.setItem(hostStorageKey, hostKeyFromUrl);
+  const hostKey =
+    hostKeyFromUrl || (hostStorageKey ? sessionStorage.getItem(hostStorageKey) : null) || null;
   const navigate = useNavigate();
-  // Rewrite a mixed-case link to its canonical lowercase URL (replace, so Back
-  // doesn't bounce through it). Same route, so the component stays mounted.
+  // Rewrite a mixed-case link to its canonical lowercase URL, and drop a host
+  // key from the address bar (replace, so Back doesn't bounce through it).
+  // Same route, so the component stays mounted.
   const { search: locSearch, hash: locHash } = useLocation();
   useEffect(() => {
-    if (rawRoomName && roomName && rawRoomName !== roomName) {
-      navigate(`/room/${roomName}${locSearch}${locHash}`, { replace: true });
+    if (!rawRoomName || !roomName) return;
+    const params = new URLSearchParams(locSearch);
+    const hadHost = params.has("host");
+    params.delete("host");
+    if (rawRoomName !== roomName || hadHost) {
+      const qs = params.toString();
+      navigate(`/room/${roomName}${qs ? `?${qs}` : ""}${locHash}`, { replace: true });
     }
   }, [rawRoomName, roomName, locSearch, locHash, navigate]);
   const {
@@ -249,6 +265,7 @@ export function Room() {
   const chatAnnounceSeq = useRoomStore((s) => s.chatAnnounceSeq);
   // True while we're knocking on a public room and waiting to be let in.
   const awaitingApproval = useRoomStore((s) => s.awaitingApproval);
+  const awaitingHost = useRoomStore((s) => s.awaitingHost);
   // Whether the room is public (shows the vote-to-kick controls) and whether we
   // ourselves were just voted out (shows the "removed" screen).
   const roomIsPublic = useRoomStore((s) => s.roomIsPublic);
@@ -312,6 +329,7 @@ export function Room() {
       noMic,
       video: videoRequested,
       moderation: loadRoomPolicy(roomName),
+      hostKey,
     })
       .then(() => setJoinState("joined"))
       .catch((err) => {
@@ -336,6 +354,7 @@ export function Room() {
     videoRequested,
     p2pStorageKey,
     searchParams,
+    hostKey,
   ]);
 
   // Mirror room lifecycle to the host page when embedded (see postToHost).
@@ -402,9 +421,13 @@ export function Room() {
         // tab. Match the PHYSICAL key (e.code) so it fires regardless of layout,
         // like the Alt+number readback above. Only when the feature is enabled —
         // otherwise leave Alt+N for the browser/OS.
+        // In a moderated room whose notes are admins-only (or nobody's), the
+        // key still fires but says so, like A/F/D/R.
         if (e.code === "KeyN" && useRoomStore.getState().notesEnabled) {
           e.preventDefault();
-          openNotes();
+          const { moderation: policy, isAdmin: admin, announce: say } = useRoomStore.getState();
+          if (allowed(policy, admin, "notes")) openNotes();
+          else say(m.announce_not_allowed());
           return;
         }
       }
@@ -502,7 +525,8 @@ export function Room() {
     navigate("/");
   }, [leave, navigate]);
 
-  // Loading state — or, for a public room, waiting to be let in (knock-to-join).
+  // Loading state — or, for a public room, waiting to be let in (knock-to-join),
+  // or, for a reserved room, waiting for its host to open it.
   if (joinState === "joining") {
     return (
       <div className="flex min-h-dvh flex-col bg-sonic-900">
@@ -515,9 +539,13 @@ export function Room() {
               behind it. (Swapping a freshly-mounted region in/out announces
               unreliably, hence the single persistent node.) */}
             <p className="text-sonic-300" role="alert" aria-live="assertive" aria-atomic="true">
-              {awaitingApproval ? m.room_awaiting_approval() : m.room_connecting()}
+              {awaitingApproval
+                ? m.room_awaiting_approval()
+                : awaitingHost
+                  ? m.room_awaiting_host()
+                  : m.room_connecting()}
             </p>
-            {awaitingApproval && (
+            {(awaitingApproval || awaitingHost) && (
               <button
                 onClick={handleLeave}
                 className="rounded-lg bg-sonic-700 px-4 py-2 text-sm text-sonic-100 hover:bg-sonic-600"
@@ -810,6 +838,7 @@ export function Room() {
           canDuck={allowed(moderation, isAdmin, "ducking")}
           canRecord={allowed(moderation, isAdmin, "recording")}
           canLiveStream={allowed(moderation, isAdmin, "liveStreaming")}
+          canNotes={allowed(moderation, isAdmin, "notes")}
           canMuteAll={canMuteAll}
           onMuteAll={muteAll}
         />

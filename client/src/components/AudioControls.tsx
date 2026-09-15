@@ -47,6 +47,7 @@ interface AudioControlsProps {
   canDuck?: boolean;
   canRecord?: boolean;
   canLiveStream?: boolean;
+  canNotes?: boolean;
   // Moderated rooms: "mute everyone" (only rendered when allowed).
   canMuteAll?: boolean;
   onMuteAll?: () => void;
@@ -68,6 +69,7 @@ export function AudioControls({
   canDuck = true,
   canRecord = true,
   canLiveStream = true,
+  canNotes = true,
   canMuteAll = false,
   onMuteAll,
 }: AudioControlsProps) {
@@ -94,6 +96,11 @@ export function AudioControls({
   const [streamOpen, setStreamOpen] = useState(false);
   const settingsPanelRef = useRef<HTMLDivElement>(null);
   const streamPanelRef = useRef<HTMLDivElement>(null);
+  // Lost the privilege mid-call (an admin revoked us): the button goes, so its
+  // popover can't stay open in front of a control that no longer exists.
+  useEffect(() => {
+    if (!canLiveStream) setStreamOpen(false);
+  }, [canLiveStream]);
 
   // Roving tabindex: the toolbar is a single tab stop and left/right arrows
   // move focus between its controls (ARIA toolbar pattern).
@@ -140,7 +147,7 @@ export function AudioControls({
     ...(recordingId ? ["download", "download-tracks"] : []),
     ...(canLiveStream ? ["stream"] : []),
     "speakers",
-    ...(notesEnabled ? ["notes"] : []),
+    ...(notesEnabled && canNotes ? ["notes"] : []),
     "settings",
     "leave",
   ];
@@ -369,23 +376,26 @@ export function AudioControls({
         )}
 
         {/* Live streaming: opens the Icecast target popover (where you start). A
-            live stream tints it purple to match the header's LIVE badge. */}
-        <button
-          {...item("stream")}
-          onClick={openStream}
-          className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
-            isStreaming
-              ? "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
-              : streamOpen
-                ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
-                : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
-          }`}
-          aria-label={m.settings_streaming_heading()}
-          aria-expanded={streamOpen}
-          title={isStreaming ? m.room_streaming_title() : m.streaming_start_title()}
-        >
-          <Radio className={`h-5 w-5 ${isStreaming ? "animate-pulse" : ""}`} />
-        </button>
+            live stream tints it purple to match the header's LIVE badge. Not
+            rendered when this peer may not stream (moderated room). */}
+        {canLiveStream && (
+          <button
+            {...item("stream")}
+            onClick={openStream}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+              isStreaming
+                ? "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                : streamOpen
+                  ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
+                  : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
+            }`}
+            aria-label={m.settings_streaming_heading()}
+            aria-expanded={streamOpen}
+            title={isStreaming ? m.room_streaming_title() : m.streaming_start_title()}
+          >
+            <Radio className={`h-5 w-5 ${isStreaming ? "animate-pulse" : ""}`} />
+          </button>
+        )}
 
         {/* Announce (and briefly number on their tiles) who's talking now or
             talked recently — a momentary readout, not a toggle. Same action as
@@ -402,8 +412,9 @@ export function AudioControls({
 
         {/* Shared notes: open (creating on first use) this room's collaborative
             NoteLab note in a new tab. Tinted when a note already exists. Hidden
-            entirely unless the instance has NOTELAB_URL configured. */}
-        {notesEnabled && (
+            entirely unless the instance has NOTELAB_URL configured, or this peer
+            may not open notes (moderated room). */}
+        {notesEnabled && canNotes && (
           <button
             {...item("notes")}
             onClick={onOpenNotes}

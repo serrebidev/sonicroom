@@ -4,6 +4,7 @@ import { getRooms } from "./room-manager.js";
 import { RateLimiter } from "./chat-util.js";
 import type { RecordingManager } from "./recording.js";
 import type { StreamManager } from "./streaming.js";
+import type { ReservationStore } from "./reservations.js";
 import { createRoomHelpers } from "./signaling/room-helpers.js";
 import type { ConnectionContext, ConnectionSession } from "./signaling/context.js";
 import { registerSessionHandlers } from "./signaling/handlers/session.js";
@@ -20,6 +21,7 @@ export function createSignalingServer(
   httpServer: HttpServer,
   recordingManager: RecordingManager,
   streamManager: StreamManager,
+  reservations: ReservationStore,
 ) {
   const io = new Server(httpServer, {
     cors: { origin: "*" },
@@ -79,6 +81,7 @@ export function createSignalingServer(
       chatLimiter,
       kickLimiter,
       helpers,
+      reservations,
       session,
     };
 

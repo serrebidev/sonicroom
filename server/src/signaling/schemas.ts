@@ -88,4 +88,8 @@ export const joinSchema = z.object({
   // the creator becomes its admin; on an existing room it is ignored (the
   // policy is fixed for the room's lifetime). See moderation-util.ts.
   moderation: moderationPolicySchema.optional(),
+  // Host key of a RESERVED room (from the host link's `?host=`, kept in
+  // sessionStorage). Required to OPEN a reserved room; on any join it makes
+  // the peer an admin and skips the knock gate. See reservations.ts.
+  hostKey: z.string().min(1).max(128).optional(),
 });

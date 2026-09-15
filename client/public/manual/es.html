@@ -316,7 +316,12 @@ id="toc-salas-públicas-llamar-a-la-puerta-y-votar">Salas públicas,
 llamar a la puerta y votar</a></li>
 <li><a href="#salas-moderadas-con-administradores"
 id="toc-salas-moderadas-con-administradores">Salas moderadas (con
-administradores)</a></li>
+administradores)</a>
+<ul>
+<li><a href="#salas-reservadas-una-sala-que-te-han-dado-de-antemano"
+id="toc-salas-reservadas-una-sala-que-te-han-dado-de-antemano">Salas
+reservadas (una sala que te han dado de antemano)</a></li>
+</ul></li>
 <li><a href="#notas-compartidas" id="toc-notas-compartidas">Notas
 compartidas</a></li>
 <li><a href="#opciones-que-puedes-poner-en-la-barra-de-direcciones"
@@ -1199,9 +1204,10 @@ llamado <strong>«Privilegios de participantes»</strong> con una casilla
 («Permitir varios administradores») y una lista desplegable por cada
 acción: grabar, compartir audio, emitir audio, activar o desactivar el
 atenuado automático, retransmitir en directo, aprobar la entrada de
-nuevos participantes, usar el chat, silenciar a un participante para
-todos, silenciar los micrófonos de todos y expulsar. En cada una eliges
-<strong>Solo administradores</strong>, <strong>Todos</strong> o
+nuevos participantes, usar el chat, abrir las notas compartidas,
+silenciar a un participante para todos, silenciar los micrófonos de
+todos y expulsar. En cada una eliges <strong>Solo
+administradores</strong>, <strong>Todos</strong> o
 <strong>Nadie</strong> (expulsar añade <strong>con votación</strong>).
 La última casilla oculta el enlace «Con tecnología de SonicRoom» dentro
 de la sala. Estas opciones se fijan al crear la sala y no cambian
@@ -1259,6 +1265,37 @@ quedando todos los avisos.</p>
 entrar se anuncia que es moderada y quiénes son los administradores.
 Todos los cambios (nombramientos, silencios, expulsiones) se anuncian y
 quedan en el chat.</p>
+<h2 id="salas-reservadas-una-sala-que-te-han-dado-de-antemano">Salas
+reservadas (una sala que te han dado de antemano)</h2>
+<p>Normalmente una sala solo existe mientras hay alguien dentro, y la
+crea quien llega primero. Eso es un problema cuando anuncias un enlace
+con antelación: cualquiera podría abrir «tu» sala antes que tú y
+convertirse en su administrador, o la sala moderada podría desaparecer
+sin más en cuanto se vacíe. Una <strong>sala reservada</strong> lo
+resuelve. El operador de la instancia reserva un nombre de sala para ti
+y te da <strong>dos enlaces</strong>:</p>
+<ul>
+<li>el <strong>enlace de anfitrión</strong>, que contiene una clave
+secreta. Guárdalo para ti; quien abre la sala con él es su
+<strong>administrador</strong>, siempre, incluso después de salir y
+volver;</li>
+<li>el <strong>enlace público</strong>, la dirección normal de la sala,
+que es el que anuncias.</li>
+</ul>
+<p>Hasta que abras la sala con el enlace de anfitrión, quien siga el
+enlace público oye «Esta sala está reservada y su anfitrión aún no la ha
+abierto» y espera en esa pantalla; entra automáticamente en cuanto
+llegas (y entonces llama a la puerta como cualquiera que entra en una
+sala moderada, así que tú decides quién pasa). Una sala reservada es
+siempre una sala moderada, con los privilegios de participante que el
+operador fijó al reservarla, y <strong>sigue siendo moderada</strong>
+mientras no estás: nadie puede quedársela, y vuelves como su
+administrador.</p>
+<p>Tu navegador recuerda la clave en esa pestaña, así que puedes
+recargar la página o pasar por el vestíbulo para poner tu nombre sin
+perderla, y se quita de la barra de direcciones al momento para que un
+enlace copiado nunca la lleve. Si pierdes el enlace de anfitrión, pide
+al operador uno nuevo (el antiguo deja de funcionar).</p>
 <hr />
 <h1 id="notas-compartidas">Notas compartidas</h1>
 <p>Si esta instancia de SonicRoom tiene las notas configuradas, la barra
@@ -1317,6 +1354,11 @@ una opción, y se pueden combinar varias con <code>&amp;</code>.</p>
 <td><code>?ios=on</code></td>
 <td>Fuerza la ruta de audio de iOS en cualquier navegador (un apaño para
 problemas de audio tercos)</td>
+</tr>
+<tr class="even">
+<td><code>?host=…</code></td>
+<td>Abre una sala reservada como su anfitrión (ver «Salas reservadas»);
+se quita de la barra al momento</td>
 </tr>
 </tbody>
 </table>

@@ -46,6 +46,11 @@ export const moderationPolicySchema = z.object({
   liveStreaming: whoSchema.default("admins"),
   approveJoins: whoNoNobodySchema.default("admins"),
   chat: whoSchema.default("everyone"),
+  // Open (and so co-edit) the room's shared NoteLab note (`open-notes`). Access
+  // to a note IS its link, so this also decides who is handed the URL at all:
+  // the join snapshot / `notes-updated` carry it only to peers allowed here.
+  // Inert on an instance without NOTELAB_URL.
+  notes: whoSchema.default("everyone"),
   // Mute ONE participant for everyone (soft: they can unmute themselves).
   mutePeer: whoSchema.default("admins"),
   // Mute EVERYONE else at once.
@@ -65,6 +70,7 @@ export type ModerationAction =
   | "liveStreaming"
   | "approveJoins"
   | "chat"
+  | "notes"
   | "mutePeer"
   | "muteAll";
 

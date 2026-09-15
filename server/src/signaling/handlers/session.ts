@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { getOrCreateRoom, createPeer } from "../../room-manager.js";
+import { getOrCreateRoom, getRooms, createPeer } from "../../room-manager.js";
+import { verifyHostKey } from "../../reservations.js";
 import { decideMode } from "../../recording-util.js";
 import { notifyPublicRoomCreated, notifyPublicRoomJoin } from "../../notify.js";
 import { notesEnabled } from "../../notes.js";
@@ -20,6 +21,7 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
     chatLimiter,
     kickLimiter,
     helpers,
+    reservations,
     session,
   } = ctx;
 
@@ -37,7 +39,23 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
         extraMic,
         joinToken,
         moderation,
+        hostKey,
       } = joinSchema.parse(data);
+
+      // RESERVED room name (reservations.ts): only its host — whoever presents
+      // the reservation's key — may OPEN it. Anyone else arriving while nobody
+      // is inside is refused with `reserved` (no room is created, so the name
+      // reads as "not live" until the host shows up; the client waits and
+      // retries by itself). Checked BEFORE getOrCreateRoom so a refused early
+      // visitor doesn't leave an empty, router-holding room behind.
+      const reservation = reservations.get(roomName);
+      const isHost = reservation != null && verifyHostKey(reservation, hostKey);
+      if (reservation && !isHost && !getRooms().has(roomName)) {
+        console.log(`[ws] ${socket.id} refused: ${roomName} is reserved and not open yet`);
+        cb({ ok: false, error: "reserved" });
+        return;
+      }
+
       const room = await getOrCreateRoom(roomName);
       const ip = clientIp(socket);
 
@@ -67,7 +85,10 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       // `wasPublic` is false, so anyone with the link joins openly.
       // A MODERATED room's door is ALWAYS knock-gated (public or not — that is
       // what its approveJoins setting decides who answers); its admins skip it.
-      const returningAdmin = joinToken != null && room.adminTokens.has(joinToken);
+      // The host of a reserved room (by key) is an admin on every join, exactly
+      // like an admin recognised by token; casters stay infrastructure.
+      const returningAdmin =
+        (joinToken != null && room.adminTokens.has(joinToken)) || (isHost && role !== "caster");
       const alreadyAdmitted =
         (joinToken != null && room.admittedTokens.has(joinToken)) ||
         room.admittedNames.has(displayName) ||
@@ -86,7 +107,7 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       }
 
       console.log(
-        `[ws] ${socket.id} joined ${roomName} as "${displayName}"${role ? ` (${role})` : ""}${disableP2p ? " (p2p disabled)" : ""}${isPublic ? " (public)" : ""}${video ? " (video)" : ""}${moderation && room.peers.size === 0 ? " (moderated)" : ""}`,
+        `[ws] ${socket.id} joined ${roomName} as "${displayName}"${role ? ` (${role})` : ""}${disableP2p ? " (p2p disabled)" : ""}${isPublic ? " (public)" : ""}${video ? " (video)" : ""}${(reservation || moderation) && room.peers.size === 0 ? " (moderated)" : ""}${isHost ? " (host)" : ""}`,
       );
 
       // Admitted (open join, reconnect, or just-approved): remember the token
@@ -100,8 +121,14 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       // This join CREATES the room (nobody inside yet): if the joiner asked for
       // a moderated room, fix its policy now and make them its admin. On an
       // existing room the field is ignored — the policy never changes.
+      // A RESERVED room takes its policy from the reservation instead (and is
+      // flagged so it stays moderated with no admin inside); the joiner's
+      // lobby fieldset is ignored for it.
       const creating = room.peers.size === 0;
-      if (creating && moderation && role !== "caster") {
+      if (creating && reservation) {
+        room.moderation = reservation.moderation;
+        room.reserved = true;
+      } else if (creating && moderation && role !== "caster") {
         room.moderation = moderation;
       }
       const peer = createPeer(room, socket.id, displayName, ip, joinToken ?? "");
@@ -229,7 +256,7 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
         // Whether shared notes are configured for this instance (gates the
         // "Notes" button / Alt+N) and this room's note URL if one exists yet.
         notesEnabled: notesEnabled(),
-        notesUrl: room.notesUrl,
+        notesUrl: helpers.canOpenNotes(room, socket.id) ? room.notesUrl : null,
         // MODERATED room: its fixed policy (null for an ordinary room), whether
         // WE are an admin, and who the admins are. The client gates its
         // controls on these; the server enforces them regardless.

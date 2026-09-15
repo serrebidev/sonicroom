@@ -21,6 +21,7 @@ describe("moderationPolicySchema", () => {
     assert.equal(p.liveStreaming, "admins");
     assert.equal(p.approveJoins, "admins");
     assert.equal(p.chat, "everyone");
+    assert.equal(p.notes, "everyone");
     assert.equal(p.mutePeer, "admins");
     assert.equal(p.muteAll, "admins");
     assert.equal(p.kick, "admins");

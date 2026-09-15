@@ -102,6 +102,10 @@ import type { VideoMedia, VideoSource } from "../lib/video/video-media";
 // state once more after TOGGLE_DEDUP_MS of quiet — and only if it actually
 // differs from what was last surfaced. So a mash shows at most the first + last.
 const TOGGLE_DEDUP_MS = 1000;
+// How often to re-check whether a RESERVED room has been opened by its host
+// while we wait outside (see waitForReservedRoom). An object so tests can
+// shorten it.
+export const reservedRoomWait = { pollMs: 3000 };
 
 // resumeContext (the keep-alive) lives in lib/audio/shared-context.ts and is
 // already wired to the document gestures / statechange / visibility there.
@@ -195,6 +199,10 @@ export function useMediasoup() {
   // pushed join-approved/-denied handlers resolve/reject it so the blocked join
   // flow continues (re-join) or fails (denied).
   const admissionRef = useRef<{ resolve: () => void; reject: (e: unknown) => void } | null>(null);
+  // Set while a RESERVED room we're joining is not open yet (the host hasn't
+  // arrived): the join loop polls /api/rooms/:name until it's live. leave()
+  // cancels it so a "back to lobby" from the waiting screen stops the poll.
+  const hostWaitRef = useRef<{ cancel: () => void } | null>(null);
   // Moderated rooms: the local half of a forced mute (set once `mute` exists —
   // see below) and whether we've announced "moderated room" this session.
   const forcedMuteRef = useRef<(by: string) => void>(() => {});
@@ -237,6 +245,45 @@ export function useMediasoup() {
           });
       }),
     [],
+  );
+
+  // Block until a RESERVED room is opened by its host (polling the room
+  // lookup; the visitor isn't in a room yet, so there is no socket event to
+  // wait on). Rejects with "left" when leave() cancels it.
+  const waitForReservedRoom = useCallback(
+    async (roomName: string) => {
+      store.getState().setAwaitingHost(true);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          let cancelled = false;
+          hostWaitRef.current = {
+            cancel: () => {
+              cancelled = true;
+              if (timer !== null) clearTimeout(timer);
+              reject(new Error("left"));
+            },
+          };
+          const poll = async () => {
+            if (cancelled) return;
+            try {
+              const res = await fetch(apiUrl(`/api/rooms/${encodeURIComponent(roomName)}`));
+              const info = (await res.json()) as { exists?: boolean };
+              if (cancelled) return;
+              if (info.exists) return resolve();
+            } catch {
+              /* transient — keep polling */
+            }
+            if (!cancelled) timer = setTimeout(poll, reservedRoomWait.pollMs);
+          };
+          timer = setTimeout(poll, reservedRoomWait.pollMs);
+        });
+      } finally {
+        hostWaitRef.current = null;
+        store.getState().setAwaitingHost(false);
+      }
+    },
+    [store],
   );
 
   // Lazily create the video controller (VIDEO rooms only). Idempotent; the module
@@ -776,6 +823,10 @@ export function useMediasoup() {
         // Create the room as a MODERATED room with this policy (ignored by the
         // server if the room already exists). See lib/moderation.ts.
         moderation?: ModerationPolicy | null;
+        // Host key of a RESERVED room (from the host link's `?host=`, stashed
+        // per room in sessionStorage by Room.tsx). Lets us OPEN the reserved
+        // room and makes us its admin on every join.
+        hostKey?: string | null;
       },
     ) => {
       // Acquire stereo audio + build the outgoing graph BEFORE connecting so
@@ -889,6 +940,8 @@ export function useMediasoup() {
           video: opts?.video,
           // Create a MODERATED room (only honoured when this join creates it).
           moderation: opts?.moderation ?? undefined,
+          // Host key of a reserved room, if we hold one (see opts).
+          hostKey: opts?.hostKey || undefined,
           joinToken,
           // On a reconnect mid-share, re-pin SFU so the share rebuilds.
           sharing: store.getState().isSharingAudio,
@@ -898,7 +951,20 @@ export function useMediasoup() {
           extraMic: store.getState().streamedMicDeviceIds.length > 0,
         };
 
-        let joinRes = await emit<JoinResponse>("join", joinPayload);
+        // RESERVED room not open yet: the server refuses with `reserved` until
+        // its host (key holder) arrives. Show the waiting screen and poll the
+        // room lookup until the name is live, then join again — which then
+        // lands in the moderated room's knock gate below, as for anyone else.
+        let joinRes: JoinResponse;
+        for (;;) {
+          try {
+            joinRes = await emit<JoinResponse>("join", joinPayload);
+            break;
+          } catch (err) {
+            if (!(err instanceof Error) || err.message !== "reserved") throw err;
+            await waitForReservedRoom(roomName);
+          }
+        }
 
         // Knock-to-join: the room is public + occupied, so we're held at the
         // door. Show the waiting screen and block until a participant decides —
@@ -1173,7 +1239,15 @@ export function useMediasoup() {
         }) => {
           const myId = store.getState().localPeerId;
           const mine = voterId != null && voterId === myId;
-          store.getState().setPeerKickVote(targetId, votes, mine ? action === "cast" : undefined);
+          // A recount down to zero (the target became an admin, or every
+          // voter left / lost the vote) also clears OUR pressed state.
+          store
+            .getState()
+            .setPeerKickVote(
+              targetId,
+              votes,
+              mine ? action === "cast" : votes === 0 ? false : undefined,
+            );
           if (action === "recount" || mine) return;
           const voter = voterName || announce_a_participant();
           const target =
@@ -1615,6 +1689,7 @@ export function useMediasoup() {
     },
     [
       emit,
+      waitForReservedRoom,
       registry,
       extraMics,
       setupSfu,
@@ -2107,6 +2182,8 @@ export function useMediasoup() {
   );
 
   const leave = useCallback(() => {
+    // Stop waiting for a reserved room's host, if we were.
+    hostWaitRef.current?.cancel();
     // Tear down any active file stream (stops the <audio>, revokes its URL).
     fileAbortRef.current?.abort();
     fileAbortRef.current = null;

@@ -17,8 +17,14 @@ describe("normalizePolicy", () => {
   });
 
   it("keeps valid fields and refuses 'nobody' where it isn't an option", () => {
-    const p = normalizePolicy({ chat: "nobody", ducking: "nobody", kick: "everyone_vote" });
+    const p = normalizePolicy({
+      chat: "nobody",
+      notes: "admins",
+      ducking: "nobody",
+      kick: "everyone_vote",
+    });
     expect(p.chat).toBe("nobody");
+    expect(p.notes).toBe("admins");
     expect(p.ducking).toBe("everyone");
     expect(p.kick).toBe("everyone_vote");
   });

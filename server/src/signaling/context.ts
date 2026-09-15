@@ -4,6 +4,7 @@ import type { RecordingManager } from "../recording.js";
 import type { StreamManager } from "../streaming.js";
 import type { RateLimiter } from "../chat-util.js";
 import type { RoomHelpers } from "./room-helpers.js";
+import type { ReservationStore } from "../reservations.js";
 
 // Per-connection mutable state. The join handler sets currentRoom/currentPeer
 // once the socket is admitted; every other handler reads them. pendingRequest is
@@ -29,5 +30,7 @@ export interface ConnectionContext {
   chatLimiter: RateLimiter;
   kickLimiter: RateLimiter;
   helpers: RoomHelpers;
+  // Room reservations (host-keyed names). Read-only, file-backed.
+  reservations: ReservationStore;
   session: ConnectionSession;
 }

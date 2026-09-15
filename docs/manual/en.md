@@ -608,8 +608,8 @@ room; an ordinary room is unchanged.
 **"Participant privileges"** unfolds, with a checkbox ("Allow several
 administrators") and one drop-down list per action: recording, sharing audio,
 streaming audio, turning auto-ducking on or off, live streaming, approving new
-participants, using the chat, muting a participant for everyone, muting
-everyone's microphones, and removing participants. For each you pick
+participants, using the chat, opening the shared notes, muting a participant
+for everyone, muting everyone's microphones, and removing participants. For each you pick
 **Administrators only**, **Everyone** or **Nobody** (removing also offers **by
 vote**). The last checkbox hides the "Powered by SonicRoom" link inside the
 room. These choices are fixed when the room is created and never change while
@@ -662,6 +662,33 @@ The room carries the **MOD** badge in the header, and on entry it is announced
 as moderated along with who the administrators are. Every change (naming,
 mutes, removals) is announced and logged to the chat.
 
+## Reserved rooms (a room you were given in advance)
+
+A room normally exists only while somebody is in it, and whoever arrives first
+creates it. That is a problem when you advertise a link ahead of time: anyone
+could open "your" room before you and become its administrator, or the
+moderated room could simply vanish the moment it empties. A **reserved room**
+fixes this. The operator of the instance reserves a room name for you and gives
+you **two links**:
+
+- the **host link**, which contains a secret key. Keep it to yourself; whoever
+  opens the room with it is its **administrator**, every time, even after
+  leaving and coming back;
+- the **public link**, the ordinary room address, which you advertise.
+
+Until you open the room with the host link, everyone else who follows the
+public link hears "This room is reserved and its host hasn't opened it yet" and
+waits on that screen; they are let in automatically as soon as you arrive (and
+then knock like anybody joining a moderated room, so you decide who enters). A
+reserved room is always a moderated room, with the participant privileges the
+operator set when reserving it, and it **stays moderated** while you are away:
+nobody can take it over, and you come back as its administrator.
+
+The key is remembered by your browser for that tab, so you can reload the page
+or be sent to the lobby for your name without losing it, and it is removed from
+the address bar at once so that a copied link never carries it. If you lose the
+host link, ask the operator for a new one (the old one stops working).
+
 ---
 
 # Shared notes
@@ -682,15 +709,16 @@ back to the SonicRoom tab and the call is still running.
 Anything after `?` in a room link sets an option, and several can be combined
 with `&`.
 
-| Option             | Effect                                                                              |
-| ------------------ | ----------------------------------------------------------------------------------- |
-| `?displayName=Ana` | Joins with this name, skipping the lobby                                            |
-| `?video=on`        | Makes it a video call                                                               |
-| `?public=true`     | Makes the room public                                                               |
-| `?mic=off`         | Joins without a microphone — listening and chat only                                |
-| `?p2p=off`         | Always relays through the server, even with two people                              |
-| `?lang=es`         | Forces the interface language (`en`, `es`, `fr`)                                    |
-| `?ios=on`          | Forces the iOS audio path on any browser (a workaround for stubborn audio problems) |
+| Option             | Effect                                                                                         |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| `?displayName=Ana` | Joins with this name, skipping the lobby                                                       |
+| `?video=on`        | Makes it a video call                                                                          |
+| `?public=true`     | Makes the room public                                                                          |
+| `?mic=off`         | Joins without a microphone — listening and chat only                                           |
+| `?p2p=off`         | Always relays through the server, even with two people                                         |
+| `?lang=es`         | Forces the interface language (`en`, `es`, `fr`)                                               |
+| `?ios=on`          | Forces the iOS audio path on any browser (a workaround for stubborn audio problems)            |
+| `?host=…`          | Opens a reserved room as its host (see "Reserved rooms"); removed from the address bar at once |
 
 For example, a link that drops somebody straight into a French-language video
 call as "Ana":

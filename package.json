@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "manual": "docs/manual/build.sh"
+    "manual": "docs/manual/build.sh",
+    "reserve": "pnpm --silent --filter server exec tsx scripts/reserve.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

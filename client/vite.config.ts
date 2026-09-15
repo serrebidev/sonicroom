@@ -96,6 +96,10 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:3100",
       },
+      // Operator admin page (server-rendered, never part of the SPA).
+      "/admin": {
+        target: "http://localhost:3100",
+      },
     },
   },
 });

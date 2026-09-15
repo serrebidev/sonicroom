@@ -373,12 +373,13 @@ libres allí.
 
 ## Con Alt
 
-| Tecla                                      | Acción                                                                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `Alt` + `1` … `Alt` + `9`                  | Lee los últimos mensajes en voz alta. `1` es el más reciente, `2` el anterior, y así. |
-| `Alt` + `0`                                | Lee el décimo mensaje más reciente.                                                   |
-| El mismo `Alt` + número dos veces seguidas | Copia ese mensaje al portapapeles.                                                    |
-| `Alt` + `N`                                | Abre las notas compartidas de la sala en una pestaña nueva.                           |
+| Tecla                                      | Acción                                                                                   |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `Alt` + `1` … `Alt` + `9`                  | Lee los últimos mensajes en voz alta. `1` es el más reciente, `2` el anterior, y así.    |
+| `Alt` + `0`                                | Lee el décimo mensaje más reciente.                                                      |
+| El mismo `Alt` + número dos veces seguidas | Copia ese mensaje al portapapeles.                                                       |
+| `Alt` + `N`                                | Abre las notas compartidas de la sala en una pestaña nueva.                              |
+| `Ctrl` + `Mayús` + `M`                     | Silencia los micrófonos de todos: **solo en salas moderadas**, y solo si tienes permiso. |
 
 La relectura con `Alt` + número es el único conjunto de atajos que **también
 funciona mientras escribes en el cuadro de chat**, y funciona esté el panel
@@ -648,10 +649,17 @@ navegador recuerda tu última configuración para la próxima vez.
 **Quién es administrador.** Quien crea la sala. Si has permitido varios
 administradores, en las opciones de cualquier participante encontrarás
 **«Nombrar administrador»** (y **«Quitar administrador»** para deshacerlo). Los
-administradores llevan la palabra «administrador» en su fila de la lista. Si el
-último administrador se va y queda gente dentro, la persona que más tiempo
-lleva en la sala pasa a ser administradora, y se anuncia. Si te recargas o
-pierdes la conexión, recuperas el cargo al volver.
+administradores llevan la palabra «administrador» en su fila de la lista. Si te
+recargas o pierdes la conexión, recuperas el cargo al volver.
+
+**Si se van todos los administradores** y queda gente dentro, la sala **deja de
+estar moderada**: se anuncia a todo el mundo («El último administrador se ha
+ido: esta sala ya no está moderada»), a todos les vuelven todos los botones, el
+chat se reabre y la sala sigue como una sala privada o pública normal el resto
+de su vida. No se nombra a nadie en su lugar, y un antiguo administrador que
+vuelva entra como participante normal. Si quieres que la sala sobreviva a tu
+ausencia con sus reglas intactas, nombra a un segundo administrador antes de
+irte.
 
 **La puerta.** En una sala moderada **siempre** se llama a la puerta, sea
 pública o no. La opción «Aprobar la entrada de nuevos participantes» decide
@@ -664,7 +672,10 @@ anuncia quién lo ha hecho. Es un silencio _suave_: la persona puede volver a
 activar su micrófono con `M` cuando vaya a hablar (así se resuelve el clásico
 «se te oye hablar con la vecina» sin pedir la palabra). En la barra de
 controles, quien tenga permiso ve además **«Silenciar los micrófonos de
-todos»**, que hace lo mismo con todos los demás de golpe.
+todos»**, que hace lo mismo con todos los demás de golpe. Su atajo es `Ctrl` +
+`Mayús` + `M`: una combinación de tres teclas a propósito, para que no se pulse
+por error al lado de la `M`. Solo existe en una sala moderada; en las demás esa
+combinación se la queda el navegador.
 
 **Expulsar.** Según la opción elegida: los administradores (o todos) expulsan
 directamente desde las opciones del participante con **«Expulsar de la sala»**,
@@ -789,6 +800,7 @@ la llave de la barra de vídeo. Se guarda solo en este navegador.
 | `Alt` + `1`…`9`, `0`                      | Leer los diez últimos mensajes, del más nuevo al más viejo    |
 | El mismo `Alt` + número dos veces         | Copiar ese mensaje                                            |
 | `Alt` + `N`                               | Notas compartidas en una pestaña nueva                        |
+| `Ctrl` + `Mayús` + `M`                    | Silenciar a todos (salas moderadas)                           |
 | `Tab` / `Mayús` + `Tab`                   | Entre las partes de la aplicación                             |
 | `Izquierda` / `Derecha`                   | Recorrer una barra; cambiar un deslizador                     |
 | `Arriba` / `Abajo`                        | Recorrer una lista                                            |

@@ -866,8 +866,8 @@ ces lettres y restent libres.</p>
 <h2 id="avec-alt">Avec Alt</h2>
 <table>
 <colgroup>
-<col style="width: 32%" />
-<col style="width: 67%" />
+<col style="width: 31%" />
+<col style="width: 68%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -893,6 +893,11 @@ ces lettres y restent libres.</p>
 <tr class="even">
 <td><code>Alt</code> + <code>N</code></td>
 <td>Ouvre les notes partagées du salon dans un nouvel onglet.</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl</code> + <code>Maj</code> + <code>M</code></td>
+<td>Coupe les micros de tout le monde : <strong>salons modérés
+seulement</strong>, et si vous y êtes autorisé.</td>
 </tr>
 </tbody>
 </table>
@@ -1219,10 +1224,17 @@ salon. Si vous avez autorisé plusieurs administrateurs, les options de
 chaque participant comprennent <strong>« Nommer administrateur
 »</strong> (et <strong>« Retirer administrateur »</strong> pour
 l’annuler). Les administrateurs portent le mot « administrateur » dans
-leur ligne de la liste. Si le dernier administrateur part alors qu’il
-reste des gens, la personne présente depuis le plus longtemps devient
-administratrice, et c’est annoncé. Si vous rechargez ou perdez la
-connexion, vous retrouvez le rôle en revenant.</p>
+leur ligne de la liste. Si vous rechargez ou perdez la connexion, vous
+retrouvez le rôle en revenant.</p>
+<p><strong>Si tous les administrateurs partent</strong> alors qu’il
+reste des gens, le salon <strong>cesse d’être modéré</strong> : c’est
+annoncé à tout le monde (« Le dernier administrateur est parti : ce
+salon n’est plus modéré »), chacun retrouve tous les boutons, le chat
+rouvre et le salon continue comme un salon privé ou public ordinaire
+jusqu’à sa fin. Personne n’est nommé à leur place, et un ancien
+administrateur qui revient entre comme simple participant. Si vous
+voulez que le salon survive à votre absence avec ses règles intactes,
+nommez un second administrateur avant de partir.</p>
 <p><strong>La porte.</strong> Dans un salon modéré, les nouveaux venus
 frappent <strong>toujours</strong> à la porte, salon public ou non. Le
 réglage « Approuver les nouveaux participants » décide qui entend les
@@ -1237,7 +1249,10 @@ une coupure <em>douce</em> : la personne peut réactiver son micro avec
 t’entend parler avec ta voisine » sans lever la main). Dans la barre de
 contrôles, qui y est autorisé voit aussi <strong>« Couper les micros de
 tout le monde »</strong>, qui fait la même chose à tous les autres d’un
-coup.</p>
+coup. Son raccourci est <code>Ctrl</code> + <code>Maj</code> +
+<code>M</code> : un accord de trois touches, exprès, pour qu’on ne le
+déclenche pas par erreur à côté du <code>M</code>. Il n’existe que dans
+un salon modéré ; ailleurs, le navigateur garde cette combinaison.</p>
 <p><strong>Exclure.</strong> Selon le réglage : les administrateurs (ou
 tout le monde) excluent directement depuis les options du participant
 avec <strong>« Exclure du salon »</strong>, sans vote ; ou bien le salon
@@ -1426,63 +1441,67 @@ page</h1>
 <td>Notes partagées dans un nouvel onglet</td>
 </tr>
 <tr class="even">
+<td><code>Ctrl</code> + <code>Maj</code> + <code>M</code></td>
+<td>Couper tous les micros (salons modérés)</td>
+</tr>
+<tr class="odd">
 <td><code>Tab</code> / <code>Maj</code> + <code>Tab</code></td>
 <td>D’une partie de l’application à l’autre</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Gauche</code> / <code>Droite</code></td>
 <td>Parcourir une barre ; régler un curseur</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Haut</code> / <code>Bas</code></td>
 <td>Parcourir une liste</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Début</code> / <code>Fin</code></td>
 <td>Premier / dernier ; minimum / maximum</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Entrée</code> / <code>Espace</code></td>
 <td>Activer</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Échap</code></td>
 <td>Fermer un panneau, une boîte de dialogue ou le plein écran</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Retour arrière</code></td>
 <td>Sortir des options ; remonter d’un dossier</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Entrée</code> dans la zone de saisie</td>
 <td>Envoyer</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Maj</code> + <code>Entrée</code> dans la zone de saisie</td>
 <td>Retour à la ligne</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Ctrl</code> / <code>Cmd</code> + <code>C</code> sur un
 message</td>
 <td>Le copier</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>NVDA</code> + <code>Espace</code></td>
 <td>NVDA : mode navigation ↔︎ mode formulaire</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>touche JAWS</code> + <code>Z</code></td>
 <td>JAWS : curseur virtuel désactivé / activé</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Verr. Maj</code> + <code>Espace</code></td>
 <td>Narrateur : mode Scan désactivé / activé</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Gauche</code> + <code>Droite</code> ensemble</td>
 <td>VoiceOver : navigation rapide désactivée / activée</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>modificateur Orca</code> + <code>A</code></td>
 <td>Orca : mode navigation ↔︎ mode focus</td>
 </tr>

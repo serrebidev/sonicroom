@@ -25,6 +25,7 @@ import {
   announce_you_were_muted,
   announce_admin_named,
   announce_you_admin_promoted,
+  announce_moderation_ended,
   announce_peer_kicked_by,
   announce_you_were_kicked_by,
 } from "../paraglide/messages.js";
@@ -885,20 +886,38 @@ describe("moderation", () => {
     expect(systemMessages().map((m) => m.text)).toContain(
       announce_admin_named({ name: "Carol", by: "Bob" }),
     );
-    // We get promoted when the last admin leaves.
+    // An admin who reconnects is re-announced with no `by`.
     await fire("admins-changed", {
       admins: [{ peerId: "id-self", displayName: "Alice" }],
       change: {
         peerId: "id-self",
         displayName: "Alice",
         isAdmin: true,
-        reason: "promoted",
+        reason: "named",
         by: null,
       },
     });
     expect(useRoomStore.getState().isAdmin).toBe(true);
     expect(useRoomStore.getState().peers.get("id-carol")?.isAdmin).toBe(false);
     expect(systemMessages().map((m) => m.text)).toContain(announce_you_admin_promoted());
+    h.unmount();
+  });
+
+  it("moderation-ended drops the policy and every admin badge and announces it", async () => {
+    const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
+      moderation: DEFAULT_MODERATION_POLICY,
+      isAdmin: false,
+      admins: [{ peerId: "id-bob", displayName: "Bob" }],
+    });
+    expect(useRoomStore.getState().moderation).not.toBeNull();
+    expect(useRoomStore.getState().peers.get("id-bob")?.isAdmin).toBe(true);
+    // The last admin left: the server dropped the policy.
+    await fire("moderation-ended", {});
+    expect(useRoomStore.getState().moderation).toBeNull();
+    expect(useRoomStore.getState().adminIds).toEqual([]);
+    expect(useRoomStore.getState().isAdmin).toBe(false);
+    expect(useRoomStore.getState().peers.get("id-bob")?.isAdmin).toBe(false);
+    expect(systemMessages().map((m) => m.text)).toContain(announce_moderation_ended());
     h.unmount();
   });
 

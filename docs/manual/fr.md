@@ -382,12 +382,13 @@ faut d'abord y répondre.
 
 ## Avec Alt
 
-| Touche                                     | Action                                                                                    |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `Alt` + `1` … `Alt` + `9`                  | Relit les derniers messages. `1` est le plus récent, `2` le précédent, et ainsi de suite. |
-| `Alt` + `0`                                | Relit le dixième message le plus récent.                                                  |
-| Le même `Alt` + chiffre deux fois de suite | Copie ce message dans le presse-papiers.                                                  |
-| `Alt` + `N`                                | Ouvre les notes partagées du salon dans un nouvel onglet.                                 |
+| Touche                                     | Action                                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `Alt` + `1` … `Alt` + `9`                  | Relit les derniers messages. `1` est le plus récent, `2` le précédent, et ainsi de suite.     |
+| `Alt` + `0`                                | Relit le dixième message le plus récent.                                                      |
+| Le même `Alt` + chiffre deux fois de suite | Copie ce message dans le presse-papiers.                                                      |
+| `Alt` + `N`                                | Ouvre les notes partagées du salon dans un nouvel onglet.                                     |
+| `Ctrl` + `Maj` + `M`                       | Coupe les micros de tout le monde : **salons modérés seulement**, et si vous y êtes autorisé. |
 
 La relecture `Alt` + chiffre est le seul jeu de raccourcis qui **fonctionne aussi
 pendant que vous tapez dans la zone de chat**, et il marche que le panneau soit
@@ -669,10 +670,17 @@ prochaine fois.
 autorisé plusieurs administrateurs, les options de chaque participant
 comprennent **« Nommer administrateur »** (et **« Retirer administrateur »**
 pour l'annuler). Les administrateurs portent le mot « administrateur » dans leur
-ligne de la liste. Si le dernier administrateur part alors qu'il reste des gens,
-la personne présente depuis le plus longtemps devient administratrice, et c'est
-annoncé. Si vous rechargez ou perdez la connexion, vous retrouvez le rôle en
-revenant.
+ligne de la liste. Si vous rechargez ou perdez la connexion, vous retrouvez le
+rôle en revenant.
+
+**Si tous les administrateurs partent** alors qu'il reste des gens, le salon
+**cesse d'être modéré** : c'est annoncé à tout le monde (« Le dernier
+administrateur est parti : ce salon n'est plus modéré »), chacun retrouve tous
+les boutons, le chat rouvre et le salon continue comme un salon privé ou public
+ordinaire jusqu'à sa fin. Personne n'est nommé à leur place, et un ancien
+administrateur qui revient entre comme simple participant. Si vous voulez que le
+salon survive à votre absence avec ses règles intactes, nommez un second
+administrateur avant de partir.
 
 **La porte.** Dans un salon modéré, les nouveaux venus frappent **toujours** à
 la porte, salon public ou non. Le réglage « Approuver les nouveaux participants »
@@ -686,7 +694,10 @@ lui dit qui l'a fait. C'est une coupure _douce_ : la personne peut réactiver so
 micro avec `M` quand elle veut parler (ce qui règle le classique « on t'entend
 parler avec ta voisine » sans lever la main). Dans la barre de contrôles, qui y
 est autorisé voit aussi **« Couper les micros de tout le monde »**, qui fait la
-même chose à tous les autres d'un coup.
+même chose à tous les autres d'un coup. Son raccourci est `Ctrl` + `Maj` + `M` :
+un accord de trois touches, exprès, pour qu'on ne le déclenche pas par erreur à
+côté du `M`. Il n'existe que dans un salon modéré ; ailleurs, le navigateur garde
+cette combinaison.
 
 **Exclure.** Selon le réglage : les administrateurs (ou tout le monde) excluent
 directement depuis les options du participant avec **« Exclure du salon »**,
@@ -810,6 +821,7 @@ de la barre vidéo. Elle n'est conservée que dans ce navigateur.
 | `Alt` + `1`…`9`, `0`                    | Relire les dix derniers messages, du plus récent au plus ancien |
 | Le même `Alt` + chiffre deux fois       | Copier ce message                                               |
 | `Alt` + `N`                             | Notes partagées dans un nouvel onglet                           |
+| `Ctrl` + `Maj` + `M`                    | Couper tous les micros (salons modérés)                         |
 | `Tab` / `Maj` + `Tab`                   | D'une partie de l'application à l'autre                         |
 | `Gauche` / `Droite`                     | Parcourir une barre ; régler un curseur                         |
 | `Haut` / `Bas`                          | Parcourir une liste                                             |

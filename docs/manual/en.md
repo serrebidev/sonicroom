@@ -362,6 +362,7 @@ answered first.
 | `Alt` + `0`                            | Read the tenth most recent message.                                                |
 | The same `Alt` + number twice, quickly | Copy that message to the clipboard.                                                |
 | `Alt` + `N`                            | Open this room's shared notes in a new tab.                                        |
+| `Ctrl` + `Shift` + `M`                 | Mute everyone's microphones — **moderated rooms only**, and only if you may.       |
 
 The `Alt` + number readback is the one set of shortcuts that **also works while
 you are typing in the chat box**, and it works whether the chat panel is open or
@@ -617,10 +618,17 @@ it exists; the browser remembers your last configuration for next time.
 **Who is an administrator.** Whoever creates the room. If you allowed several
 administrators, every participant's options include **"Make administrator"**
 (and **"Remove administrator"** to undo it). Administrators carry the word
-"administrator" in their row of the list. If the last administrator leaves while
-people remain, the person who has been in the room longest becomes the
-administrator, and it is announced. If you reload or lose the connection, you
-get the role back when you return.
+"administrator" in their row of the list. If you reload or lose the connection,
+you get the role back when you return.
+
+**If every administrator leaves** while people remain, the room **stops being
+moderated**: it is announced to everyone ("The last administrator has left: this
+room is no longer moderated"), every button comes back for everybody, the chat
+reopens, and the room carries on as an ordinary private or public room for the
+rest of its life. Nobody is promoted in the leavers' place, and a former
+administrator who comes back is a regular participant. If you want the room to
+survive your absence with its rules intact, name a second administrator before
+you go.
 
 **The door.** In a moderated room newcomers **always** knock, public or not.
 The "Approve new participants" setting decides who hears the knock and gets the
@@ -633,7 +641,9 @@ did it. It is a _soft_ mute: the person can turn their microphone back on with
 `M` when they mean to speak (which settles the classic "we can hear you talking
 to your neighbour" without a raise-hand flow). In the controls bar, whoever is
 allowed also sees **"Mute everyone's microphones"**, which does the same to
-everybody else at once.
+everybody else at once. Its shortcut is `Ctrl` + `Shift` + `M` — a deliberate
+three-key chord, so it cannot be hit by mistake next to `M`. It only exists in a
+moderated room; elsewhere the browser keeps that combination.
 
 **Removing people.** Depending on the setting: administrators (or everyone)
 remove directly from the participant's options with **"Remove from room"**, no
@@ -753,6 +763,7 @@ video toolbar. It is kept in this browser only.
 | `Alt` + `1`…`9`, `0`                 | Read the last ten messages, newest first |
 | Same `Alt` + number twice            | Copy that message                        |
 | `Alt` + `N`                          | Shared notes in a new tab                |
+| `Ctrl` + `Shift` + `M`               | Mute everyone (moderated rooms)          |
 | `Tab` / `Shift` + `Tab`              | Between parts of the app                 |
 | `Left` / `Right`                     | Along a toolbar; change a slider         |
 | `Up` / `Down`                        | Through a list                           |

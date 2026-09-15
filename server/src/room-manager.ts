@@ -17,8 +17,7 @@ export interface Peer {
   // can room-ban it on removal, the same soft ban a knock-deny applies.
   ip: string;
   // The per-session join token this peer joined with ("" if none). Lets a
-  // moderated room re-recognise an admin after a reconnect (adminTokens) and
-  // record a promoted admin's token.
+  // moderated room re-recognise an admin after a reconnect (adminTokens).
   token: string;
   // Mirrors the client's mute toggle (set via producer-pause/-resume, which
   // fire in P2P mode too) so late joiners can render existing peers' state.
@@ -118,11 +117,12 @@ export interface Room {
   // A moderated room is pinned to the SFU so the server can pause a muted
   // producer itself. See moderation-util.ts.
   moderation: ModerationPolicy | null;
-  // Peer ids of the current admins (the creator, co-admins they named, and
-  // anyone auto-promoted when the last admin left). Empty for unmoderated rooms.
+  // Peer ids of the current admins (the creator and co-admins they named).
+  // Empty for unmoderated rooms — and once the last admin leaves, the room
+  // stops being moderated altogether (endModerationIfNoAdmins).
   admins: Set<string>;
   // Join tokens of admins, so an admin who reconnects (new socket id) comes back
-  // as an admin. Revoking removes the token again.
+  // as an admin. Revoking removes the token again; ending moderation clears all.
   adminTokens: Set<string>;
   // Rolling chat history (bounded to CHAT_HISTORY_MAX) so late joiners receive
   // recent messages on join. Newest last.

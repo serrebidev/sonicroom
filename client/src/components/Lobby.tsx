@@ -20,8 +20,11 @@ import {
 } from "../lib/moderation";
 import { m } from "../paraglide/messages.js";
 
+// Room names are case-insensitive; lowercase is the canonical form (the
+// server normalizes too — see roomNameSchema), so the link we navigate to is
+// already the one everyone else shares.
 function sanitize(input: string): string {
-  return input.replace(/[^a-zA-Z0-9_-]/g, "");
+  return input.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
 }
 
 // `?p2p=off` (also accepts false/0/no/disable/disabled) means P2P is disabled —

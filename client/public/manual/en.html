@@ -851,6 +851,11 @@ those letters stay free there.</p>
 <td><code>Alt</code> + <code>N</code></td>
 <td>Open this room’s shared notes in a new tab.</td>
 </tr>
+<tr class="odd">
+<td><code>Ctrl</code> + <code>Shift</code> + <code>M</code></td>
+<td>Mute everyone’s microphones — <strong>moderated rooms only</strong>,
+and only if you may.</td>
+</tr>
 </tbody>
 </table>
 <p>The <code>Alt</code> + number readback is the one set of shortcuts
@@ -1145,10 +1150,17 @@ your last configuration for next time.</p>
 If you allowed several administrators, every participant’s options
 include <strong>“Make administrator”</strong> (and <strong>“Remove
 administrator”</strong> to undo it). Administrators carry the word
-“administrator” in their row of the list. If the last administrator
-leaves while people remain, the person who has been in the room longest
-becomes the administrator, and it is announced. If you reload or lose
-the connection, you get the role back when you return.</p>
+“administrator” in their row of the list. If you reload or lose the
+connection, you get the role back when you return.</p>
+<p><strong>If every administrator leaves</strong> while people remain,
+the room <strong>stops being moderated</strong>: it is announced to
+everyone (“The last administrator has left: this room is no longer
+moderated”), every button comes back for everybody, the chat reopens,
+and the room carries on as an ordinary private or public room for the
+rest of its life. Nobody is promoted in the leavers’ place, and a former
+administrator who comes back is a regular participant. If you want the
+room to survive your absence with its rules intact, name a second
+administrator before you go.</p>
 <p><strong>The door.</strong> In a moderated room newcomers
 <strong>always</strong> knock, public or not. The “Approve new
 participants” setting decides who hears the knock and gets the Allow /
@@ -1161,8 +1173,11 @@ mute: the person can turn their microphone back on with <code>M</code>
 when they mean to speak (which settles the classic “we can hear you
 talking to your neighbour” without a raise-hand flow). In the controls
 bar, whoever is allowed also sees <strong>“Mute everyone’s
-microphones”</strong>, which does the same to everybody else at
-once.</p>
+microphones”</strong>, which does the same to everybody else at once.
+Its shortcut is <code>Ctrl</code> + <code>Shift</code> + <code>M</code>
+— a deliberate three-key chord, so it cannot be hit by mistake next to
+<code>M</code>. It only exists in a moderated room; elsewhere the
+browser keeps that combination.</p>
 <p><strong>Removing people.</strong> Depending on the setting:
 administrators (or everyone) remove directly from the participant’s
 options with <strong>“Remove from room”</strong>, no vote; or the room
@@ -1346,63 +1361,67 @@ video toolbar. It is kept in this browser only.</p>
 <td>Shared notes in a new tab</td>
 </tr>
 <tr class="even">
+<td><code>Ctrl</code> + <code>Shift</code> + <code>M</code></td>
+<td>Mute everyone (moderated rooms)</td>
+</tr>
+<tr class="odd">
 <td><code>Tab</code> / <code>Shift</code> + <code>Tab</code></td>
 <td>Between parts of the app</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Left</code> / <code>Right</code></td>
 <td>Along a toolbar; change a slider</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Up</code> / <code>Down</code></td>
 <td>Through a list</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Home</code> / <code>End</code></td>
 <td>First / last; minimum / maximum</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Enter</code> / <code>Space</code></td>
 <td>Activate</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Escape</code></td>
 <td>Close panel, dialog or full screen</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Backspace</code></td>
 <td>Back out of options; up a folder</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Enter</code> in the message box</td>
 <td>Send</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Shift</code> + <code>Enter</code> in the message box</td>
 <td>New line</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Ctrl</code> / <code>Cmd</code> + <code>C</code> on a
 message</td>
 <td>Copy it</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>NVDA</code> + <code>Space</code></td>
 <td>NVDA: browse mode ↔︎ focus mode</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>JAWS key</code> + <code>Z</code></td>
 <td>JAWS: Virtual Cursor off / on</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Caps Lock</code> + <code>Space</code></td>
 <td>Narrator: Scan Mode off / on</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Left</code> + <code>Right</code> together</td>
 <td>VoiceOver: Quick Nav off / on</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Orca Modifier</code> + <code>A</code></td>
 <td>Orca: browse mode ↔︎ focus mode</td>
 </tr>

@@ -865,8 +865,8 @@ audio, así que esas letras quedan libres allí.</p>
 <h2 id="con-alt">Con Alt</h2>
 <table>
 <colgroup>
-<col style="width: 33%" />
-<col style="width: 66%" />
+<col style="width: 32%" />
+<col style="width: 67%" />
 </colgroup>
 <thead>
 <tr class="header">
@@ -892,6 +892,11 @@ reciente, <code>2</code> el anterior, y así.</td>
 <tr class="even">
 <td><code>Alt</code> + <code>N</code></td>
 <td>Abre las notas compartidas de la sala en una pestaña nueva.</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl</code> + <code>Mayús</code> + <code>M</code></td>
+<td>Silencia los micrófonos de todos: <strong>solo en salas
+moderadas</strong>, y solo si tienes permiso.</td>
 </tr>
 </tbody>
 </table>
@@ -1207,9 +1212,17 @@ permitido varios administradores, en las opciones de cualquier
 participante encontrarás <strong>«Nombrar administrador»</strong> (y
 <strong>«Quitar administrador»</strong> para deshacerlo). Los
 administradores llevan la palabra «administrador» en su fila de la
-lista. Si el último administrador se va y queda gente dentro, la persona
-que más tiempo lleva en la sala pasa a ser administradora, y se anuncia.
-Si te recargas o pierdes la conexión, recuperas el cargo al volver.</p>
+lista. Si te recargas o pierdes la conexión, recuperas el cargo al
+volver.</p>
+<p><strong>Si se van todos los administradores</strong> y queda gente
+dentro, la sala <strong>deja de estar moderada</strong>: se anuncia a
+todo el mundo («El último administrador se ha ido: esta sala ya no está
+moderada»), a todos les vuelven todos los botones, el chat se reabre y
+la sala sigue como una sala privada o pública normal el resto de su
+vida. No se nombra a nadie en su lugar, y un antiguo administrador que
+vuelva entra como participante normal. Si quieres que la sala sobreviva
+a tu ausencia con sus reglas intactas, nombra a un segundo administrador
+antes de irte.</p>
 <p><strong>La puerta.</strong> En una sala moderada
 <strong>siempre</strong> se llama a la puerta, sea pública o no. La
 opción «Aprobar la entrada de nuevos participantes» decide quién oye los
@@ -1223,7 +1236,10 @@ con <code>M</code> cuando vaya a hablar (así se resuelve el clásico «se
 te oye hablar con la vecina» sin pedir la palabra). En la barra de
 controles, quien tenga permiso ve además <strong>«Silenciar los
 micrófonos de todos»</strong>, que hace lo mismo con todos los demás de
-golpe.</p>
+golpe. Su atajo es <code>Ctrl</code> + <code>Mayús</code> +
+<code>M</code>: una combinación de tres teclas a propósito, para que no
+se pulse por error al lado de la <code>M</code>. Solo existe en una sala
+moderada; en las demás esa combinación se la queda el navegador.</p>
 <p><strong>Expulsar.</strong> Según la opción elegida: los
 administradores (o todos) expulsan directamente desde las opciones del
 participante con <strong>«Expulsar de la sala»</strong>, sin votación; o
@@ -1410,63 +1426,67 @@ navegador.</p>
 <td>Notas compartidas en una pestaña nueva</td>
 </tr>
 <tr class="even">
+<td><code>Ctrl</code> + <code>Mayús</code> + <code>M</code></td>
+<td>Silenciar a todos (salas moderadas)</td>
+</tr>
+<tr class="odd">
 <td><code>Tab</code> / <code>Mayús</code> + <code>Tab</code></td>
 <td>Entre las partes de la aplicación</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Izquierda</code> / <code>Derecha</code></td>
 <td>Recorrer una barra; cambiar un deslizador</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Arriba</code> / <code>Abajo</code></td>
 <td>Recorrer una lista</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Inicio</code> / <code>Fin</code></td>
 <td>Primero / último; mínimo / máximo</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Enter</code> / <code>Espacio</code></td>
 <td>Activar</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Escape</code></td>
 <td>Cerrar panel, diálogo o pantalla completa</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Retroceso</code></td>
 <td>Salir de las opciones; subir una carpeta</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Enter</code> en el cuadro de mensaje</td>
 <td>Enviar</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Mayús</code> + <code>Enter</code> en el cuadro de mensaje</td>
 <td>Salto de línea</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Control</code> / <code>Cmd</code> + <code>C</code> sobre un
 mensaje</td>
 <td>Copiarlo</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>NVDA</code> + <code>Espacio</code></td>
 <td>NVDA: modo exploración ↔︎ modo foco</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>tecla JAWS</code> + <code>Z</code></td>
 <td>JAWS: cursor virtual desactivado / activado</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>Bloq Mayús</code> + <code>Espacio</code></td>
 <td>Narrador: modo de exploración desactivado / activado</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>Izquierda</code> + <code>Derecha</code> a la vez</td>
 <td>VoiceOver: navegación rápida desactivada / activada</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>modificador de Orca</code> + <code>A</code></td>
 <td>Orca: modo navegación ↔︎ modo foco</td>
 </tr>

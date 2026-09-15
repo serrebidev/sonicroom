@@ -17,8 +17,20 @@ import path from "node:path";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
+const envPath = path.resolve(here, "../../.env");
 try {
-  process.loadEnvFile(path.resolve(here, "../../.env"));
-} catch {
-  /* no .env present — fine */
+  process.loadEnvFile(envPath);
+} catch (err) {
+  // A missing file is fine (every .env-gated feature simply stays off). Any
+  // other failure is NOT — most likely the file exists but the service user
+  // can't read it (e.g. root-owned 0640 while running as `sonicroom`), which
+  // silently disables NOTELAB_URL, CASTER_TOKENS, NOTY_*, AUDIO_LIBRARY_DIR…
+  // and looks exactly like "the Notes button disappeared". Say so loudly.
+  const code = (err as NodeJS.ErrnoException)?.code;
+  if (code !== "ENOENT") {
+    console.warn(
+      `[env] could not read ${envPath} (${code ?? String(err)}) — .env-gated features are OFF. ` +
+        "Make it readable by the service user (e.g. chown root:sonicroom .env && chmod 640 .env).",
+    );
+  }
 }

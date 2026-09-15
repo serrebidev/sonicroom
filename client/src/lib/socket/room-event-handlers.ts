@@ -27,11 +27,11 @@ import {
   announce_all_muted,
   announce_admin_named,
   announce_admin_revoked,
-  announce_admin_promoted,
   announce_admin_joined,
   announce_you_admin_named,
   announce_you_admin_revoked,
   announce_you_admin_promoted,
+  announce_moderation_ended,
   announce_you_were_muted,
 } from "../../paraglide/messages.js";
 
@@ -136,15 +136,15 @@ export function registerMuteHandlers(socket: Socket, surfaceToggle: SurfaceToggl
   });
 }
 
-// --- MODERATED rooms: admin-set changes, forced mutes. Never fire in an
-// ordinary room (the server has no admins there). `onForcedMute` is the
+// --- MODERATED rooms: admin-set changes, the end of moderation, forced mutes.
+// Never fire in an ordinary room (the server has no admins there). `onForcedMute` is the
 // hook-owned local mute (track off + producer paused + store), applied when an
 // admin muted US — the server already paused our producer, so no emit. ---
 export interface AdminChange {
   peerId: string;
   displayName: string;
   isAdmin: boolean;
-  reason: "named" | "revoked" | "promoted";
+  reason: "named" | "revoked";
   by: string | null;
 }
 export function registerAdminHandlers(socket: Socket, onForcedMute: (by: string) => void) {
@@ -163,9 +163,7 @@ export function registerAdminHandlers(socket: Socket, onForcedMute: (by: string)
       const name = change.displayName;
       const by = change.by ?? "";
       let text: string;
-      if (change.reason === "promoted") {
-        text = me ? announce_you_admin_promoted() : announce_admin_promoted({ name });
-      } else if (change.isAdmin) {
+      if (change.isAdmin) {
         // Named by someone — or an admin (re)joined (no `by`).
         text = change.by
           ? me
@@ -180,6 +178,17 @@ export function registerAdminHandlers(socket: Socket, onForcedMute: (by: string)
       s.announceEvent(text);
     },
   );
+
+  // The last admin left: the room is an ordinary room from now on. Dropping
+  // the policy is what un-gates every control (Room.tsx derives all its gates
+  // from `moderation`), reopens the chat and brings PoweredBy back; clearing
+  // the admin list drops every row's badge. A room event — logged to chat.
+  socket.on("moderation-ended", () => {
+    const s = store.getState();
+    s.setModeration(null);
+    s.setAdmins([]);
+    s.announceEvent(announce_moderation_ended());
+  });
 
   // Someone muted OUR microphone for everyone. Soft: we may unmute again (M).
   socket.on("you-were-muted", ({ by }: { by: string }) => {

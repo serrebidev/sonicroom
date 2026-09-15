@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef, useState, lazy, Suspense } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   Headphones,
   Users,
@@ -76,7 +76,12 @@ function postToHost(type: string, payload?: Record<string, unknown>) {
 }
 
 export function Room() {
-  const { roomName } = useParams<{ roomName: string }>();
+  const { roomName: rawRoomName } = useParams<{ roomName: string }>();
+  // Room names are case-insensitive (lowercase canonical, matching the
+  // server's roomNameSchema): /room/Foo joins "foo", and the storage keys
+  // below are derived from the canonical name so a re-typed link still finds
+  // this tab's per-room state.
+  const roomName = rawRoomName?.toLowerCase();
   const [searchParams] = useSearchParams();
   // P2P-off can come from the URL (?p2p=off) or — so the choice survives a
   // reload/rejoin even if the reloaded link drops the query — from a per-room
@@ -91,6 +96,14 @@ export function Room() {
   // Only a REQUEST: the server's (sticky) answer is `roomIsVideo` in the store.
   const videoRequested = isVideoRoomParam(searchParams.get("video"));
   const navigate = useNavigate();
+  // Rewrite a mixed-case link to its canonical lowercase URL (replace, so Back
+  // doesn't bounce through it). Same route, so the component stays mounted.
+  const { search: locSearch, hash: locHash } = useLocation();
+  useEffect(() => {
+    if (rawRoomName && roomName && rawRoomName !== roomName) {
+      navigate(`/room/${roomName}${locSearch}${locHash}`, { replace: true });
+    }
+  }, [rawRoomName, roomName, locSearch, locHash, navigate]);
   const {
     join,
     leave,
@@ -398,6 +411,27 @@ export function Room() {
 
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
+      // Ctrl+Shift+M: mute everyone's microphones (moderated rooms only). A
+      // deliberate two-modifier chord, not a single letter, so it can't be hit
+      // by accident next to M — a stray "everyone muted" is a confusing thing to
+      // undo even though each person can unmute again. Physical key (e.code)
+      // like Alt+N. Someone who may not do it is told so, like A/F/D/R; in an
+      // ordinary room the combo is left to the browser.
+      if (
+        e.ctrlKey &&
+        e.shiftKey &&
+        !e.altKey &&
+        !e.metaKey &&
+        e.code === "KeyM" &&
+        useRoomStore.getState().moderation != null
+      ) {
+        e.preventDefault();
+        const { moderation: policy, isAdmin: admin, announce: say } = useRoomStore.getState();
+        if (allowed(policy, admin, "muteAll")) muteAll();
+        else say(m.announce_not_allowed());
+        return;
+      }
+
       // Single-letter room shortcuts must not hijack browser/OS combos like
       // Ctrl+R (reload), Alt+D (address bar) or Cmd+R — bail when any of
       // Ctrl/Alt/Meta is held. (Shift stays allowed: it's how the uppercase
@@ -459,6 +493,7 @@ export function Room() {
     announceSpeakers,
     openNotes,
     toggleVideo,
+    muteAll,
   ]);
 
   const handleLeave = useCallback(() => {

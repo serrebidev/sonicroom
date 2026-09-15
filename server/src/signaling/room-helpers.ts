@@ -102,7 +102,7 @@ export function createRoomHelpers(
       peerId: string;
       displayName: string;
       isAdmin: boolean;
-      reason: "named" | "revoked" | "promoted";
+      reason: "named" | "revoked";
       by: string | null;
     },
   ) {
@@ -277,8 +277,10 @@ export function createRoomHelpers(
     removePeer(room, peerId);
 
     if (room.peers.size > 0) {
+      // Before the mode decision: a room that just stopped being moderated
+      // loses its SFU pin, and applyModeDecision must see that.
+      endModerationIfNoAdmins(room);
       applyModeDecision(room);
-      promoteAdminIfNone(room);
     } else if (room.pendingJoins.size > 0) {
       // The room just emptied while someone was still knocking — their request
       // can never be answered now, so let them go (their client surfaces the
@@ -288,30 +290,24 @@ export function createRoomHelpers(
     }
   }
 
-  // A MODERATED room must never be left without an admin while people are
-  // still inside (nobody could approve knocks, mute or kick any more): when
-  // the last admin leaves, the longest-present human is promoted and everyone
-  // is told. `room.peers` is insertion-ordered, so the first non-caster entry
-  // is the longest-present. The promoted admin's token is recorded so they
-  // keep the role across a reconnect. A promoted admin also needs any queue of
-  // pending knocks they may now be the only one able to decide.
-  function promoteAdminIfNone(room: Room) {
+  // When the LAST admin of a moderated room leaves while people remain, the
+  // room stops being moderated: the policy is dropped, so from here on it
+  // behaves exactly like an ordinary private/public room (every control comes
+  // back, knocks can be answered by anyone, the chat reopens), and everyone is
+  // told (`moderation-ended`, announced + logged client-side). Nobody is
+  // promoted — an admin role handed to whoever happened to be there longest
+  // was the alternative, and it was ruled out. The admin tokens go too: a
+  // former admin who reconnects comes back as a regular participant, because
+  // there is no moderated room to be an admin of any more. Pending knockers
+  // are re-broadcast because the set of people who may answer them has just
+  // widened to everyone.
+  function endModerationIfNoAdmins(room: Room) {
     if (!room.moderation || room.admins.size > 0) return;
-    for (const [id, peer] of room.peers) {
-      if (room.casters.has(id)) continue;
-      room.admins.add(id);
-      if (peer.token) room.adminTokens.add(peer.token);
-      console.log(`[ws] ${peer.displayName} (${id}) promoted to admin of ${room.name}`);
-      emitAdminsChanged(room, {
-        peerId: id,
-        displayName: peer.displayName,
-        isAdmin: true,
-        reason: "promoted",
-        by: null,
-      });
-      if (room.pendingJoins.size > 0) broadcastJoinRequests(room);
-      return;
-    }
+    room.moderation = null;
+    room.adminTokens.clear();
+    console.log(`[ws] last admin left ${room.name}: room is no longer moderated`);
+    io.to(room.name).emit("moderation-ended", {});
+    if (room.pendingJoins.size > 0) broadcastJoinRequests(room);
   }
 
   // Remove a peer the room voted out — or, in a moderated room, one an admin
@@ -390,7 +386,7 @@ export function createRoomHelpers(
     adminList,
     emitAdminsChanged,
     canApproveJoins,
-    promoteAdminIfNone,
+    endModerationIfNoAdmins,
   };
 }
 

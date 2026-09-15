@@ -3,11 +3,15 @@ import { CHAT_TEXT_MAX } from "../chat-util.js";
 import { moderationPolicySchema } from "../moderation-util.js";
 
 // --- Validation schemas ---
+// Room names are CASE-INSENSITIVE: the canonical form is lowercase, applied
+// here so every entry point (join, /api/rooms/:name) keys the room map the
+// same way — /room/Foo and /room/foo are one room.
 export const roomNameSchema = z
   .string()
   .min(1)
   .max(64)
-  .regex(/^[a-zA-Z0-9_-]+$/, "Room name must be alphanumeric, hyphens, or underscores");
+  .regex(/^[a-zA-Z0-9_-]+$/, "Room name must be alphanumeric, hyphens, or underscores")
+  .transform((s) => s.toLowerCase());
 
 export const displayNameSchema = z
   .string()

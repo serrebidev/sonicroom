@@ -9,7 +9,9 @@
     "start": "pnpm --filter server start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "manual": "docs/manual/build.sh",
+    "reserve": "pnpm --silent --filter server exec tsx scripts/reserve.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -18,5 +20,6 @@
     "globals": "^17.6.0",
     "prettier": "^3.8.4",
     "typescript-eslint": "^8.61.0"
-  }
+  },
+  "packageManager": "pnpm@11.22.0"
 }

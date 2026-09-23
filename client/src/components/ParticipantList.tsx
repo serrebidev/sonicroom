@@ -11,8 +11,16 @@ import {
   CircleStop,
   ChevronRight,
   ChevronLeft,
+  Video,
+  MonitorUp,
+  ScanEye,
+  Pin,
+  PinOff,
+  ShieldCheck,
+  ShieldOff,
+  MicOff as MicOffIcon,
 } from "lucide-react";
-import type { PeerState } from "../stores/room";
+import { isPinned, type PeerState, type PinnedVideo } from "../stores/room";
 import { m } from "../paraglide/messages.js";
 
 interface ParticipantListProps {
@@ -42,6 +50,32 @@ interface ParticipantListProps {
   // peerId → rank (1-based) for the most recent talkers, shown as a transient
   // numbered badge on the tile (set by the W shortcut / button, auto-cleared).
   speakerBadges: Record<string, number>;
+  // VIDEO rooms only (undefined in audio rooms, so nothing video-related is
+  // offered): have Claude describe a snapshot of this peer's camera / screen
+  // (or our own camera). Offered as options in the participant's menu.
+  onDescribeVideo?: (peerId: string, source: "camera" | "screen") => void;
+  // VIDEO rooms only: pin one camera/screen to fill the video stage. Local view
+  // choice, never signaled. `pinnedVideo` is the store's current pin (needed
+  // both to flip the option to "Unpin" and to KEEP offering it while the pinned
+  // camera is momentarily off — otherwise a pin could become unremovable).
+  pinnedVideo?: PinnedVideo | null;
+  onTogglePinVideo?: (peerId: string, source: "camera" | "screen") => void;
+  // How tall the list may grow before it scrolls itself. A video room passes a
+  // smaller cap so the pictures keep the majority of the window; audio rooms
+  // (where the list IS the UI) keep the roomy default.
+  maxHeightClass?: string;
+  // MODERATED rooms only (all false/undefined in an ordinary room, so nothing
+  // admin-related is offered there): whether WE are an admin (admin-on-admin
+  // actions), and per the room's policy whether we may remove people directly
+  // (no vote), mute one participant for everyone, and name/revoke co-admins.
+  moderated?: boolean;
+  isAdmin?: boolean;
+  kickDirect?: boolean;
+  onKickDirect?: (peerId: string) => void;
+  canMutePeer?: boolean;
+  onMutePeer?: (peerId: string) => void;
+  canSetAdmin?: boolean;
+  onSetAdmin?: (peerId: string, admin: boolean) => void;
 }
 
 function getInitials(name: string): string {
@@ -79,6 +113,18 @@ export function ParticipantList({
   onStopStream,
   announce,
   speakerBadges,
+  onDescribeVideo,
+  pinnedVideo = null,
+  onTogglePinVideo,
+  maxHeightClass = "max-h-[70vh]",
+  moderated = false,
+  isAdmin = false,
+  kickDirect = false,
+  onKickDirect,
+  canMutePeer = false,
+  onMutePeer,
+  canSetAdmin = false,
+  onSetAdmin,
 }: ParticipantListProps) {
   const rows = useMemo(() => [selfPeer, ...peerList], [selfPeer, peerList]);
   const isSelf = (peerId: string) => peerId === selfPeer.peerId;
@@ -135,9 +181,19 @@ export function ParticipantList({
     const textOnly = self && !hasMic;
     let label = peer.displayName;
     if (self) label += ` (${m.card_you()})`;
+    if (peer.isAdmin) label += `, ${m.card_admin_fragment()}`;
     if (textOnly) label += `, ${m.card_text_only()}`;
     else if (peer.isMuted) label += `, ${m.card_muted_fragment()}`;
     if (peer.isSpeaking) label += `, ${m.card_speaking_fragment()}`;
+    // Video-room status (false everywhere in an audio room).
+    if (peer.hasVideo) label += `, ${m.participants_sharing_video()}`;
+    if (peer.hasScreen) label += `, ${m.participants_sharing_screen()}`;
+    if (
+      isPinned(pinnedVideo, peer.peerId, "camera") ||
+      isPinned(pinnedVideo, peer.peerId, "screen")
+    ) {
+      label += `, ${m.video_pinned_fragment()}`;
+    }
     if (peer.localMuted) label += `, ${m.participants_muted_fragment()}`;
     if (kickEnabled && !peer.isMusic && !peer.isMicStream && !self && peer.kickVotes > 0) {
       label += `, ${peer.kickVotes === 1 ? m.card_votes_one() : m.card_votes_many({ count: peer.kickVotes })}`;
@@ -191,9 +247,37 @@ export function ParticipantList({
         onVolumeChange={onVolumeChange}
         onLocalMuteChange={onLocalMuteChange}
         showKick={
-          kickEnabled && !openPeer.isMusic && !openPeer.isMicStream && !isSelf(openPeer.peerId)
+          kickEnabled &&
+          !openPeer.isMusic &&
+          !openPeer.isMicStream &&
+          !isSelf(openPeer.peerId) &&
+          // Moderated room: admins are never a vote's target.
+          !(moderated && openPeer.isAdmin)
         }
         onToggleKick={onToggleKick}
+        // Moderated room. A human row only (never a caster/stream tile, never
+        // ourself); an admin may only be acted on by another admin.
+        showKickDirect={
+          kickDirect &&
+          !openPeer.isMusic &&
+          !openPeer.isMicStream &&
+          !isSelf(openPeer.peerId) &&
+          (!openPeer.isAdmin || isAdmin)
+        }
+        onKickDirect={onKickDirect}
+        showMuteForAll={
+          canMutePeer &&
+          !openPeer.isMusic &&
+          !openPeer.isMicStream &&
+          !isSelf(openPeer.peerId) &&
+          !openPeer.isMuted &&
+          (!openPeer.isAdmin || isAdmin)
+        }
+        onMutePeer={onMutePeer}
+        showSetAdmin={
+          canSetAdmin && !openPeer.isMusic && !openPeer.isMicStream && !isSelf(openPeer.peerId)
+        }
+        onSetAdmin={onSetAdmin}
         showKickCaster={openPeer.isCaster}
         onKickCaster={onKickCaster}
         // Any per-stream media tile — a share/file (isMusic, but not the caster) or
@@ -201,6 +285,9 @@ export function ParticipantList({
         // The tile's key is the producerId the stop targets.
         showStopStream={(openPeer.isMusic && !openPeer.isCaster) || openPeer.isMicStream}
         onStopStream={onStopStream}
+        onDescribeVideo={onDescribeVideo}
+        pinnedVideo={pinnedVideo}
+        onTogglePinVideo={onTogglePinVideo}
         announce={announce}
         onClose={closeOptions}
       />
@@ -219,7 +306,7 @@ export function ParticipantList({
       aria-activedescendant={activeId}
       onKeyDown={onListKeyDown}
       onFocus={() => setActiveIdx((i) => (i < 0 && rows.length ? 0 : i))}
-      className="max-h-[70vh] w-full max-w-md space-y-1 overflow-y-auto rounded-xl border border-sonic-700 bg-sonic-800/40 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sonic-accent/60"
+      className={`${maxHeightClass} w-full max-w-md space-y-1 overflow-y-auto rounded-xl border border-sonic-700 bg-sonic-800/40 p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-sonic-accent/60`}
     >
       {rows.map((peer, i) => {
         const self = isSelf(peer.peerId);
@@ -284,6 +371,13 @@ export function ParticipantList({
                     {m.card_you()}
                   </span>
                 )}
+                {/* Moderated room: admin badge (the aria-label says it too). */}
+                {peer.isAdmin && (
+                  <ShieldCheck
+                    className="ml-1.5 inline h-3.5 w-3.5 align-text-bottom text-amber-300"
+                    aria-hidden="true"
+                  />
+                )}
               </span>
               {(peer.localMuted || flaggedForKick) && (
                 <span className="truncate text-xs text-sonic-400">
@@ -296,6 +390,15 @@ export function ParticipantList({
                 </span>
               )}
             </div>
+
+            {/* Video-room indicators (camera on / screen shared). Visual only
+                here — the row's aria-label carries the same words. */}
+            {peer.hasVideo && (
+              <Video className="h-4 w-4 shrink-0 text-sonic-accent" aria-hidden="true" />
+            )}
+            {peer.hasScreen && (
+              <MonitorUp className="h-4 w-4 shrink-0 text-sonic-accent" aria-hidden="true" />
+            )}
 
             {/* Status icon */}
             {peer.localMuted ? (
@@ -343,6 +446,19 @@ interface ParticipantOptionsProps {
   // Share/file media tile only: offer an immediate "Stop this stream" action.
   showStopStream: boolean;
   onStopStream: (producerId: string) => void;
+  // Moderated rooms only: remove at once (no vote), mute for everyone, and
+  // name/revoke as co-admin. The list gates each per row.
+  showKickDirect?: boolean;
+  onKickDirect?: (peerId: string) => void;
+  showMuteForAll?: boolean;
+  onMutePeer?: (peerId: string) => void;
+  showSetAdmin?: boolean;
+  onSetAdmin?: (peerId: string, admin: boolean) => void;
+  // Video rooms only: "Describe X's video / screen" (Claude). Undefined elsewhere.
+  onDescribeVideo?: (peerId: string, source: "camera" | "screen") => void;
+  // Video rooms only: "Pin / Unpin X's video / screen". Undefined elsewhere.
+  pinnedVideo?: PinnedVideo | null;
+  onTogglePinVideo?: (peerId: string, source: "camera" | "screen") => void;
   announce: (message: string) => void;
   onClose: () => void;
 }
@@ -395,6 +511,15 @@ function ParticipantOptions({
   onKickCaster,
   showStopStream,
   onStopStream,
+  showKickDirect = false,
+  onKickDirect,
+  showMuteForAll = false,
+  onMutePeer,
+  showSetAdmin = false,
+  onSetAdmin,
+  onDescribeVideo,
+  pinnedVideo = null,
+  onTogglePinVideo,
   announce,
   onClose,
 }: ParticipantOptionsProps) {
@@ -402,8 +527,43 @@ function ParticipantOptions({
   const votesPhrase =
     peer.kickVotes === 1 ? m.card_votes_one() : m.card_votes_many({ count: peer.kickVotes });
 
-  // Options for this participant, in display order. Self gets only the mic level.
+  // Options for this participant, in display order. Self gets the mic level
+  // (and, in a video room with our camera on, pin/describe "my video").
   const opts: OptionDef[] = [];
+
+  // Pin / unpin this peer's camera or screen (video rooms only). Offered while
+  // that picture is LIVE — or while it is the current pin even though it isn't,
+  // because a pin survives the camera going off and would otherwise become
+  // impossible to remove until they turned it back on.
+  const pinOption = (source: "camera" | "screen"): OptionDef | null => {
+    if (!onTogglePinVideo) return null;
+    const on = isPinned(pinnedVideo, peer.peerId, source);
+    const live = source === "camera" ? peer.hasVideo : peer.hasScreen;
+    if (!on && !live) return null;
+    return {
+      id: source === "camera" ? "pin-video" : "pin-screen",
+      kind: "toggle",
+      // No aria-pressed (role=option doesn't support it): like Mute/Unmute the
+      // label itself carries the state.
+      ariaLabel: isSelf
+        ? on
+          ? m.card_unpin_my_video()
+          : m.card_pin_my_video()
+        : source === "screen"
+          ? on
+            ? m.card_unpin_screen({ name })
+            : m.card_pin_screen({ name })
+          : on
+            ? m.card_unpin_video({ name })
+            : m.card_pin_video({ name }),
+      activate: () => onTogglePinVideo(peer.peerId, source),
+    };
+  };
+  const pushPin = (source: "camera" | "screen") => {
+    const opt = pinOption(source);
+    if (opt) opts.push(opt);
+  };
+
   if (isSelf) {
     if (hasMic) {
       opts.push({
@@ -416,6 +576,15 @@ function ParticipantOptions({
           label: m.card_your_mic_level(),
           percent: toPercent(micGain),
         }),
+      });
+    }
+    pushPin("camera");
+    if (onDescribeVideo && peer.hasVideo) {
+      opts.push({
+        id: "describe-video",
+        kind: "toggle",
+        ariaLabel: m.card_describe_my_video(),
+        activate: () => onDescribeVideo(peer.peerId, "camera"),
       });
     }
   } else {
@@ -440,6 +609,25 @@ function ParticipantOptions({
         announce(next ? m.announce_local_muted({ name }) : m.announce_local_unmuted({ name }));
       },
     });
+    // Moderated room: mute this person for everyone (soft — they can unmute).
+    if (showMuteForAll && onMutePeer) {
+      opts.push({
+        id: "mute-for-all",
+        kind: "toggle",
+        ariaLabel: m.card_mute_for_all({ name }),
+        activate: () => onMutePeer(peer.peerId),
+      });
+    }
+    // Moderated room: name / revoke a co-admin. The label flips with the
+    // person's current role (role="option" can't carry aria-pressed).
+    if (showSetAdmin && onSetAdmin) {
+      opts.push({
+        id: "set-admin",
+        kind: "toggle",
+        ariaLabel: peer.isAdmin ? m.card_revoke_admin({ name }) : m.card_make_admin({ name }),
+        activate: () => onSetAdmin(peer.peerId, !peer.isAdmin),
+      });
+    }
     if (showKick) {
       opts.push({
         id: "kick",
@@ -454,6 +642,15 @@ function ParticipantOptions({
             ? m.card_kick_with_votes({ name, votes: votesPhrase })
             : m.card_kick({ name }),
         activate: () => onToggleKick(peer.peerId),
+      });
+    }
+    // Moderated room: remove this person at once (no vote).
+    if (showKickDirect && onKickDirect) {
+      opts.push({
+        id: "kick-now",
+        kind: "toggle",
+        ariaLabel: m.card_kick_now({ name }),
+        activate: () => onKickDirect(peer.peerId),
       });
     }
     // Caster (Ecobox): an immediate, non-vote removal — available in any room.
@@ -473,6 +670,27 @@ function ParticipantOptions({
         kind: "toggle",
         ariaLabel: m.card_stop_stream({ name }),
         activate: () => onStopStream(peer.peerId),
+      });
+    }
+    // Video room: pin their camera / screen to the stage (local view only).
+    pushPin("camera");
+    pushPin("screen");
+    // Video room: have Claude describe a snapshot of their camera / screen.
+    // Only offered while that picture is actually live.
+    if (onDescribeVideo && peer.hasVideo) {
+      opts.push({
+        id: "describe-video",
+        kind: "toggle",
+        ariaLabel: m.card_describe_video({ name }),
+        activate: () => onDescribeVideo(peer.peerId, "camera"),
+      });
+    }
+    if (onDescribeVideo && peer.hasScreen) {
+      opts.push({
+        id: "describe-screen",
+        kind: "toggle",
+        ariaLabel: m.card_describe_screen({ name }),
+        activate: () => onDescribeVideo(peer.peerId, "screen"),
       });
     }
   }
@@ -575,6 +793,25 @@ function ParticipantOptions({
         <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-sonic-100">{name}</h2>
       </div>
 
+      {/* Video-room status line: what this participant is currently sharing.
+          Visible icons + the same words as text, so it's read by the menu too. */}
+      {(peer.hasVideo || peer.hasScreen) && (
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-sonic-300">
+          {peer.hasVideo && (
+            <span className="flex items-center gap-1">
+              <Video className="h-3.5 w-3.5 text-sonic-accent" aria-hidden="true" />
+              {m.participants_sharing_video()}
+            </span>
+          )}
+          {peer.hasScreen && (
+            <span className="flex items-center gap-1">
+              <MonitorUp className="h-3.5 w-3.5 text-sonic-accent" aria-hidden="true" />
+              {m.participants_sharing_screen()}
+            </span>
+          )}
+        </p>
+      )}
+
       {opts.length === 0 ? (
         <p className="px-1 py-2 text-sm text-sonic-400">{m.participants_no_options()}</p>
       ) : (
@@ -593,7 +830,17 @@ function ParticipantOptions({
             const kickOn = opt.id === "kick" && peer.iVotedKick;
             const removeCaster = opt.id === "remove-caster";
             const stopStream = opt.id === "stop-stream";
-            const destructive = removeCaster || stopStream;
+            const kickNow = opt.id === "kick-now";
+            const muteForAll = opt.id === "mute-for-all";
+            const setAdmin = opt.id === "set-admin";
+            const describeVideo = opt.id === "describe-video";
+            const describeScreen = opt.id === "describe-screen";
+            const pinVideo = opt.id === "pin-video";
+            const pinScreen = opt.id === "pin-screen";
+            const pinOn =
+              (pinVideo && isPinned(pinnedVideo, peer.peerId, "camera")) ||
+              (pinScreen && isPinned(pinnedVideo, peer.peerId, "screen"));
+            const destructive = removeCaster || stopStream || kickNow;
             return (
               <li
                 key={opt.id}
@@ -609,15 +856,17 @@ function ParticipantOptions({
                 className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm font-medium transition-colors ${
                   kickOn
                     ? "bg-red-600 text-white"
-                    : muteOn
+                    : pinOn
                       ? "bg-sonic-accent/20 text-sonic-accent"
-                      : destructive
-                        ? isActive
-                          ? "bg-red-600/20 text-red-300"
-                          : "text-red-400"
-                        : isActive
-                          ? "bg-sonic-accent/15 text-sonic-50"
-                          : "text-sonic-200"
+                      : muteOn
+                        ? "bg-sonic-accent/20 text-sonic-accent"
+                        : destructive
+                          ? isActive
+                            ? "bg-red-600/20 text-red-300"
+                            : "text-red-400"
+                          : isActive
+                            ? "bg-sonic-accent/15 text-sonic-50"
+                            : "text-sonic-200"
                 }`}
               >
                 {opt.kind === "slider" ? (
@@ -662,6 +911,59 @@ function ParticipantOptions({
                   <>
                     <CircleStop className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">{m.card_stop_stream_label()}</span>
+                  </>
+                ) : kickNow ? (
+                  <>
+                    <UserX className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{m.card_kick_now_label()}</span>
+                  </>
+                ) : muteForAll ? (
+                  <>
+                    <MicOffIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{m.card_mute_for_all_label()}</span>
+                  </>
+                ) : setAdmin ? (
+                  <>
+                    {peer.isAdmin ? (
+                      <ShieldOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="truncate">
+                      {peer.isAdmin ? m.card_revoke_admin_label() : m.card_make_admin_label()}
+                    </span>
+                  </>
+                ) : pinVideo || pinScreen ? (
+                  <>
+                    {pinOn ? (
+                      <PinOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    ) : (
+                      <Pin className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    )}
+                    <span className="truncate">
+                      {isSelf
+                        ? pinOn
+                          ? m.card_unpin_my_video()
+                          : m.card_pin_my_video()
+                        : pinScreen
+                          ? pinOn
+                            ? m.card_unpin_screen_label()
+                            : m.card_pin_screen_label()
+                          : pinOn
+                            ? m.card_unpin_video_label()
+                            : m.card_pin_video_label()}
+                    </span>
+                  </>
+                ) : describeVideo || describeScreen ? (
+                  <>
+                    <ScanEye className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">
+                      {describeScreen
+                        ? m.card_describe_screen_label()
+                        : isSelf
+                          ? m.card_describe_my_video()
+                          : m.card_describe_video_label()}
+                    </span>
                   </>
                 ) : (
                   <>

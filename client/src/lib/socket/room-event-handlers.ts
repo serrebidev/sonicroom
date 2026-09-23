@@ -7,7 +7,7 @@
 // hint ref) are passed in.
 import type { Socket } from "socket.io-client";
 import { useRoomStore } from "../../stores/room";
-import { sharedAudioContext } from "../audio/shared-context";
+import { getSharedAudioContext } from "../audio/shared-context";
 import { playCue } from "../sounds";
 import { formatMessage, META_SEP, type ChatMessage } from "../chat";
 import {
@@ -22,6 +22,18 @@ import {
   announce_peer_muted,
   announce_peer_unmuted,
   announce_chat_hint,
+  announce_notes_opened,
+  announce_peer_muted_by,
+  announce_all_muted,
+  announce_admin_named,
+  announce_admin_revoked,
+  announce_admin_joined,
+  announce_you_admin_named,
+  announce_you_admin_revoked,
+  announce_you_admin_promoted,
+  announce_moderation_ended,
+  announce_notes_available,
+  announce_you_were_muted,
 } from "../../paraglide/messages.js";
 
 const store = useRoomStore;
@@ -79,18 +91,44 @@ export function registerStreamingHandlers(socket: Socket) {
   });
 }
 
+// --- Shared notes (room-wide): someone opened this room's collaborative note
+// for the first time. Sync the URL so our button flips to "open" and a later
+// Alt+N opens it straight away, and log it to chat (rule: room events go to
+// chat via announceEvent). Deduped so we don't re-announce a URL we already have
+// (e.g. a creator who got the URL from their own ack). ---
+export function registerNotesHandlers(socket: Socket) {
+  // `by` names the creator; null means the note just became available to US
+  // (we were named admin in a room whose notes are admins-only, or the room
+  // stopped being moderated) — a different, listener-only announcement.
+  socket.on("notes-updated", ({ url, by }: { url: string; by?: string | null }) => {
+    if (!url || store.getState().notesUrl === url) return;
+    store.getState().setNotesUrl(url);
+    store
+      .getState()
+      .announceEvent(by ? announce_notes_opened({ name: by }) : announce_notes_available());
+  });
+}
+
 type SurfaceToggle = (key: string, value: boolean, emit: () => void) => void;
 
 // A remote peer toggled their mic: reflect it, play a soft cue, and speak it on the
 // polite ARIA region. NOT logged to chat (announce, not announceEvent) — too noisy.
 // Coalesced per peer (surfaceToggle) so a peer mashing their mic only blips once.
 export function registerMuteHandlers(socket: Socket, surfaceToggle: SurfaceToggle) {
-  socket.on("peer-muted", ({ peerId }: { peerId: string }) => {
+  socket.on("peer-muted", ({ peerId, by }: { peerId: string; by?: string }) => {
     store.getState().setPeerMuted(peerId, true);
+    // Muted FOR everyone by someone else (moderated room): that's a room event,
+    // logged to chat by name — not the transient "X muted" of a self-mute.
+    if (by) {
+      const name = store.getState().peers.get(peerId)?.displayName ?? announce_a_participant();
+      store.getState().announceEvent(announce_peer_muted_by({ name, by }));
+      playCue(getSharedAudioContext(), "peer-mute");
+      return;
+    }
     surfaceToggle(`peer:${peerId}`, true, () => {
       const name = store.getState().peers.get(peerId)?.displayName ?? announce_a_participant();
       store.getState().announce(announce_peer_muted({ name }));
-      playCue(sharedAudioContext, "peer-mute");
+      playCue(getSharedAudioContext(), "peer-mute");
     });
   });
 
@@ -99,8 +137,76 @@ export function registerMuteHandlers(socket: Socket, surfaceToggle: SurfaceToggl
     surfaceToggle(`peer:${peerId}`, false, () => {
       const name = store.getState().peers.get(peerId)?.displayName ?? announce_a_participant();
       store.getState().announce(announce_peer_unmuted({ name }));
-      playCue(sharedAudioContext, "peer-unmute");
+      playCue(getSharedAudioContext(), "peer-unmute");
     });
+  });
+}
+
+// --- MODERATED rooms: admin-set changes, the end of moderation, forced mutes.
+// Never fire in an ordinary room (the server has no admins there). `onForcedMute` is the
+// hook-owned local mute (track off + producer paused + store), applied when an
+// admin muted US — the server already paused our producer, so no emit. ---
+export interface AdminChange {
+  peerId: string;
+  displayName: string;
+  isAdmin: boolean;
+  reason: "named" | "revoked";
+  by: string | null;
+}
+export function registerAdminHandlers(socket: Socket, onForcedMute: (by: string) => void) {
+  socket.on(
+    "admins-changed",
+    ({
+      admins,
+      change,
+    }: {
+      admins: Array<{ peerId: string; displayName: string }>;
+      change: AdminChange;
+    }) => {
+      const s = store.getState();
+      s.setAdmins(admins.map((a) => a.peerId));
+      const me = change.peerId === s.localPeerId;
+      const name = change.displayName;
+      const by = change.by ?? "";
+      let text: string;
+      if (change.isAdmin) {
+        // Named by someone — or an admin (re)joined (no `by`).
+        text = change.by
+          ? me
+            ? announce_you_admin_named({ by })
+            : announce_admin_named({ name, by })
+          : me
+            ? announce_you_admin_promoted()
+            : announce_admin_joined({ name });
+      } else {
+        text = me ? announce_you_admin_revoked({ by }) : announce_admin_revoked({ name, by });
+      }
+      s.announceEvent(text);
+    },
+  );
+
+  // The last admin left: the room is an ordinary room from now on. Dropping
+  // the policy is what un-gates every control (Room.tsx derives all its gates
+  // from `moderation`), reopens the chat and brings PoweredBy back; clearing
+  // the admin list drops every row's badge. A room event — logged to chat.
+  socket.on("moderation-ended", () => {
+    const s = store.getState();
+    s.setModeration(null);
+    s.setAdmins([]);
+    s.announceEvent(announce_moderation_ended());
+  });
+
+  // Someone muted OUR microphone for everyone. Soft: we may unmute again (M).
+  socket.on("you-were-muted", ({ by }: { by: string }) => {
+    onForcedMute(by);
+    store.getState().announceEvent(announce_you_were_muted({ by }));
+    playCue(getSharedAudioContext(), "mute");
+  });
+
+  // Someone muted everyone at once (each affected peer also got peer-muted /
+  // you-were-muted; this is the one room-level line for the log).
+  socket.on("all-muted", ({ by }: { by: string }) => {
+    store.getState().announceEvent(announce_all_muted({ by }));
   });
 }
 
@@ -118,6 +224,6 @@ export function registerChatHandlers(socket: Socket, chatHintGiven: { current: b
       announcement += `${META_SEP}${announce_chat_hint()}`;
     }
     store.getState().announceChat(announcement);
-    playCue(sharedAudioContext, "message");
+    playCue(getSharedAudioContext(), "message");
   });
 }

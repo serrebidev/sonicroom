@@ -1,7 +1,16 @@
-import { useEffect, useCallback, useRef, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Headphones, Users, Loader2, Circle, MessageSquare, Radio } from "lucide-react";
-import { useRoomStore } from "../stores/room";
+import { useEffect, useCallback, useRef, useState, lazy, Suspense } from "react";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import {
+  Headphones,
+  Users,
+  Loader2,
+  Circle,
+  MessageSquare,
+  Radio,
+  Video,
+  ShieldCheck,
+} from "lucide-react";
+import { useRoomStore, isPinned } from "../stores/room";
 import { useMediasoup } from "../hooks/useMediasoup";
 import { formatMessage, messageContent } from "../lib/chat";
 import { getInstanceName } from "../lib/branding";
@@ -12,8 +21,16 @@ import { AudioSourceDialog } from "./AudioSourceDialog";
 import { Chat } from "./Chat";
 import { JoinRequests } from "./JoinRequests";
 import { LanguageSelect } from "./LanguageSelect";
-import { Footer, PoweredBy } from "./Footer";
+import { Footer, FooterLinks } from "./Footer";
+import { isVideoRoomParam } from "../lib/video/room-type";
+import { allowed, kickMode, loadRoomPolicy, voteIsAdminsOnly } from "../lib/moderation";
 import { m } from "../paraglide/messages.js";
+
+// VIDEO rooms only: the video grid and the video toolbar are separate lazy
+// chunks, mounted solely when the join response says the room is a video room —
+// an audio room never downloads or renders any video component.
+const VideoStage = lazy(() => import("./video/VideoStage"));
+const VideoControls = lazy(() => import("./video/VideoControls"));
 
 type JoinState = "idle" | "joining" | "joined" | "error";
 
@@ -59,7 +76,12 @@ function postToHost(type: string, payload?: Record<string, unknown>) {
 }
 
 export function Room() {
-  const { roomName } = useParams<{ roomName: string }>();
+  const { roomName: rawRoomName } = useParams<{ roomName: string }>();
+  // Room names are case-insensitive (lowercase canonical, matching the
+  // server's roomNameSchema): /room/Foo joins "foo", and the storage keys
+  // below are derived from the canonical name so a re-typed link still finds
+  // this tab's per-room state.
+  const roomName = rawRoomName?.toLowerCase();
   const [searchParams] = useSearchParams();
   // P2P-off can come from the URL (?p2p=off) or — so the choice survives a
   // reload/rejoin even if the reloaded link drops the query — from a per-room
@@ -70,7 +92,34 @@ export function Room() {
     (p2pStorageKey != null && sessionStorage.getItem(p2pStorageKey) === "1");
   const makePublic = isPublicEnabled(searchParams.get("public"));
   const noMic = isMicDisabled(searchParams.get("mic"));
+  // Room type from the URL (`?video=on`, set by the lobby's "Video call" radio).
+  // Only a REQUEST: the server's (sticky) answer is `roomIsVideo` in the store.
+  const videoRequested = isVideoRoomParam(searchParams.get("video"));
+  // Host key of a RESERVED room, from the host link (`?host=KEY`). Kept per
+  // room in sessionStorage for this tab — so it survives the lobby round-trip
+  // for a name, a reload and a reconnect — and stripped from the URL below so
+  // a copied/shared address never carries it. The server treats whoever
+  // presents it as the room's host (opens the room, is its admin).
+  const hostStorageKey = roomName ? `sonicroom:hostKey:${roomName}` : null;
+  const hostKeyFromUrl = searchParams.get("host");
+  if (hostKeyFromUrl && hostStorageKey) sessionStorage.setItem(hostStorageKey, hostKeyFromUrl);
+  const hostKey =
+    hostKeyFromUrl || (hostStorageKey ? sessionStorage.getItem(hostStorageKey) : null) || null;
   const navigate = useNavigate();
+  // Rewrite a mixed-case link to its canonical lowercase URL, and drop a host
+  // key from the address bar (replace, so Back doesn't bounce through it).
+  // Same route, so the component stays mounted.
+  const { search: locSearch, hash: locHash } = useLocation();
+  useEffect(() => {
+    if (!rawRoomName || !roomName) return;
+    const params = new URLSearchParams(locSearch);
+    const hadHost = params.has("host");
+    params.delete("host");
+    if (rawRoomName !== roomName || hadHost) {
+      const qs = params.toString();
+      navigate(`/room/${roomName}${qs ? `?${qs}` : ""}${locHash}`, { replace: true });
+    }
+  }, [rawRoomName, roomName, locSearch, locHash, navigate]);
   const {
     join,
     leave,
@@ -94,7 +143,16 @@ export function Room() {
     voteKick,
     kickCaster,
     stopPeerStream,
+    setAdmin,
+    mutePeer,
+    muteAll,
+    kickPeer,
     announceSpeakers,
+    openNotes,
+    toggleVideo,
+    describeVideo,
+    getLocalVideoStream,
+    getVideoStream,
   } = useMediasoup();
 
   const [joinState, setJoinState] = useState<JoinState>("idle");
@@ -104,6 +162,9 @@ export function Room() {
   // Bumped to (re)focus the chat composer even when the panel is already open —
   // used to hand focus to the call after the knock-to-join modal closes.
   const [chatFocusSignal, setChatFocusSignal] = useState(0);
+  // Bumped by the E shortcut to toggle the video stage's fullscreen — the stage
+  // owns the element, this handler only asks.
+  const [videoFullscreenSignal, setVideoFullscreenSignal] = useState(0);
   const joinedRef = useRef(false);
   const knownPeersRef = useRef<Set<string>>(new Set());
   // How many messages had arrived last time chat was open, to badge unread.
@@ -152,6 +213,31 @@ export function Room() {
     else setAudioSourceOpen(true);
   }, [stopFileStream]);
 
+  // Pin/unpin a camera or screen to the video stage. Local only — nothing is
+  // signaled, so the person you pin never knows. Announced transiently (like
+  // local mute / volume): it changes only YOUR view, so it isn't a room event
+  // and doesn't belong in the chat timeline.
+  const togglePinVideo = useCallback((peerId: string, source: "camera" | "screen") => {
+    const s = useRoomStore.getState();
+    const on = isPinned(s.pinnedVideo, peerId, source);
+    s.togglePinnedVideo(peerId, source);
+    const self = peerId === s.localPeerId;
+    const name = self ? "" : (s.peers.get(peerId)?.displayName ?? "");
+    s.announce(
+      self
+        ? on
+          ? m.announce_unpinned_self()
+          : m.announce_pinned_self()
+        : source === "screen"
+          ? on
+            ? m.announce_unpinned_screen({ name })
+            : m.announce_pinned_screen({ name })
+          : on
+            ? m.announce_unpinned_video({ name })
+            : m.announce_pinned_video({ name }),
+    );
+  }, []);
+
   const localPeerId = useRoomStore((s) => s.localPeerId);
   const displayName = useRoomStore((s) => s.displayName);
   const peers = useRoomStore((s) => s.peers);
@@ -179,10 +265,21 @@ export function Room() {
   const chatAnnounceSeq = useRoomStore((s) => s.chatAnnounceSeq);
   // True while we're knocking on a public room and waiting to be let in.
   const awaitingApproval = useRoomStore((s) => s.awaitingApproval);
+  const awaitingHost = useRoomStore((s) => s.awaitingHost);
   // Whether the room is public (shows the vote-to-kick controls) and whether we
   // ourselves were just voted out (shows the "removed" screen).
   const roomIsPublic = useRoomStore((s) => s.roomIsPublic);
   const kicked = useRoomStore((s) => s.kicked);
+  // MODERATED room: its policy (null in an ordinary room) and whether we're an
+  // admin. Every admin control below is gated on these; the server enforces
+  // them too, so hiding is a courtesy, not the security.
+  const moderation = useRoomStore((s) => s.moderation);
+  const isAdmin = useRoomStore((s) => s.isAdmin);
+  // Room type (server truth) + our own camera state, for the self row.
+  const roomIsVideo = useRoomStore((s) => s.roomIsVideo);
+  const isVideoOn = useRoomStore((s) => s.isVideoOn);
+  // Which camera/screen is pinned to the video stage (local view choice).
+  const pinnedVideo = useRoomStore((s) => s.pinnedVideo);
 
   // Reflect the room name in the document/tab title while in (or joining) the
   // room, restoring the default when we leave.
@@ -224,7 +321,16 @@ export function Room() {
     // re-asserts it even without the URL param.
     if (disableP2p && p2pStorageKey) sessionStorage.setItem(p2pStorageKey, "1");
 
-    join(roomName, name, { disableP2p, isPublic: makePublic, noMic })
+    // A moderated room's policy comes from the lobby via sessionStorage (keyed
+    // by room name); the server honours it only if this join creates the room.
+    join(roomName, name, {
+      disableP2p,
+      isPublic: makePublic,
+      noMic,
+      video: videoRequested,
+      moderation: loadRoomPolicy(roomName),
+      hostKey,
+    })
       .then(() => setJoinState("joined"))
       .catch((err) => {
         setJoinState("error");
@@ -238,7 +344,18 @@ export function Room() {
             : msg || m.room_failed_to_join(),
         );
       });
-  }, [roomName, join, navigate, disableP2p, makePublic, noMic, p2pStorageKey, searchParams]);
+  }, [
+    roomName,
+    join,
+    navigate,
+    disableP2p,
+    makePublic,
+    noMic,
+    videoRequested,
+    p2pStorageKey,
+    searchParams,
+    hostKey,
+  ]);
 
   // Mirror room lifecycle to the host page when embedded (see postToHost).
   useEffect(() => {
@@ -300,9 +417,43 @@ export function Room() {
           announce(msg ? formatMessage(msg, now) : m.room_no_message({ n }));
           return;
         }
+        // Alt+N: open (creating on first use) the room's shared notes in a new
+        // tab. Match the PHYSICAL key (e.code) so it fires regardless of layout,
+        // like the Alt+number readback above. Only when the feature is enabled —
+        // otherwise leave Alt+N for the browser/OS.
+        // In a moderated room whose notes are admins-only (or nobody's), the
+        // key still fires but says so, like A/F/D/R.
+        if (e.code === "KeyN" && useRoomStore.getState().notesEnabled) {
+          e.preventDefault();
+          const { moderation: policy, isAdmin: admin, announce: say } = useRoomStore.getState();
+          if (allowed(policy, admin, "notes")) openNotes();
+          else say(m.announce_not_allowed());
+          return;
+        }
       }
 
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      // Ctrl+Shift+M: mute everyone's microphones (moderated rooms only). A
+      // deliberate two-modifier chord, not a single letter, so it can't be hit
+      // by accident next to M — a stray "everyone muted" is a confusing thing to
+      // undo even though each person can unmute again. Physical key (e.code)
+      // like Alt+N. Someone who may not do it is told so, like A/F/D/R; in an
+      // ordinary room the combo is left to the browser.
+      if (
+        e.ctrlKey &&
+        e.shiftKey &&
+        !e.altKey &&
+        !e.metaKey &&
+        e.code === "KeyM" &&
+        useRoomStore.getState().moderation != null
+      ) {
+        e.preventDefault();
+        const { moderation: policy, isAdmin: admin, announce: say } = useRoomStore.getState();
+        if (allowed(policy, admin, "muteAll")) muteAll();
+        else say(m.announce_not_allowed());
+        return;
+      }
 
       // Single-letter room shortcuts must not hijack browser/OS combos like
       // Ctrl+R (reload), Alt+D (address bar) or Cmd+R — bail when any of
@@ -310,27 +461,45 @@ export function Room() {
       // variants handled below get produced.)
       if (e.ctrlKey || e.altKey || e.metaKey) return;
 
+      // Moderated room: a shortcut whose action this peer may not perform says
+      // so (bare announce — a local refusal, not a room event) and does nothing.
+      const { moderation: policy, isAdmin: admin, announce: say } = useRoomStore.getState();
+      const may = (action: Parameters<typeof allowed>[2]) => {
+        if (allowed(policy, admin, action)) return true;
+        say(m.announce_not_allowed());
+        return false;
+      };
+
       if (e.key === "m" || e.key === "M") {
         e.preventDefault();
         toggleMute();
       } else if (e.key === "a" || e.key === "A") {
         e.preventDefault();
-        toggleAudioShare();
+        if (may("shareAudio")) toggleAudioShare();
       } else if (e.key === "f" || e.key === "F") {
         // Open the audio-source chooser.
         e.preventDefault();
-        setAudioSourceOpen(true);
+        if (may("streamAudio")) setAudioSourceOpen(true);
       } else if (e.key === "d" || e.key === "D") {
         // Toggle room-wide auto-ducking.
         e.preventDefault();
-        toggleDucking();
+        if (may("ducking")) toggleDucking();
       } else if (e.key === "r" || e.key === "R") {
         e.preventDefault();
-        toggleRecording();
+        if (may("recording")) toggleRecording();
       } else if (e.key === "w" || e.key === "W") {
         // Announce + briefly number the people talking now / who talked recently.
         e.preventDefault();
         announceSpeakers();
+      } else if ((e.key === "v" || e.key === "V") && useRoomStore.getState().roomIsVideo) {
+        // Video rooms only: toggle our camera. In an audio room V is left alone.
+        e.preventDefault();
+        toggleVideo();
+      } else if ((e.key === "e" || e.key === "E") && useRoomStore.getState().roomIsVideo) {
+        // Video rooms only: expand the video stage to fullscreen (Escape, or E
+        // again, leaves it). Video rooms only, so E stays free in audio rooms.
+        e.preventDefault();
+        setVideoFullscreenSignal((n) => n + 1);
       }
     };
 
@@ -338,7 +507,17 @@ export function Room() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [joinState, toggleMute, toggleAudioShare, toggleDucking, toggleRecording, announceSpeakers]);
+  }, [
+    joinState,
+    toggleMute,
+    toggleAudioShare,
+    toggleDucking,
+    toggleRecording,
+    announceSpeakers,
+    openNotes,
+    toggleVideo,
+    muteAll,
+  ]);
 
   const handleLeave = useCallback(() => {
     postToHost("readyToClose");
@@ -346,7 +525,8 @@ export function Room() {
     navigate("/");
   }, [leave, navigate]);
 
-  // Loading state — or, for a public room, waiting to be let in (knock-to-join).
+  // Loading state — or, for a public room, waiting to be let in (knock-to-join),
+  // or, for a reserved room, waiting for its host to open it.
   if (joinState === "joining") {
     return (
       <div className="flex min-h-dvh flex-col bg-sonic-900">
@@ -359,9 +539,13 @@ export function Room() {
               behind it. (Swapping a freshly-mounted region in/out announces
               unreliably, hence the single persistent node.) */}
             <p className="text-sonic-300" role="alert" aria-live="assertive" aria-atomic="true">
-              {awaitingApproval ? m.room_awaiting_approval() : m.room_connecting()}
+              {awaitingApproval
+                ? m.room_awaiting_approval()
+                : awaitingHost
+                  ? m.room_awaiting_host()
+                  : m.room_connecting()}
             </p>
-            {awaitingApproval && (
+            {(awaitingApproval || awaitingHost) && (
               <button
                 onClick={handleLeave}
                 className="rounded-lg bg-sonic-700 px-4 py-2 text-sm text-sonic-100 hover:bg-sonic-600"
@@ -425,7 +609,23 @@ export function Room() {
   // private room) below 3 votable people. Votable = humans only: everyone except
   // media-source tiles (music casters and extra-mic streams), plus ourself (+1).
   const votableCount = peerList.filter((p) => !p.isMusic && !p.isMicStream).length + 1;
-  const kickEnabled = roomIsPublic && votableCount >= 3;
+  // MODERATED room: the kick policy decides whether WE vote (among admins or
+  // among everyone — the electorate the threshold counts) or remove directly;
+  // an ordinary room keeps vote-to-kick in public rooms only.
+  const myKickMode = moderation ? kickMode(moderation, isAdmin) : null;
+  const electorate =
+    moderation && voteIsAdminsOnly(moderation)
+      ? peerList.filter((p) => p.isAdmin && !p.isMusic && !p.isMicStream).length + (isAdmin ? 1 : 0)
+      : votableCount;
+  const kickEnabled = moderation
+    ? myKickMode === "vote" && electorate >= 3
+    : roomIsPublic && votableCount >= 3;
+  const kickDirect = myKickMode === "direct";
+  // The rest of the moderated-room gates (all true in an ordinary room).
+  const canMutePeer = moderation != null && allowed(moderation, isAdmin, "mutePeer");
+  const canMuteAll = moderation != null && allowed(moderation, isAdmin, "muteAll");
+  const canSetAdmin = moderation != null && moderation.multipleAdmins && isAdmin;
+  const canApproveJoins = allowed(moderation, isAdmin, "approveJoins");
 
   return (
     <div className="flex min-h-dvh flex-col bg-sonic-900">
@@ -436,6 +636,25 @@ export function Room() {
           <h1 className="text-lg font-semibold text-sonic-100">{roomName}</h1>
         </div>
         <div className="flex items-center gap-3 text-sm text-sonic-300">
+          {roomIsVideo && (
+            <span
+              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-medium bg-sonic-accent/20 text-sonic-accent"
+              title={m.room_video_badge_title()}
+            >
+              <Video className="h-3 w-3" aria-hidden="true" />
+              {m.room_video_badge()}
+            </span>
+          )}
+          {moderation && (
+            <span
+              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-medium bg-amber-500/20 text-amber-300"
+              title={m.room_moderated_badge_title()}
+            >
+              <ShieldCheck className="h-3 w-3" aria-hidden="true" />
+              {m.room_moderated_badge()}
+              <span className="sr-only">, {m.room_moderated_badge_title()}</span>
+            </span>
+          )}
           {isRecording && (
             <span
               className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-medium bg-red-500/20 text-red-400"
@@ -501,7 +720,29 @@ export function Room() {
 
       {/* Participants grid + optional chat side panel */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        <main className="flex min-w-0 flex-1 items-center justify-center overflow-y-auto p-6">
+        {/* A video room lays out as a COLUMN that fills the window: the stage
+            takes every pixel left over after the (self-scrolling, capped)
+            participant list, so one camera is one big picture rather than a
+            thumbnail floating in an empty page. An audio room is untouched. */}
+        <main
+          className={`flex min-w-0 flex-1 ${
+            roomIsVideo
+              ? "flex-col items-center gap-3 overflow-hidden p-3 sm:p-4"
+              : "items-center justify-center overflow-y-auto p-6"
+          }`}
+        >
+          {/* Video room: the video grid sits in the foreground, above the list.
+              Lazy chunk — never loaded in an audio room. */}
+          {roomIsVideo && (
+            <Suspense fallback={null}>
+              <VideoStage
+                getLocalStream={getLocalVideoStream}
+                getStream={getVideoStream}
+                onTogglePin={togglePinVideo}
+                fullscreenSignal={videoFullscreenSignal}
+              />
+            </Suspense>
+          )}
           {/* Self + everyone (and every stream) as one keyboard-navigable
               listbox; Enter on a row opens that participant's options (volume,
               local mute, vote-to-kick), self's being the mic level. */}
@@ -519,6 +760,9 @@ export function Room() {
                 kickVotes: 0,
                 iVotedKick: false,
                 localMuted: false,
+                hasVideo: isVideoOn,
+                hasScreen: false,
+                isAdmin,
               }}
               peerList={peerList}
               hasMic={hasMic}
@@ -530,14 +774,39 @@ export function Room() {
               onToggleKick={(id) => voteKick(id, !peers.get(id)?.iVotedKick)}
               onKickCaster={kickCaster}
               onStopStream={stopPeerStream}
+              moderated={moderation != null}
+              isAdmin={isAdmin}
+              kickDirect={kickDirect}
+              onKickDirect={kickPeer}
+              canMutePeer={canMutePeer}
+              onMutePeer={mutePeer}
+              canSetAdmin={canSetAdmin}
+              onSetAdmin={setAdmin}
               announce={announce}
               speakerBadges={speakerBadges}
+              onDescribeVideo={roomIsVideo ? describeVideo : undefined}
+              pinnedVideo={pinnedVideo}
+              onTogglePinVideo={roomIsVideo ? togglePinVideo : undefined}
+              maxHeightClass={roomIsVideo ? "max-h-[30vh] shrink-0" : "max-h-[70vh]"}
             />
           )}
         </main>
 
         {chatOpen && (
-          <Chat onSend={sendChatMessage} onClose={closeChat} focusSignal={chatFocusSignal} />
+          <Chat
+            onSend={sendChatMessage}
+            onClose={closeChat}
+            focusSignal={chatFocusSignal}
+            // Moderated room: chat may be admins-only or off — the panel stays
+            // (announcements live there), only the composer goes.
+            composer={
+              allowed(moderation, isAdmin, "chat")
+                ? "on"
+                : moderation?.chat === "admins"
+                  ? "admins-only"
+                  : "off"
+            }
+          />
         )}
       </div>
 
@@ -545,6 +814,13 @@ export function Room() {
           inside this single footer landmark (rather than a second <Footer />) so
           the active call keeps exactly one `contentinfo`. */}
       <footer className="flex flex-col items-center gap-2 border-t border-sonic-700 p-4">
+        {/* Video room: camera on/off + face-centering guidance + Claude API key.
+            Lazy chunk — never loaded in an audio room. */}
+        {roomIsVideo && (
+          <Suspense fallback={null}>
+            <VideoControls onToggleVideo={toggleVideo} getLocalStream={getLocalVideoStream} />
+          </Suspense>
+        )}
         <AudioControls
           onToggleMute={toggleMute}
           onToggleAudioShare={toggleAudioShare}
@@ -554,9 +830,19 @@ export function Room() {
           onStartStreaming={startStreaming}
           onStopStreaming={stopStreaming}
           onAnnounceSpeakers={announceSpeakers}
+          onOpenNotes={openNotes}
           onLeave={handleLeave}
+          // Moderated room: controls this peer may not use are not rendered.
+          canShare={allowed(moderation, isAdmin, "shareAudio")}
+          canStreamAudio={allowed(moderation, isAdmin, "streamAudio")}
+          canDuck={allowed(moderation, isAdmin, "ducking")}
+          canRecord={allowed(moderation, isAdmin, "recording")}
+          canLiveStream={allowed(moderation, isAdmin, "liveStreaming")}
+          canNotes={allowed(moderation, isAdmin, "notes")}
+          canMuteAll={canMuteAll}
+          onMuteAll={muteAll}
         />
-        <PoweredBy />
+        <FooterLinks />
       </footer>
 
       {/* Screen reader announcements (peer join/leave, recording, etc.).
@@ -579,7 +865,9 @@ export function Room() {
 
       {/* Knock-to-join: allow/deny people asking to enter this public room.
           Self-hides when nobody is waiting. */}
-      <JoinRequests onDecide={decideJoinRequest} onCleared={onJoinRequestsCleared} />
+      {canApproveJoins && (
+        <JoinRequests onDecide={decideJoinRequest} onCleared={onJoinRequestsCleared} />
+      )}
 
       {audioSourceOpen && (
         <AudioSourceDialog

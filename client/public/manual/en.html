@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>SonicRoom — the screen reader manual</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #16181d;
+      --muted: #4a4f5a;
+      --accent: #1451b4;
+      --accent-fg: #ffffff;
+      --rule: #c9ced8;
+      --panel: #f1f3f7;
+      --code-bg: #eceff4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1116;
+        --fg: #eceff4;
+        --muted: #b3bac6;
+        --accent: #7ab5ff;
+        --accent-fg: #0f1116;
+        --rule: #3a4150;
+        --panel: #191d25;
+        --code-bg: #232833;
+      }
+    }
+
+    html {
+      font-size: 112.5%;
+      /* Painted on <html> as well as <body> so the gutters either side of the
+         centred column match the page rather than showing the UA canvas. */
+      background: var(--bg);
+      color: var(--fg);
+    }
+    body {
+      margin: 0 auto;
+      padding: 2rem 1.25rem 6rem;
+      max-width: 46rem;
+      background: var(--bg);
+      color: var(--fg);
+      font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+      line-height: 1.65;
+      overflow-wrap: break-word;
+    }
+
+    a {
+      color: var(--accent);
+    }
+    a:focus-visible,
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    header#title-block-header {
+      border-bottom: 2px solid var(--rule);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    h1.title {
+      font-size: 1.9rem;
+      line-height: 1.25;
+      margin: 0 0 0.35rem;
+    }
+    p.subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      font-weight: 400;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.25;
+      margin: 2.25rem 0 0.75rem;
+    }
+    h1 {
+      font-size: 1.6rem;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 0.35rem;
+    }
+    h2 {
+      font-size: 1.25rem;
+    }
+    h3 {
+      font-size: 1.08rem;
+    }
+
+    nav#TOC {
+      background: var(--panel);
+      border: 1px solid var(--rule);
+      border-radius: 0.6rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    nav#TOC h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    nav#TOC ul {
+      padding-left: 1.2rem;
+      margin-bottom: 0;
+    }
+    nav#TOC li {
+      margin: 0.2rem 0;
+    }
+
+    .manual-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+      align-items: baseline;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 0.9rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .manual-nav strong {
+      font-weight: 600;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0 1.5rem;
+      font-size: 0.98rem;
+    }
+    caption {
+      text-align: left;
+      color: var(--muted);
+      padding-bottom: 0.35rem;
+    }
+    th,
+    td {
+      border: 1px solid var(--rule);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    thead th {
+      background: var(--panel);
+    }
+    tbody tr:nth-child(even) td {
+      background: color-mix(in srgb, var(--panel) 55%, transparent);
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.1em 0.35em;
+      border-radius: 0.25rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--rule);
+      border-radius: 0.5rem;
+      padding: 0.85rem 1rem;
+      overflow-x: auto;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0;
+      padding: 0.5rem 1rem;
+      border-left: 4px solid var(--accent);
+      background: var(--panel);
+      color: var(--fg);
+    }
+    blockquote p {
+      margin: 0.25rem 0;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid var(--rule);
+      margin: 2.5rem 0;
+    }
+
+    ol,
+    ul {
+      padding-left: 1.4rem;
+    }
+    li {
+      margin: 0.3rem 0;
+    }
+
+    @media print {
+      body {
+        max-width: none;
+      }
+      nav#TOC,
+      .manual-nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+<nav class="manual-nav" aria-label="Manual navigation">
+  <a href="/">Back to SonicRoom</a>
+  <span><strong>Other languages:</strong>
+    <a href="./es.html" hreflang="es" lang="es">Español</a>
+    <a href="./fr.html" hreflang="fr" lang="fr">Français</a>
+  </span>
+</nav>
+<header id="title-block-header">
+<h1 class="title">SonicRoom — the screen reader manual</h1>
+<p class="subtitle">How to set your screen reader up, how the keyboard
+works, and every shortcut</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Contents</h2>
+<ul>
+<li><a href="#read-this-part-first" id="toc-read-this-part-first">Read
+this part first</a></li>
+<li><a href="#setting-your-screen-reader-up"
+id="toc-setting-your-screen-reader-up">Setting your screen reader up</a>
+<ul>
+<li><a href="#nvda" id="toc-nvda">NVDA</a></li>
+<li><a href="#jaws" id="toc-jaws">JAWS</a></li>
+<li><a href="#narrator-windows" id="toc-narrator-windows">Narrator
+(Windows)</a></li>
+<li><a href="#voiceover-macos" id="toc-voiceover-macos">VoiceOver
+(macOS)</a></li>
+<li><a href="#orca-linux" id="toc-orca-linux">Orca (Linux)</a></li>
+<li><a href="#iphone-ipad-and-android"
+id="toc-iphone-ipad-and-android">iPhone, iPad and Android</a></li>
+<li><a href="#a-ten-second-test-that-you-are-set-up-correctly"
+id="toc-a-ten-second-test-that-you-are-set-up-correctly">A ten-second
+test that you are set up correctly</a></li>
+</ul></li>
+<li><a href="#how-the-keyboard-works-everywhere-in-sonicroom"
+id="toc-how-the-keyboard-works-everywhere-in-sonicroom">How the keyboard
+works everywhere in SonicRoom</a></li>
+<li><a href="#the-lobby" id="toc-the-lobby">The lobby</a></li>
+<li><a href="#the-room-part-by-part" id="toc-the-room-part-by-part">The
+room, part by part</a>
+<ul>
+<li><a href="#header" id="toc-header">Header</a></li>
+<li><a href="#participant-list" id="toc-participant-list">Participant
+list</a></li>
+<li><a href="#participant-options"
+id="toc-participant-options">Participant options</a></li>
+<li><a href="#chat-panel" id="toc-chat-panel">Chat panel</a></li>
+<li><a href="#the-audio-controls-toolbar"
+id="toc-the-audio-controls-toolbar">The audio controls toolbar</a></li>
+<li><a href="#footer" id="toc-footer">Footer</a></li>
+</ul></li>
+<li><a href="#every-keyboard-shortcut"
+id="toc-every-keyboard-shortcut">Every keyboard shortcut</a>
+<ul>
+<li><a href="#single-letters" id="toc-single-letters">Single
+letters</a></li>
+<li><a href="#with-alt" id="toc-with-alt">With Alt</a></li>
+<li><a href="#navigation-and-closing"
+id="toc-navigation-and-closing">Navigation and closing</a></li>
+</ul></li>
+<li><a href="#hearing-what-is-going-on"
+id="toc-hearing-what-is-going-on">Hearing what is going on</a></li>
+<li><a href="#talking-and-listening"
+id="toc-talking-and-listening">Talking and listening</a></li>
+<li><a href="#sharing-audio-into-the-room"
+id="toc-sharing-audio-into-the-room">Sharing audio into the room</a>
+<ul>
+<li><a href="#screen-or-tab-audio-a"
+id="toc-screen-or-tab-audio-a">Screen or tab audio
+(<code>A</code>)</a></li>
+<li><a href="#a-file-a-link-or-a-server-file-f"
+id="toc-a-file-a-link-or-a-server-file-f">A file, a link or a server
+file (<code>F</code>)</a></li>
+</ul></li>
+<li><a href="#recording-and-live-streaming"
+id="toc-recording-and-live-streaming">Recording and live
+streaming</a></li>
+<li><a href="#video-calls" id="toc-video-calls">Video calls</a></li>
+<li><a href="#public-rooms-knocking-and-voting"
+id="toc-public-rooms-knocking-and-voting">Public rooms, knocking and
+voting</a></li>
+<li><a href="#moderated-rooms-with-administrators"
+id="toc-moderated-rooms-with-administrators">Moderated rooms (with
+administrators)</a>
+<ul>
+<li><a href="#reserved-rooms-a-room-you-were-given-in-advance"
+id="toc-reserved-rooms-a-room-you-were-given-in-advance">Reserved rooms
+(a room you were given in advance)</a></li>
+</ul></li>
+<li><a href="#shared-notes" id="toc-shared-notes">Shared notes</a></li>
+<li><a href="#options-you-can-put-in-the-address-bar"
+id="toc-options-you-can-put-in-the-address-bar">Options you can put in
+the address bar</a></li>
+<li><a href="#when-something-is-not-working"
+id="toc-when-something-is-not-working">When something is not
+working</a></li>
+<li><a href="#one-page-key-reference"
+id="toc-one-page-key-reference">One-page key reference</a></li>
+</ul>
+</nav>
+<h1 id="read-this-part-first">Read this part first</h1>
+<p><strong>SonicRoom is an application, not a web page.</strong></p>
+<p>That one sentence explains almost every problem people hit. SonicRoom
+happens to run in a browser, but nothing in it behaves like an article
+you read. There is no document to scroll through. There are toolbars,
+lists and dialogs, and they are driven the way a desktop program is
+driven: <strong>Tab moves between the parts, the arrow keys move inside
+a part</strong>.</p>
+<p>Screen readers do not know this by themselves. Out of the box, NVDA,
+JAWS, Narrator and Orca all put a <em>virtual copy</em> of the page in
+front of you and intercept your keys, so that <code>H</code> jumps to a
+heading and <code>B</code> jumps to a button. That is exactly right for
+a news site and exactly wrong here, because in SonicRoom <code>M</code>
+mutes your microphone, <code>R</code> starts a recording and
+<code>W</code> tells you who has been talking. If your screen reader
+swallows those keys, none of them will ever reach the app.</p>
+<p>So the first thing to do — before you join anything — is to put your
+screen reader into the mode where the application receives your
+keystrokes. Each screen reader calls it something different. The next
+section tells you how.</p>
+<p>If you only remember one thing: <strong>when a single letter does
+nothing, you are in the wrong mode.</strong></p>
+<hr />
+<h1 id="setting-your-screen-reader-up">Setting your screen reader
+up</h1>
+<h2 id="nvda">NVDA</h2>
+<p>NVDA calls the two modes <strong>browse mode</strong> and
+<strong>focus mode</strong>.</p>
+<ul>
+<li>Browse mode is the reading mode. Single letters are navigation
+commands and never reach the page.</li>
+<li>Focus mode passes every keystroke straight through to the
+application. This is the mode SonicRoom needs.</li>
+</ul>
+<p><strong>Toggle it with <code>NVDA</code> +
+<code>Space</code>.</strong> You will hear a short low sound when focus
+mode switches on, and a higher one when you go back to browse mode. Some
+voices also say “focus mode” and “browse mode” out loud.</p>
+<p>NVDA already switches to focus mode by itself whenever you land on an
+edit box or a similar control, so you will often be in focus mode
+without asking. What it will <em>not</em> do is switch by itself when
+you are sitting on a plain button — and that is precisely when you want
+to press <code>M</code> or <code>R</code>. Press <code>NVDA</code> +
+<code>Space</code> and stay in focus mode for the whole call.</p>
+<p>If you would like NVDA to be more eager about it, open <strong>NVDA
+menu → Preferences → Settings → Browse Mode</strong> (or press
+<code>NVDA</code> + <code>Ctrl</code> + <code>B</code>) and turn on
+<em>Automatic focus mode for focus changes</em> and <em>Automatic focus
+mode for caret movement</em>.</p>
+<h2 id="jaws">JAWS</h2>
+<p>JAWS calls its reading mode the <strong>Virtual Cursor</strong>
+(sometimes the “PC virtual cursor”), and its pass-through mode
+<strong>Forms Mode</strong>.</p>
+<p><strong>The recommendation for SonicRoom is to turn the Virtual
+Cursor off entirely: press <code>JAWS key</code> +
+<code>Z</code></strong> (the JAWS key is <code>Insert</code> by default,
+or <code>Caps Lock</code> on the laptop layout). JAWS will say “Virtual
+PC cursor off”. Every key you press from then on goes to SonicRoom.</p>
+<p>You <em>can</em> rely on Auto Forms Mode instead — JAWS drops into
+Forms Mode when you press <code>Enter</code> on a control and leaves it
+with <code>NumPad Plus</code>. It works, but it fights you here for two
+reasons: SonicRoom’s single-letter commands are not attached to form
+controls, so Auto Forms Mode will not trigger for them; and SonicRoom
+uses <code>Escape</code> for real work (closing the chat panel, closing
+a dialog, stopping a file that is playing), which Forms Mode may
+intercept.</p>
+<p>Turning the Virtual Cursor off with <code>JAWS key</code> +
+<code>Z</code> avoids both problems. Press it again to get the Virtual
+Cursor back when you leave the call.</p>
+<h2 id="narrator-windows">Narrator (Windows)</h2>
+<p>Narrator calls its reading mode <strong>Scan Mode</strong>. Turn it
+<strong>off</strong> with <code>Caps Lock</code> + <code>Space</code>.
+Narrator will say “Scan off”. With Scan Mode off, <code>Tab</code> and
+the arrow keys behave as this manual describes and single letters reach
+the app.</p>
+<h2 id="voiceover-macos">VoiceOver (macOS)</h2>
+<p>VoiceOver’s equivalent trap is <strong>Quick Nav</strong>. With Quick
+Nav on, the arrow keys are VoiceOver navigation commands and never reach
+the page.</p>
+<p><strong>Turn Quick Nav off by pressing the Left and Right arrow keys
+together.</strong> VoiceOver says “Quick Nav off”.</p>
+<p>After that:</p>
+<ul>
+<li><code>Tab</code> and <code>Shift</code> + <code>Tab</code> move
+between the parts of the app.</li>
+<li>The arrow keys move inside a toolbar or a list, as described
+below.</li>
+<li>Single letters (<code>M</code>, <code>A</code>, <code>R</code>,
+<code>W</code>…) reach SonicRoom as long as the keyboard focus is not
+inside a text field.</li>
+</ul>
+<p><code>VO</code> in the shortcuts below means <code>Control</code> +
+<code>Option</code>. You may need <code>VO</code> + <code>Shift</code> +
+<code>Down Arrow</code> to interact with the web content group before
+VoiceOver will follow the focus into the app.</p>
+<h2 id="orca-linux">Orca (Linux)</h2>
+<p>Orca has <strong>browse mode</strong> and <strong>focus mode</strong>
+in web content, just like NVDA. Orca switches to focus mode
+automatically on form controls; to switch by hand, press
+<code>Orca Modifier</code> + <code>A</code> (the Orca modifier is
+<code>Insert</code> on the desktop keyboard layout and
+<code>Caps Lock</code> on the laptop layout).</p>
+<h2 id="iphone-ipad-and-android">iPhone, iPad and Android</h2>
+<p>SonicRoom works with VoiceOver and TalkBack, and every button, list
+and dialog is labelled. The single-letter shortcuts need a physical
+keyboard, so on a touch screen use the buttons instead — everything a
+shortcut does has a button somewhere in the toolbar or the participant
+list.</p>
+<p>Two things behave differently on iOS: Safari cannot show the video
+full screen (the app says so out loud rather than leaving a dead
+button), and the audio engine only starts after you touch the screen
+once, which SonicRoom handles for you on your first tap.</p>
+<h2 id="a-ten-second-test-that-you-are-set-up-correctly">A ten-second
+test that you are set up correctly</h2>
+<p>Join a room on your own, make sure the focus is <strong>not</strong>
+in the chat box, and press <code>M</code>. If you hear the mute sound
+and “Microphone muted”, you are ready. If your screen reader says
+something about a heading, a list, or “no next element”, you are still
+in the reading mode — go back and toggle it.</p>
+<hr />
+<h1 id="how-the-keyboard-works-everywhere-in-sonicroom">How the keyboard
+works everywhere in SonicRoom</h1>
+<p>Three rules cover the entire app.</p>
+<p><strong>1. <code>Tab</code> moves between parts. The arrow keys move
+inside a part.</strong></p>
+<p>A toolbar of eleven buttons is a <em>single</em> <code>Tab</code>
+stop, not eleven. A list of twenty participants is a single
+<code>Tab</code> stop. This is deliberate: it means you can cross the
+whole app in five or six presses of <code>Tab</code> instead of forty,
+and it is how desktop applications have always worked. It also means
+that pressing <code>Tab</code> inside a toolbar does
+<strong>not</strong> get you to the next button —
+<code>Right Arrow</code> does.</p>
+<p><strong>2. Toolbars: <code>Left Arrow</code> and
+<code>Right Arrow</code>.</strong></p>
+<p>SonicRoom has two toolbars, both at the bottom of the call: the audio
+controls (always) and the video controls (video calls only). Inside
+either one:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Right Arrow</code></td>
+<td>Next button (wraps round to the first)</td>
+</tr>
+<tr class="even">
+<td><code>Left Arrow</code></td>
+<td>Previous button (wraps round to the last)</td>
+</tr>
+<tr class="odd">
+<td><code>Home</code></td>
+<td>First button</td>
+</tr>
+<tr class="even">
+<td><code>End</code></td>
+<td>Last button</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> or <code>Space</code></td>
+<td>Press the button you are on</td>
+</tr>
+<tr class="even">
+<td><code>Tab</code></td>
+<td>Leave the toolbar entirely</td>
+</tr>
+</tbody>
+</table>
+<p><strong>3. Lists: <code>Up Arrow</code> and <code>Down Arrow</code>,
+then <code>Enter</code>.</strong></p>
+<p>The participant list, the chat history, the public-room list in the
+lobby and the server file browser are all lists in the same style:</p>
+<table>
+<colgroup>
+<col style="width: 27%" />
+<col style="width: 72%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Down Arrow</code> / <code>Up Arrow</code></td>
+<td>Next / previous item</td>
+</tr>
+<tr class="even">
+<td><code>Home</code> / <code>End</code></td>
+<td>First / last item</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> or <code>Space</code></td>
+<td>Open or activate the item</td>
+</tr>
+<tr class="even">
+<td><code>Escape</code> or <code>Backspace</code></td>
+<td>Go back a level (in the participant options and the file
+browser)</td>
+</tr>
+</tbody>
+</table>
+<p>Your screen reader will announce each item as you arrow onto it,
+along with its state — muted, speaking, sharing video, and so on.</p>
+<p><strong>Sliders</strong> (your microphone level, another person’s
+volume) live inside the participant options list. On a slider,
+<code>Left Arrow</code> and <code>Right Arrow</code> change the value
+and speak the new percentage; <code>Home</code> and <code>End</code>
+jump to the minimum and the maximum. <code>Up Arrow</code> and
+<code>Down Arrow</code> keep their usual job of moving to the next
+option.</p>
+<p><strong><code>Escape</code> closes things.</strong> The chat panel,
+the audio settings, the streaming settings, the audio source picker, the
+API key box, the file player and video full screen all close with
+<code>Escape</code>, and focus goes back to the control you opened them
+from. The one exception is the “someone wants to join” dialog, which you
+must answer.</p>
+<hr />
+<h1 id="the-lobby">The lobby</h1>
+<p>The lobby is the first screen. It is an ordinary form, so it is fine
+to read it in browse mode if you prefer — but the public-room list needs
+arrow keys, so focus mode is still easier.</p>
+<p>In order, top to bottom:</p>
+<ol type="1">
+<li><strong>Language</strong> — a combo box. Changing it re-labels
+everything immediately, in the lobby and in a call, without a
+reload.</li>
+<li><strong>Room Name</strong> — letters, numbers, hyphens and
+underscores, up to 64 characters. Anything else is stripped out as you
+type. If nobody is in a room by that name yet, typing it creates
+it.</li>
+<li><strong>Room type</strong> — two radio buttons, <strong>Audio
+call</strong> and <strong>Video call</strong>. Audio is always the
+default. Pick with the arrow keys. This decision is permanent for the
+life of the room, and it decides whether cameras exist at all.</li>
+<li><strong>Video background</strong> — only appears if you chose
+<em>Video call</em>. See <a href="#video-calls">Video calls</a>.</li>
+<li><strong>Display Name</strong> — the name everyone will hear when you
+join, speak or send a message.</li>
+<li><strong>Public rooms</strong> — a list of rooms that are currently
+open to anyone, with who is in each. Only shown when at least one
+exists. Arrow to a room and press <code>Enter</code> to fill its name in
+for you; focus jumps back to Display Name so you can just type your
+name.</li>
+<li><strong>Mic level</strong> — a <strong>Test</strong> button, a
+<strong>Microphone level</strong> slider and a live level meter. Press
+Test and you will hear yourself (use headphones), and your screen reader
+will tell you when the level moves between <em>silent</em>,
+<em>low</em>, <em>good</em> and <em>high</em>. Raise the slider until it
+says good. That level carries into the call. This is worth doing once —
+a lot of laptop microphones are far too quiet by default.</li>
+<li><strong>Disable P2P</strong> — a checkbox. With two people,
+SonicRoom normally connects you directly to each other. Tick this to
+always relay through the server instead. Most people never need it.</li>
+<li><strong>Make this room public</strong> — a checkbox. Lists the room
+publicly, and turns on the knock-to-join and vote-to-kick rules
+described further down. Once anyone makes a room public it stays public
+until everybody leaves; unticking it later does not undo it.</li>
+<li><strong>Join without a microphone</strong> — a checkbox. You listen
+and use text chat, and the browser never asks for microphone permission.
+If you have no microphone, or you refuse the permission prompt, you end
+up in this mode anyway.</li>
+<li><strong>Join Room</strong> — the submit button. <code>Enter</code>
+from any of the text fields works too.</li>
+</ol>
+<hr />
+<h1 id="the-room-part-by-part">The room, part by part</h1>
+<h2 id="header">Header</h2>
+<p>Reads the room name and the name of this SonicRoom instance, then any
+badges that apply — <strong>VIDEO</strong> for a video call,
+<strong>REC</strong> while the call is being recorded,
+<strong>LIVE</strong> while it is being streamed out — then the number
+of people present, then the <strong>chat</strong> button (which also
+carries the unread count in its name), then the language combo box.</p>
+<h2 id="participant-list">Participant list</h2>
+<p>The heart of the app. It is one list containing <strong>you first,
+then everybody else</strong>, and then one row for every extra thing
+being sent into the room: a music caster, a shared screen’s audio, a
+file somebody is streaming, an extra microphone.</p>
+<p>Each row is read as the person’s name followed by whatever is true
+right now, for example:</p>
+<blockquote>
+<p>Ana (you), muted, sharing video, press Enter to open options for this
+participant</p>
+</blockquote>
+<p>The pieces you may hear are: <em>you</em>, <em>text only</em> (joined
+without a microphone), <em>muted</em>, <em>speaking</em>, <em>sharing
+video</em>, <em>sharing screen</em>, <em>pinned</em>, <em>muted by
+you</em>, and a vote count when a vote to remove that person is
+running.</p>
+<p>Press <code>Enter</code> on a row to open that person’s options. This
+replaces the list with a second list, and <code>Escape</code> or
+<code>Backspace</code> brings you back.</p>
+<h2 id="participant-options">Participant options</h2>
+<p>What you find here depends on whose row you opened.</p>
+<p><strong>On your own row:</strong></p>
+<ul>
+<li><strong>Your microphone level</strong> — a slider.
+<code>Left</code>/<code>Right</code> to change,
+<code>Home</code>/<code>End</code> for minimum and maximum. This is a
+boost applied before your voice leaves your machine, so it changes what
+everyone hears.</li>
+<li><strong>Describe my video</strong> and <strong>Pin my video</strong>
+— video calls only.</li>
+</ul>
+<p><strong>On somebody else’s row:</strong></p>
+<ul>
+<li><strong>Volume for <em>name</em></strong> — a slider. Only changes
+what <em>you</em> hear.</li>
+<li><strong>Mute <em>name</em> for me</strong> / <strong>Unmute
+<em>name</em> for me</strong> — silences them for you alone. They are
+not told. The label flips to say what pressing it will do next.</li>
+<li><strong>Pin <em>name</em>’s video</strong> / <strong>Pin
+<em>name</em>’s screen</strong> — video calls only, and purely a change
+to your own screen; the person you pin is never told.</li>
+<li><strong>Describe <em>name</em>’s video</strong> / <strong>Describe
+<em>name</em>’s screen</strong> — video calls only. See <a
+href="#video-calls">Video calls</a>.</li>
+<li><strong>Kick <em>name</em></strong> — only in public rooms with
+three or more people. See <a
+href="#public-rooms-knocking-and-voting">Public rooms, knocking and
+voting</a>.</li>
+<li><strong>Remove caster</strong> — removes a music-casting
+source.</li>
+<li><strong>Stop this stream</strong> — stops one shared file, shared
+screen audio or extra microphone.</li>
+</ul>
+<h2 id="chat-panel">Chat panel</h2>
+<p>Open it with the chat button in the header. The panel is laid out
+<strong>message history first, message box second</strong>, on purpose,
+so that you land on what was said rather than on an empty edit
+field.</p>
+<ul>
+<li>The message list is a list: <code>Up</code>/<code>Down</code>,
+<code>Home</code>/<code>End</code>.</li>
+<li><code>Ctrl</code> + <code>C</code> (or <code>Cmd</code> +
+<code>C</code>) on a message copies it.</li>
+<li>In the message box, <code>Enter</code> sends and <code>Shift</code>
++ <code>Enter</code> starts a new line.</li>
+<li><strong>Announce new messages</strong> is a combo box in the panel’s
+header with four settings: <em>Polite</em> (spoken when your screen
+reader next pauses), <em>Assertive</em> (interrupts), <em>Spoken
+aloud</em> (the browser’s own voice, for people not using a screen
+reader) and <em>Off</em>.</li>
+<li><code>Escape</code> closes the panel and puts focus back on the chat
+button.</li>
+</ul>
+<p>You do not have to keep the panel open. Everything that happens in
+the room is written into the chat history as well as spoken, and
+<code>Alt</code> + a number reads it back from anywhere — see <a
+href="#hearing-what-is-going-on">Hearing what is going on</a>.</p>
+<h2 id="the-audio-controls-toolbar">The audio controls toolbar</h2>
+<p>At the bottom of the window. One <code>Tab</code> stop;
+<code>Left</code>/<code>Right</code> to move along it. In order:</p>
+<table>
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 7%" />
+<col style="width: 81%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Button</th>
+<th>Shortcut</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Mute microphone</td>
+<td><code>M</code></td>
+<td>Mutes and unmutes you. Disabled, but still readable, if you joined
+without a microphone.</td>
+</tr>
+<tr class="even">
+<td>Share audio</td>
+<td><code>A</code></td>
+<td>Shares the sound of a screen or browser tab. Your browser asks which
+one, and you must tick its “share audio” box.</td>
+</tr>
+<tr class="odd">
+<td>Stream audio</td>
+<td><code>F</code></td>
+<td>Opens the source picker: a file from your computer, a link, or a
+file stored on the server.</td>
+</tr>
+<tr class="even">
+<td>Auto-ducking</td>
+<td><code>D</code></td>
+<td>Turns the automatic dip of music under voices on or off, <strong>for
+the whole room</strong>.</td>
+</tr>
+<tr class="odd">
+<td>Record call</td>
+<td><code>R</code></td>
+<td>Starts and stops a server-side recording of everybody.</td>
+</tr>
+<tr class="even">
+<td>Download</td>
+<td>—</td>
+<td>Appears once a recording exists. Downloads the whole call mixed
+together.</td>
+</tr>
+<tr class="odd">
+<td>Tracks</td>
+<td>—</td>
+<td>Appears once a recording exists. Downloads a zip with one file per
+person, all aligned and padded to the same length.</td>
+</tr>
+<tr class="even">
+<td>Live streaming</td>
+<td>—</td>
+<td>Opens the panel where you type an Icecast server’s details and start
+streaming the call out to it.</td>
+</tr>
+<tr class="odd">
+<td>Who’s talking</td>
+<td><code>W</code></td>
+<td>Says who is talking now or talked recently, numbered.</td>
+</tr>
+<tr class="even">
+<td>Shared notes</td>
+<td><code>Alt</code> + <code>N</code></td>
+<td>Opens this room’s shared notepad in a new tab. Only present if this
+instance has the feature configured.</td>
+</tr>
+<tr class="odd">
+<td>Audio settings</td>
+<td>—</td>
+<td>Microphone and speaker pickers, voice processing, hi-fi voice, extra
+microphones.</td>
+</tr>
+<tr class="even">
+<td>Leave</td>
+<td>—</td>
+<td>Leaves the call and returns to the lobby.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="footer">Footer</h2>
+<p>A link back to the SonicRoom project, and the link to this
+manual.</p>
+<hr />
+<h1 id="every-keyboard-shortcut">Every keyboard shortcut</h1>
+<p>These work anywhere in the call, <strong>as long as the keyboard
+focus is not inside a text box</strong> and your screen reader is
+passing keys through. They stop working while a “someone wants to join”
+dialog is open, because that dialog has to be answered first.</p>
+<h2 id="single-letters">Single letters</h2>
+<table>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>M</code></td>
+<td>Mute / unmute your microphone</td>
+</tr>
+<tr class="even">
+<td><code>A</code></td>
+<td>Start / stop sharing screen or tab audio</td>
+</tr>
+<tr class="odd">
+<td><code>F</code></td>
+<td>Open the “Stream audio” picker</td>
+</tr>
+<tr class="even">
+<td><code>D</code></td>
+<td>Auto-ducking on / off for the whole room</td>
+</tr>
+<tr class="odd">
+<td><code>R</code></td>
+<td>Start / stop recording</td>
+</tr>
+<tr class="even">
+<td><code>W</code></td>
+<td>Who’s talking — announces recent speakers, numbered</td>
+</tr>
+<tr class="odd">
+<td><code>V</code></td>
+<td>Camera on / off — <strong>video calls only</strong></td>
+</tr>
+<tr class="even">
+<td><code>E</code></td>
+<td>Video full screen on / off — <strong>video calls only</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>V</code> and <code>E</code> do nothing in an audio call, so
+those letters stay free there.</p>
+<h2 id="with-alt">With Alt</h2>
+<table>
+<colgroup>
+<col style="width: 31%" />
+<col style="width: 68%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Alt</code> + <code>1</code> … <code>Alt</code> +
+<code>9</code></td>
+<td>Read the last messages aloud. <code>1</code> is the newest,
+<code>2</code> the one before it, and so on.</td>
+</tr>
+<tr class="even">
+<td><code>Alt</code> + <code>0</code></td>
+<td>Read the tenth most recent message.</td>
+</tr>
+<tr class="odd">
+<td>The same <code>Alt</code> + number twice, quickly</td>
+<td>Copy that message to the clipboard.</td>
+</tr>
+<tr class="even">
+<td><code>Alt</code> + <code>N</code></td>
+<td>Open this room’s shared notes in a new tab.</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl</code> + <code>Shift</code> + <code>M</code></td>
+<td>Mute everyone’s microphones — <strong>moderated rooms only</strong>,
+and only if you may.</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>Alt</code> + number readback is the one set of shortcuts
+that <strong>also works while you are typing in the chat box</strong>,
+and it works whether the chat panel is open or closed. It reads the
+physical number keys, so it is unaffected by AZERTY, Dvorak or any other
+layout.</p>
+<h2 id="navigation-and-closing">Navigation and closing</h2>
+<table>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 76%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Tab</code> / <code>Shift</code> + <code>Tab</code></td>
+<td>Move between the parts of the app</td>
+</tr>
+<tr class="even">
+<td><code>Left</code> / <code>Right</code></td>
+<td>Move along a toolbar, or change a slider</td>
+</tr>
+<tr class="odd">
+<td><code>Up</code> / <code>Down</code></td>
+<td>Move through a list</td>
+</tr>
+<tr class="even">
+<td><code>Home</code> / <code>End</code></td>
+<td>First / last item, or minimum / maximum of a slider</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> / <code>Space</code></td>
+<td>Activate what you are on</td>
+</tr>
+<tr class="even">
+<td><code>Escape</code></td>
+<td>Close the panel, dialog or full screen you are in</td>
+</tr>
+<tr class="odd">
+<td><code>Backspace</code></td>
+<td>Back out of the participant options; up a folder in the server file
+browser</td>
+</tr>
+<tr class="even">
+<td><code>Enter</code></td>
+<td>Send a chat message</td>
+</tr>
+<tr class="odd">
+<td><code>Shift</code> + <code>Enter</code></td>
+<td>New line in a chat message</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl</code> / <code>Cmd</code> + <code>C</code></td>
+<td>Copy the chat message you are on</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="hearing-what-is-going-on">Hearing what is going on</h1>
+<p>SonicRoom is built around one rule: <strong>anything the room is
+told, you can read again later.</strong></p>
+<p>Every room event — somebody joined, somebody muted, a recording
+started, a file started playing, somebody was removed — is spoken
+through a live region <em>and</em> written into the chat history as a
+system message. Nothing is announced once and lost. If your screen
+reader was busy, or you were typing, or you simply missed it, press
+<code>Alt</code> + <code>1</code> and walk back through it.</p>
+<p>Three things are spoken but deliberately <em>not</em> written to
+chat, because they are about your own view rather than about the room:
+your own local volume changes, muting somebody for yourself, and pinning
+a video. Nobody else is affected by those, so they do not belong in a
+shared timeline.</p>
+<p><strong>Sound cues.</strong> Short sounds play for mute, unmute,
+someone joining, someone leaving, a new chat message, a share starting
+or stopping, someone knocking to get in, and a camera going on or off.
+They are local — the room never hears them — and they are designed to be
+distinguishable from speech.</p>
+<p><strong>“Who’s talking” (<code>W</code>).</strong> Voices come and go
+and a screen reader cannot follow them. Press <code>W</code> and
+SonicRoom names the people who are talking now or talked in the last
+little while, numbered “1. Ana, 2. Luis, 3. Marta” — most recent first.
+The same numbers appear briefly on their tiles, so a sighted person next
+to you sees the same list.</p>
+<hr />
+<h1 id="talking-and-listening">Talking and listening</h1>
+<p><strong>Mute</strong> with <code>M</code>, or the first button in the
+toolbar. Muting affects your voice only. If you are also streaming a
+file, sharing screen audio or running extra microphones, those keep
+going — you stop them by stopping them, not by muting.</p>
+<p><strong>Your own level</strong> is the slider in your own row of the
+participant list, and also the slider in the lobby. Raise it if people
+say you are quiet.</p>
+<p><strong>Somebody else’s level</strong> is the slider in
+<em>their</em> row of the participant list. That one changes only what
+you hear.</p>
+<p><strong>Auto-ducking (<code>D</code>)</strong> makes music dip
+automatically whenever someone talks, and lift again when they stop. It
+is on by default and it is a room-wide setting, so turning it off turns
+it off for everybody. Announced either way.</p>
+<p><strong>Audio settings</strong> (the gear in the toolbar) holds:</p>
+<ul>
+<li><strong>Microphone</strong> and <strong>Speakers</strong> — device
+combo boxes. Changing them applies immediately, mid-call, and is
+remembered. Device names only appear once you have granted microphone
+permission.</li>
+<li><strong>Voice processing</strong> — echo cancellation, noise
+suppression and automatic levelling. On by default. Turn it off if you
+are sending music or playing an instrument, since it will fight
+you.</li>
+<li><strong>Hi-fi voice (stereo)</strong> — sends stereo at a higher
+bitrate. Off by default, because most microphones are mono and it costs
+everyone else bandwidth. It applies to your <strong>next</strong> call,
+not the one you are in.</li>
+<li><strong>Extra microphones to stream</strong> — a list of checkboxes,
+one per input device you own other than your main microphone, each with
+a <strong>Mono</strong> / <strong>Stereo</strong> radio pair. Tick one
+and it is sent into the room as its own separate stream, alongside your
+voice, appearing as its own row in everyone’s participant list. This is
+how people send a mixing desk, an instrument or a virtual audio cable.
+Muting yourself does not mute these; untick them to stop them.</li>
+</ul>
+<hr />
+<h1 id="sharing-audio-into-the-room">Sharing audio into the room</h1>
+<h2 id="screen-or-tab-audio-a">Screen or tab audio (<code>A</code>)</h2>
+<p>Press <code>A</code> and your browser opens its own picker — a system
+dialog, not part of SonicRoom, so your screen reader treats it as a
+separate window. Choose a screen, window or tab, <strong>and tick the
+checkbox that shares its audio</strong>; without that box the share is
+silent. Chrome and Edge do this best; Firefox’s support for sharing
+system audio is limited or absent depending on your platform.</p>
+<p>Shared audio bypasses your microphone’s processing and limiter, so
+music keeps its dynamics. In an audio call the picture is thrown away
+and only the sound is sent. <code>A</code> again stops it.</p>
+<h2 id="a-file-a-link-or-a-server-file-f">A file, a link or a server
+file (<code>F</code>)</h2>
+<p><code>F</code> opens the <strong>Stream audio</strong> dialog, which
+offers three sources:</p>
+<ul>
+<li><strong>Choose from computer</strong> — a file picker.</li>
+<li><strong>Audio URL</strong> — an edit box. Paste any public link: a
+direct MP3, an internet radio stream, or a page on a video or music
+site, which the server extracts the audio from for you.</li>
+<li><strong>Server files</strong> — a browsable folder tree of audio
+kept on the server. Arrow through it, <code>Enter</code> on a folder to
+go in, <code>Enter</code> on a file to play it, <code>Backspace</code>
+to go back up a folder. Long names are truncated visually but read in
+full.</li>
+</ul>
+<p>Once something is playing, a small <strong>File stream</strong>
+window appears and focus lands on its play/pause button, so
+<code>Space</code> pauses immediately. It also has a <strong>Your
+volume</strong> slider, which changes only your own monitoring — the
+room always hears the file at full level — and a stop button.
+<code>Escape</code> anywhere in that window stops the stream and closes
+it.</p>
+<p>Pressing <code>F</code> again while something is playing opens the
+picker again and lets you swap to a different source without restarting
+the stream.</p>
+<hr />
+<h1 id="recording-and-live-streaming">Recording and live streaming</h1>
+<p><strong>Recording (<code>R</code>)</strong> happens on the server, so
+it captures everyone at full quality regardless of what your own machine
+is doing. Starting and stopping is announced to the whole room and a
+<strong>REC</strong> badge appears in the header — nobody is recorded
+without being told.</p>
+<p>Once a recording exists, two more buttons appear in the toolbar:</p>
+<ul>
+<li><strong>Download</strong> — the whole call mixed into one file. You
+can press it while the recording is still running; it downloads
+everything so far and the recording carries on.</li>
+<li><strong>Tracks</strong> — a zip with one file per person, each
+padded and time-aligned so they line up when dropped into an audio
+editor.</li>
+</ul>
+<p>In a video call, the whole-call download is a video file with
+everybody’s cameras and screens in a grid; in an audio call it is an
+audio file, as it always was.</p>
+<p><strong>Live streaming</strong> (the radio button in the toolbar)
+sends the whole mixed call to an Icecast server you specify. The panel
+asks for host, port, mount, user, password, format and bitrate, and
+remembers them in this browser. Those details are never shown to the
+rest of the room; all they get is a <strong>LIVE</strong> badge and an
+announcement that streaming started, and by whom.</p>
+<hr />
+<h1 id="video-calls">Video calls</h1>
+<p>A room is a video call only if it was created as one — the
+<strong>Video call</strong> radio in the lobby, which cannot be changed
+back afterwards. In an audio call, none of this exists: no camera, no
+<code>V</code>, no <code>E</code>, and sharing your screen still sends
+only its sound.</p>
+<p><strong>Everybody enters with their camera off</strong>, every time.
+Nothing turns your camera on except you.</p>
+<ul>
+<li><strong><code>V</code></strong> turns your camera on and off.
+Everyone is told, in speech and in the chat log.</li>
+<li><strong><code>E</code></strong> makes the video area fill the
+screen; <code>E</code> again or <code>Escape</code> leaves it. Announced
+both ways. On iOS Safari, which has no full screen for page elements,
+SonicRoom says so rather than doing nothing.</li>
+<li><strong>Pinning</strong> makes one camera or screen fill the video
+area for you alone. It is in each participant’s options (“Pin
+<em>name</em>’s video”), it is never signalled to anyone, and the person
+you pin is not told. If they turn their camera off, the pin is kept and
+waits — you are told it is waiting, and told again when the picture
+comes back.</li>
+</ul>
+<p><strong>Face-centering guidance</strong> is the button next to the
+camera button, on by default. While your camera is on, SonicRoom watches
+your own picture and speaks short corrections — “move to your right”,
+“move up”, “you’re centered”, “your face isn’t visible in the frame” —
+on an assertive live region, so they interrupt rather than queue. The
+directions are given from your point of view, not the picture’s. It
+repeats the same hint every three seconds while it still applies, says
+“centered” once when you get there, and goes quiet. Turn it off with the
+same button when you have finished adjusting.</p>
+<p><strong>“Describe <em>name</em>’s video”</strong> is in each
+participant’s options, including your own. It takes a single frame and
+asks Claude to describe it in a few sentences, reading out any text that
+is visible, in whatever language the interface is set to. The
+description is logged to chat like everything else, so <code>Alt</code>
++ <code>1</code> reads it again.</p>
+<p>This needs <strong>your own Claude API key</strong>, which you enter
+with the key button in the video toolbar. It is stored in this browser
+only and the request goes from your browser straight to Claude — it
+never passes through the SonicRoom server.</p>
+<p><strong>Video backgrounds</strong> are chosen in the
+<strong>lobby</strong>, under the <em>Video call</em> radio, and never
+in the call — that way the picture is settled before anything is sent.
+The choices are no background, blur, one of six supplied images, or your
+own image. Everything is done inside your browser, so the room only ever
+receives the finished picture and never your real surroundings. If your
+browser cannot do it, SonicRoom says so out loud and sends your camera
+unchanged rather than quietly failing.</p>
+<hr />
+<h1 id="public-rooms-knocking-and-voting">Public rooms, knocking and
+voting</h1>
+<p><strong>There are no moderators in an ordinary SonicRoom room, and no
+owner.</strong> Nobody can remove anybody on their own. In exchange,
+public rooms have two collective rules. (<strong>Moderated
+rooms</strong>, which do have administrators, are a separate thing: see
+the next chapter.)</p>
+<p><strong>Knock to join.</strong> When a room is public and somebody
+new asks to come in, everybody already inside hears a knocking sound and
+gets a dialog naming the person, with <strong>Allow</strong> and
+<strong>Deny</strong> buttons (and <strong>Allow all</strong> /
+<strong>Deny all</strong> when several are waiting). Focus goes straight
+to the first Allow button, and <code>Tab</code> cycles inside the
+dialog. It cannot be dismissed with <code>Escape</code> — this is the
+one dialog you have to answer. Anyone may answer it; the first answer
+counts. Denying somebody also blocks them from that room.</p>
+<p>Meanwhile the person knocking hears “Waiting for someone in the room
+to let you in…” and has a Cancel button.</p>
+<p><strong>Vote to kick.</strong> Only in public rooms, and only with
+<strong>three or more people</strong> present. Below three the option is
+not offered at all, so it can never be used by one person against
+another. The threshold is <em>at least half</em>, counting the person
+concerned: 2 votes out of 3, 2 out of 4, 3 out of 5.</p>
+<p>The option is in each participant’s options list. Its name carries
+the running tally — “Kick Ana (2 votes)” — and every vote and withdrawal
+is announced to the whole room, with names. Choosing it again withdraws
+your vote. Because the threshold depends on how many people are present,
+somebody leaving can be what tips an existing vote over the line.</p>
+<hr />
+<h1 id="moderated-rooms-with-administrators">Moderated rooms (with
+administrators)</h1>
+<p>Besides private and public rooms, which have no moderators, you can
+create a <strong>moderated room</strong>: a room with
+<strong>administrators</strong>, meant for talk shows and hosted panels,
+where somebody has to be able to silence the person who forgot to mute
+or eject a troll at once. Everything below exists only in this kind of
+room; an ordinary room is unchanged.</p>
+<p><strong>Creating one.</strong> In the lobby, tick <strong>“Admin
+options”</strong>. A group called <strong>“Participant
+privileges”</strong> unfolds, with a checkbox (“Allow several
+administrators”) and one drop-down list per action: recording, sharing
+audio, streaming audio, turning auto-ducking on or off, live streaming,
+approving new participants, using the chat, opening the shared notes,
+muting a participant for everyone, muting everyone’s microphones, and
+removing participants. For each you pick <strong>Administrators
+only</strong>, <strong>Everyone</strong> or <strong>Nobody</strong>
+(removing also offers <strong>by vote</strong>). The last checkbox hides
+the “Powered by SonicRoom” link inside the room. These choices are fixed
+when the room is created and never change while it exists; the browser
+remembers your last configuration for next time.</p>
+<p><strong>Who is an administrator.</strong> Whoever creates the room.
+If you allowed several administrators, every participant’s options
+include <strong>“Make administrator”</strong> (and <strong>“Remove
+administrator”</strong> to undo it). Administrators carry the word
+“administrator” in their row of the list. If you reload or lose the
+connection, you get the role back when you return.</p>
+<p><strong>If every administrator leaves</strong> while people remain,
+the room <strong>stops being moderated</strong>: it is announced to
+everyone (“The last administrator has left: this room is no longer
+moderated”), every button comes back for everybody, the chat reopens,
+and the room carries on as an ordinary private or public room for the
+rest of its life. Nobody is promoted in the leavers’ place, and a former
+administrator who comes back is a regular participant. If you want the
+room to survive your absence with its rules intact, name a second
+administrator before you go.</p>
+<p><strong>The door.</strong> In a moderated room newcomers
+<strong>always</strong> knock, public or not. The “Approve new
+participants” setting decides who hears the knock and gets the Allow /
+Deny dialog: administrators only, or everyone. Administrators walk in
+without knocking.</p>
+<p><strong>Muting somebody for everyone.</strong> In the participant’s
+options: <strong>“Mute for everyone”</strong>. Their microphone is cut
+for the whole room and they are told who did it. It is a <em>soft</em>
+mute: the person can turn their microphone back on with <code>M</code>
+when they mean to speak (which settles the classic “we can hear you
+talking to your neighbour” without a raise-hand flow). In the controls
+bar, whoever is allowed also sees <strong>“Mute everyone’s
+microphones”</strong>, which does the same to everybody else at once.
+Its shortcut is <code>Ctrl</code> + <code>Shift</code> + <code>M</code>
+— a deliberate three-key chord, so it cannot be hit by mistake next to
+<code>M</code>. It only exists in a moderated room; elsewhere the
+browser keeps that combination.</p>
+<p><strong>Removing people.</strong> Depending on the setting:
+administrators (or everyone) remove directly from the participant’s
+options with <strong>“Remove from room”</strong>, no vote; or the room
+votes as a public room does (with <strong>at least three</strong>
+eligible voters; if only administrators vote, only they count). Nobody
+can remove themselves. An administrator can only be muted or removed by
+another administrator.</p>
+<p><strong>What you may not do is not shown.</strong> If your role
+doesn’t allow recording, sharing or streaming audio, changing ducking,
+live streaming or writing in the chat, that button is not in the bar and
+the matching letter (<code>R</code>, <code>A</code>, <code>F</code>,
+<code>D</code>) answers “You can’t do that in this room”. The chat panel
+still opens even if you can’t write, because every announcement still
+lands there.</p>
+<p>The room carries the <strong>MOD</strong> badge in the header, and on
+entry it is announced as moderated along with who the administrators
+are. Every change (naming, mutes, removals) is announced and logged to
+the chat.</p>
+<h2 id="reserved-rooms-a-room-you-were-given-in-advance">Reserved rooms
+(a room you were given in advance)</h2>
+<p>A room normally exists only while somebody is in it, and whoever
+arrives first creates it. That is a problem when you advertise a link
+ahead of time: anyone could open “your” room before you and become its
+administrator, or the moderated room could simply vanish the moment it
+empties. A <strong>reserved room</strong> fixes this. The operator of
+the instance reserves a room name for you and gives you <strong>two
+links</strong>:</p>
+<ul>
+<li>the <strong>host link</strong>, which contains a secret key. Keep it
+to yourself; whoever opens the room with it is its
+<strong>administrator</strong>, every time, even after leaving and
+coming back;</li>
+<li>the <strong>public link</strong>, the ordinary room address, which
+you advertise.</li>
+</ul>
+<p>Until you open the room with the host link, everyone else who follows
+the public link hears “This room is reserved and its host hasn’t opened
+it yet” and waits on that screen; they are let in automatically as soon
+as you arrive (and then knock like anybody joining a moderated room, so
+you decide who enters). A reserved room is always a moderated room, with
+the participant privileges the operator set when reserving it, and it
+<strong>stays moderated</strong> while you are away: nobody can take it
+over, and you come back as its administrator.</p>
+<p>The key is remembered by your browser for that tab, so you can reload
+the page or be sent to the lobby for your name without losing it, and it
+is removed from the address bar at once so that a copied link never
+carries it. If you lose the host link, ask the operator for a new one
+(the old one stops working).</p>
+<hr />
+<h1 id="shared-notes">Shared notes</h1>
+<p>If this SonicRoom instance has notes configured, the toolbar has a
+<strong>Shared notes</strong> button and <code>Alt</code> +
+<code>N</code> does the same thing. It opens one shared, collaborative
+notepad for the room <strong>in a new browser tab</strong> — never in a
+frame inside the call, so your screen reader deals with an ordinary
+editable document.</p>
+<p>The first press creates the note; everyone else’s press opens the
+same one, and the fact that it exists is announced and logged to chat
+with the link. Switch back to the SonicRoom tab and the call is still
+running.</p>
+<hr />
+<h1 id="options-you-can-put-in-the-address-bar">Options you can put in
+the address bar</h1>
+<p>Anything after <code>?</code> in a room link sets an option, and
+several can be combined with <code>&amp;</code>.</p>
+<table>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 83%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Option</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>?displayName=Ana</code></td>
+<td>Joins with this name, skipping the lobby</td>
+</tr>
+<tr class="even">
+<td><code>?video=on</code></td>
+<td>Makes it a video call</td>
+</tr>
+<tr class="odd">
+<td><code>?public=true</code></td>
+<td>Makes the room public</td>
+</tr>
+<tr class="even">
+<td><code>?mic=off</code></td>
+<td>Joins without a microphone — listening and chat only</td>
+</tr>
+<tr class="odd">
+<td><code>?p2p=off</code></td>
+<td>Always relays through the server, even with two people</td>
+</tr>
+<tr class="even">
+<td><code>?lang=es</code></td>
+<td>Forces the interface language (<code>en</code>, <code>es</code>,
+<code>fr</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>?ios=on</code></td>
+<td>Forces the iOS audio path on any browser (a workaround for stubborn
+audio problems)</td>
+</tr>
+<tr class="even">
+<td><code>?host=…</code></td>
+<td>Opens a reserved room as its host (see “Reserved rooms”); removed
+from the address bar at once</td>
+</tr>
+</tbody>
+</table>
+<p>For example, a link that drops somebody straight into a
+French-language video call as “Ana”:</p>
+<pre><code>https://your-instance.example/room/studio?video=on&amp;lang=fr&amp;displayName=Ana</code></pre>
+<hr />
+<h1 id="when-something-is-not-working">When something is not
+working</h1>
+<p><strong>A single letter types nothing and does nothing.</strong> Your
+screen reader is in its reading mode and eating the key.
+<code>NVDA</code> + <code>Space</code>, <code>JAWS key</code> +
+<code>Z</code>, <code>Caps Lock</code> + <code>Space</code> for
+Narrator, or turn Quick Nav off for VoiceOver. This is by far the most
+common problem.</p>
+<p><strong>A single letter appears in the chat box instead.</strong> The
+focus is in the message box. That is deliberate — you have to be able to
+type the letter M in a message. Press <code>Escape</code> to close the
+chat panel, or <code>Tab</code> out of the box, then try again.
+<code>Alt</code> + number is the one shortcut that still works from
+inside the box.</p>
+<p><strong><code>Tab</code> will not move me to the next button in the
+toolbar.</strong> It is not meant to. The whole toolbar is one stop; use
+<code>Right Arrow</code>. <code>Tab</code> leaves the toolbar.</p>
+<p><strong><code>Alt</code> + a number says “No message 1”.</strong>
+Nothing has been said in the room yet. Room events count as messages, so
+the first join will fill it.</p>
+<p><strong>I cannot hear anyone.</strong> Check the
+<strong>Speakers</strong> combo box in the audio settings — browsers do
+not always follow the system default. Then check that you have not muted
+that person for yourself: their row would read “muted by you”.</p>
+<p><strong>People say I am very quiet.</strong> Raise <strong>Your
+microphone level</strong> in your own row of the participant list, or
+use the lobby’s Test button, which speaks the level band as you adjust
+it.</p>
+<p><strong>My extra microphone did not start.</strong> SonicRoom asks
+for that exact device rather than accepting a substitute, so if it is in
+use by another program or unplugged, it fails instead of silently
+sending your main microphone twice. Close whatever is holding the device
+and tick it again.</p>
+<p><strong>Sharing a screen shares no sound.</strong> The audio checkbox
+in the browser’s own share dialog was not ticked. That dialog belongs to
+the browser, not to SonicRoom. Try Chrome or Edge if your browser does
+not offer the option at all.</p>
+<p><strong>“Describe video” says to add an API key.</strong> That
+feature uses your own Claude API key, entered with the key button in the
+video toolbar. It is kept in this browser only.</p>
+<hr />
+<h1 id="one-page-key-reference">One-page key reference</h1>
+<table>
+<colgroup>
+<col style="width: 47%" />
+<col style="width: 52%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Key</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>M</code></td>
+<td>Mute / unmute</td>
+</tr>
+<tr class="even">
+<td><code>A</code></td>
+<td>Share / stop sharing screen or tab audio</td>
+</tr>
+<tr class="odd">
+<td><code>F</code></td>
+<td>Stream audio — open the source picker</td>
+</tr>
+<tr class="even">
+<td><code>D</code></td>
+<td>Auto-ducking on / off (whole room)</td>
+</tr>
+<tr class="odd">
+<td><code>R</code></td>
+<td>Start / stop recording</td>
+</tr>
+<tr class="even">
+<td><code>W</code></td>
+<td>Who’s talking</td>
+</tr>
+<tr class="odd">
+<td><code>V</code></td>
+<td>Camera on / off (video calls)</td>
+</tr>
+<tr class="even">
+<td><code>E</code></td>
+<td>Video full screen (video calls)</td>
+</tr>
+<tr class="odd">
+<td><code>Alt</code> + <code>1</code>…<code>9</code>,
+<code>0</code></td>
+<td>Read the last ten messages, newest first</td>
+</tr>
+<tr class="even">
+<td>Same <code>Alt</code> + number twice</td>
+<td>Copy that message</td>
+</tr>
+<tr class="odd">
+<td><code>Alt</code> + <code>N</code></td>
+<td>Shared notes in a new tab</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl</code> + <code>Shift</code> + <code>M</code></td>
+<td>Mute everyone (moderated rooms)</td>
+</tr>
+<tr class="odd">
+<td><code>Tab</code> / <code>Shift</code> + <code>Tab</code></td>
+<td>Between parts of the app</td>
+</tr>
+<tr class="even">
+<td><code>Left</code> / <code>Right</code></td>
+<td>Along a toolbar; change a slider</td>
+</tr>
+<tr class="odd">
+<td><code>Up</code> / <code>Down</code></td>
+<td>Through a list</td>
+</tr>
+<tr class="even">
+<td><code>Home</code> / <code>End</code></td>
+<td>First / last; minimum / maximum</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> / <code>Space</code></td>
+<td>Activate</td>
+</tr>
+<tr class="even">
+<td><code>Escape</code></td>
+<td>Close panel, dialog or full screen</td>
+</tr>
+<tr class="odd">
+<td><code>Backspace</code></td>
+<td>Back out of options; up a folder</td>
+</tr>
+<tr class="even">
+<td><code>Enter</code> in the message box</td>
+<td>Send</td>
+</tr>
+<tr class="odd">
+<td><code>Shift</code> + <code>Enter</code> in the message box</td>
+<td>New line</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl</code> / <code>Cmd</code> + <code>C</code> on a
+message</td>
+<td>Copy it</td>
+</tr>
+<tr class="odd">
+<td><code>NVDA</code> + <code>Space</code></td>
+<td>NVDA: browse mode ↔︎ focus mode</td>
+</tr>
+<tr class="even">
+<td><code>JAWS key</code> + <code>Z</code></td>
+<td>JAWS: Virtual Cursor off / on</td>
+</tr>
+<tr class="odd">
+<td><code>Caps Lock</code> + <code>Space</code></td>
+<td>Narrator: Scan Mode off / on</td>
+</tr>
+<tr class="even">
+<td><code>Left</code> + <code>Right</code> together</td>
+<td>VoiceOver: Quick Nav off / on</td>
+</tr>
+<tr class="odd">
+<td><code>Orca Modifier</code> + <code>A</code></td>
+<td>Orca: browse mode ↔︎ focus mode</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

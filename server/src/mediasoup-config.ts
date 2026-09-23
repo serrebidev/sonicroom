@@ -1,7 +1,10 @@
-import type { WorkerSettings, RouterOptions, WebRtcTransportOptions } from "mediasoup/types";
+import type {
+  WorkerSettings,
+  RouterOptions,
+  WebRtcTransportOptions,
+  TransportListenInfo,
+} from "mediasoup/types";
 import os from "node:os";
-
-const numCores = os.cpus().length;
 
 export const workerSettings: WorkerSettings = {
   logLevel: "warn",
@@ -9,7 +12,60 @@ export const workerSettings: WorkerSettings = {
   rtcMaxPort: 40100,
 };
 
-export const numWorkers = Math.max(1, numCores);
+// ---------------------------------------------------------------------------
+// How many mediasoup workers to spawn
+// ---------------------------------------------------------------------------
+//
+// mediasoup handles media in separate C++ worker processes and rooms are spread
+// across them, so "one per core" is the throughput-maximising default and stays
+// the behaviour when nothing is set. It isn't always what an operator wants
+// though: on a box that also runs other things a big core count spawns workers
+// that will never carry a room, and a container CPU quota makes `os.cpus()`
+// lie (it reports the host's cores, not the share we actually get).
+//
+// MEDIASOUP_WORKERS pins the count instead. Anything unparseable or < 1 is
+// ignored (with a warning) rather than failing the boot, and the cap only
+// exists to stop a fat-fingered "160" from forking the box to a halt.
+export const MAX_WORKERS = 64;
+
+export interface WorkerCount {
+  count: number;
+  /** Set when the operator's value was ignored or adjusted — logged at startup. */
+  warning: string | null;
+}
+
+export function resolveWorkerCount(
+  env: NodeJS.ProcessEnv = process.env,
+  cpuCount: number = os.cpus().length,
+): WorkerCount {
+  // os.cpus() can report 0 in some containers, so never go below one worker.
+  const perCore = Math.max(1, cpuCount);
+  const raw = env.MEDIASOUP_WORKERS?.trim();
+  if (!raw) return { count: perCore, warning: null };
+
+  const requested = Number(raw);
+  if (!Number.isInteger(requested) || requested < 1) {
+    return {
+      count: perCore,
+      warning:
+        `MEDIASOUP_WORKERS="${raw}" is not a positive integer — ` +
+        `ignoring it and using ${perCore} (one per core).`,
+    };
+  }
+  if (requested > MAX_WORKERS) {
+    return {
+      count: MAX_WORKERS,
+      warning: `MEDIASOUP_WORKERS=${requested} is above the ${MAX_WORKERS}-worker cap — using ${MAX_WORKERS}.`,
+    };
+  }
+  if (requested > perCore) {
+    return {
+      count: requested,
+      warning: `MEDIASOUP_WORKERS=${requested} exceeds this host's ${perCore} core(s) — workers will contend for CPU.`,
+    };
+  }
+  return { count: requested, warning: null };
+}
 
 export const routerOptions: RouterOptions = {
   mediaCodecs: [
@@ -35,8 +91,113 @@ export const routerOptions: RouterOptions = {
         ptime: 10,
       },
     },
+    // Video is only ever produced in a VIDEO room (room.isVideo — the produce
+    // handler rejects video elsewhere). VP8 is the universal WebRTC baseline
+    // (every browser, software-encodable everywhere), which matters more here
+    // than H.264's hardware paths; the start-bitrate hint keeps the first
+    // seconds from looking like a slideshow before BWE ramps.
+    {
+      kind: "video",
+      mimeType: "video/VP8",
+      clockRate: 90000,
+      parameters: { "x-google-start-bitrate": 800 },
+    },
   ],
 };
+
+// ---------------------------------------------------------------------------
+// Announced ICE addresses
+// ---------------------------------------------------------------------------
+//
+// mediasoup announces ONE address per listenInfo, so "advertise several
+// addresses" means "one listenInfo per address": the transport gathers a
+// candidate for each and ICE picks whichever pair actually works.
+//
+// A single public IP is right for a VPS, but wrong for a box behind NAT. Peers
+// on the same LAN as a home-hosted server usually cannot reach it via its
+// public IP (most consumer routers don't hairpin NAT), so announcing only the
+// public address leaves the people closest to the server unable to connect —
+// while announcing only the LAN address locks out everyone off the LAN.
+// Announcing both fixes it: LAN peers use the local candidate, the rest use the
+// public one.
+//
+// So ANNOUNCED_IP / ANNOUNCED_IP6 accept a comma- (or space-) separated LIST,
+// and ANNOUNCE_LOCAL_IPS=true appends this host's own non-loopback interface
+// addresses so a home instance doesn't have to hardcode a DHCP-assigned LAN IP.
+// A single value behaves exactly as it always did; an empty one keeps the old
+// "announce whatever we bind" listenInfo.
+//
+// Cost of extra addresses: each listenInfo binds its own UDP port per
+// transport, and every peer holds two transports (send + recv). Within the
+// 40000-40100 worker range that caps concurrency at ~101 / (2 x addresses)
+// peers, so announce the addresses you need rather than every address you have.
+
+function parseAnnouncedAddresses(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(/[,\s]+/)
+    .map((entry) => entry.trim().replace(/^\[|\]$/g, "")) // tolerate [2001:db8::1]
+    .filter(Boolean);
+}
+
+/**
+ * This host's own addresses for `family`, minus loopback and IPv6 link-local
+ * (fe80::, which needs a scope id an ICE candidate can't carry). This is what
+ * ANNOUNCE_LOCAL_IPS adds, so a home instance auto-announces its LAN address.
+ */
+export function localInterfaceAddresses(
+  family: "IPv4" | "IPv6",
+  interfaces: () => NodeJS.Dict<os.NetworkInterfaceInfo[]> = os.networkInterfaces,
+): string[] {
+  return Object.values(interfaces())
+    .flatMap((addrs) => addrs ?? [])
+    .filter((addr) => addr.family === family && !addr.internal)
+    .map((addr) => addr.address)
+    .filter((address) => !address.toLowerCase().startsWith("fe80:"));
+}
+
+function isTruthy(value: string | undefined): boolean {
+  return ["1", "true", "yes", "on", "enable", "enabled"].includes(
+    (value ?? "").trim().toLowerCase(),
+  );
+}
+
+/** One UDP listenInfo per announced address, per IP family. */
+export function buildListenInfos(
+  env: NodeJS.ProcessEnv = process.env,
+  interfaces: () => NodeJS.Dict<os.NetworkInterfaceInfo[]> = os.networkInterfaces,
+): TransportListenInfo[] {
+  const announceLocal = isTruthy(env.ANNOUNCE_LOCAL_IPS);
+  const families = [
+    {
+      ip: "0.0.0.0",
+      announced: [
+        ...parseAnnouncedAddresses(env.ANNOUNCED_IP),
+        ...(announceLocal ? localInterfaceAddresses("IPv4", interfaces) : []),
+      ],
+    },
+    {
+      ip: "::",
+      announced: [
+        ...parseAnnouncedAddresses(env.ANNOUNCED_IP6),
+        ...(announceLocal ? localInterfaceAddresses("IPv6", interfaces) : []),
+      ],
+    },
+  ];
+
+  return families.flatMap<TransportListenInfo>(({ ip, announced }) => {
+    const unique = [...new Set(announced)];
+    // Nothing announced for this family: keep the historical single listenInfo
+    // that announces whatever it binds (fine for localhost / LAN-only runs).
+    if (unique.length === 0) return [{ protocol: "udp", ip }];
+    return unique.map((announcedAddress) => ({ protocol: "udp", ip, announcedAddress }));
+  });
+}
+
+/** The addresses handed to ICE, for the startup log. */
+export function announcedAddresses(infos: TransportListenInfo[]): string[] {
+  return infos.map((info) => info.announcedAddress).filter((a): a is string => Boolean(a));
+}
 
 export const transportOptions: WebRtcTransportOptions = {
   // UDP only. We deliberately don't advertise TCP ICE candidates: the firewall
@@ -44,18 +205,7 @@ export const transportOptions: WebRtcTransportOptions = {
   // shared coturn (TURN over 3478/tcp, TURNS over 5349/tls). Advertising
   // unreachable TCP candidates just made ICE slower (clients probed dead
   // candidates before relaying via coturn anyway).
-  listenInfos: [
-    {
-      protocol: "udp",
-      ip: "0.0.0.0",
-      announcedAddress: process.env.ANNOUNCED_IP || undefined,
-    },
-    {
-      protocol: "udp",
-      ip: "::",
-      announcedAddress: process.env.ANNOUNCED_IP6 || undefined,
-    },
-  ],
+  listenInfos: buildListenInfos(),
   initialAvailableOutgoingBitrate: 600000,
   enableUdp: true,
   enableTcp: false,

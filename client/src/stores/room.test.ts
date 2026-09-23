@@ -1,7 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ChatMessage } from "../lib/chat";
 import { isIOS } from "../lib/microphone";
-import { useRoomStore, DEFAULT_STREAM_CONFIG, MAX_MIC_GAIN, type StreamConfig } from "./room";
+import {
+  useRoomStore,
+  isPinned,
+  DEFAULT_STREAM_CONFIG,
+  MAX_MIC_GAIN,
+  type StreamConfig,
+} from "./room";
 
 // localStorage keys (kept in lockstep with room.ts — they are module-private there).
 const KEYS = {
@@ -15,6 +21,8 @@ const KEYS = {
   micStereo: "sonicroom:micStereoByDevice",
   streamConfig: "sonicroom:streamConfig",
   chatAnnounce: "sonicroom:chatAnnounceMode",
+  videoBackground: "sonicroom:videoBackground",
+  videoBackgroundImage: "sonicroom:videoBackgroundImage",
 };
 
 const CHAT_MESSAGES_MAX = 200;
@@ -64,6 +72,9 @@ describe("peer map actions", () => {
       kickVotes: 0,
       iVotedKick: false,
       localMuted: false,
+      hasVideo: false,
+      hasScreen: false,
+      isAdmin: false,
     });
   });
 
@@ -670,6 +681,13 @@ describe("simple setters", () => {
     expect(useRoomStore.getState().awaitingApproval).toBe(true);
   });
 
+  it("setAwaitingHost, cleared by reset", () => {
+    useRoomStore.getState().setAwaitingHost(true);
+    expect(useRoomStore.getState().awaitingHost).toBe(true);
+    useRoomStore.getState().reset();
+    expect(useRoomStore.getState().awaitingHost).toBe(false);
+  });
+
   it("setRoomIsPublic", () => {
     useRoomStore.getState().setRoomIsPublic(true);
     expect(useRoomStore.getState().roomIsPublic).toBe(true);
@@ -791,6 +809,7 @@ describe("reset", () => {
     s.setAwaitingApproval(true);
     s.setRoomIsPublic(true);
     s.setKicked(true);
+    s.setPinnedVideo({ peerId: "p1", source: "camera" });
 
     useRoomStore.getState().reset();
     const st = useRoomStore.getState();
@@ -826,6 +845,7 @@ describe("reset", () => {
     expect(st.awaitingApproval).toBe(false);
     expect(st.roomIsPublic).toBe(false);
     expect(st.kicked).toBe(false);
+    expect(st.pinnedVideo).toBe(null);
 
     // --- persisted prefs preserved ---
     expect(st.micDeviceId).toBe("mic-x");
@@ -839,5 +859,196 @@ describe("reset", () => {
     expect(st.chatAnnounceMode).toBe("tts");
     expect(st.streamConfig).toEqual(customCfg);
     expect(st.locale).toBe("fr");
+  });
+});
+
+describe("video background (lobby-configured, persisted)", () => {
+  // A stand-in for the downscaled JPEG data URL the picker produces.
+  const IMAGE = "data:image/jpeg;base64,AAAA";
+
+  async function freshStore() {
+    vi.resetModules();
+    const mod = await import("./room");
+    return mod.useRoomStore;
+  }
+
+  it("defaults to no background — the raw camera, and no compositor at all", () => {
+    expect(useRoomStore.getState().videoBackground).toBe("none");
+    expect(useRoomStore.getState().videoBackgroundImage).toBe("");
+  });
+
+  it("persists a preset choice", () => {
+    useRoomStore.getState().setVideoBackground("beach");
+    expect(useRoomStore.getState().videoBackground).toBe("beach");
+    expect(localStorage.getItem(KEYS.videoBackground)).toBe("beach");
+  });
+
+  it("refuses 'custom' while no image is stored, keeping none instead", () => {
+    useRoomStore.getState().setVideoBackground("custom");
+    expect(useRoomStore.getState().videoBackground).toBe("none");
+  });
+
+  it("accepts 'custom' once an image is stored", () => {
+    useRoomStore.getState().setVideoBackgroundImage(IMAGE);
+    useRoomStore.getState().setVideoBackground("custom");
+    expect(useRoomStore.getState().videoBackground).toBe("custom");
+    expect(localStorage.getItem(KEYS.videoBackgroundImage)).toBe(IMAGE);
+  });
+
+  it("drops a 'custom' selection when the image is removed, and persists that too", () => {
+    useRoomStore.getState().setVideoBackgroundImage(IMAGE);
+    useRoomStore.getState().setVideoBackground("custom");
+    useRoomStore.getState().setVideoBackgroundImage("");
+    expect(useRoomStore.getState().videoBackground).toBe("none");
+    expect(localStorage.getItem(KEYS.videoBackground)).toBe("none");
+  });
+
+  it("leaves a preset selection alone when the custom image is removed", () => {
+    useRoomStore.getState().setVideoBackgroundImage(IMAGE);
+    useRoomStore.getState().setVideoBackground("mountains");
+    useRoomStore.getState().setVideoBackgroundImage("");
+    expect(useRoomStore.getState().videoBackground).toBe("mountains");
+  });
+
+  it("reports whether the image actually persisted", () => {
+    expect(useRoomStore.getState().setVideoBackgroundImage(IMAGE)).toBe(true);
+    // The test harness installs its own in-memory Storage, so spy on the
+    // instance rather than Storage.prototype.
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new Error("QuotaExceededError");
+    });
+    // Applied in memory for this call even though storage refused it.
+    expect(useRoomStore.getState().setVideoBackgroundImage(IMAGE)).toBe(false);
+    expect(useRoomStore.getState().videoBackgroundImage).toBe(IMAGE);
+    setItem.mockRestore();
+  });
+
+  it("survives reset — it is a preference, not per-room state", () => {
+    useRoomStore.getState().setVideoBackground("studio");
+    useRoomStore.getState().reset();
+    expect(useRoomStore.getState().videoBackground).toBe("studio");
+  });
+
+  describe("loading a stored choice", () => {
+    it("restores a preset", async () => {
+      localStorage.setItem(KEYS.videoBackground, "bookshelves");
+      expect((await freshStore()).getState().videoBackground).toBe("bookshelves");
+    });
+    it("degrades 'custom' to none when the image is gone", async () => {
+      localStorage.setItem(KEYS.videoBackground, "custom");
+      expect((await freshStore()).getState().videoBackground).toBe("none");
+    });
+    it("keeps 'custom' when the image is still there", async () => {
+      localStorage.setItem(KEYS.videoBackground, "custom");
+      localStorage.setItem(KEYS.videoBackgroundImage, IMAGE);
+      expect((await freshStore()).getState().videoBackground).toBe("custom");
+    });
+    it("degrades a preset this build no longer ships", async () => {
+      localStorage.setItem(KEYS.videoBackground, "some-retired-preset");
+      expect((await freshStore()).getState().videoBackground).toBe("none");
+    });
+  });
+});
+
+describe("pinned video (local view choice, video rooms)", () => {
+  const CAM = { peerId: "p1", source: "camera" } as const;
+
+  it("starts unpinned", () => {
+    expect(useRoomStore.getState().pinnedVideo).toBe(null);
+  });
+
+  it("togglePinnedVideo pins, then unpins the SAME target", () => {
+    const s = useRoomStore.getState();
+    s.togglePinnedVideo("p1", "camera");
+    expect(useRoomStore.getState().pinnedVideo).toEqual(CAM);
+    s.togglePinnedVideo("p1", "camera");
+    expect(useRoomStore.getState().pinnedVideo).toBe(null);
+  });
+
+  it("pinning something else REPLACES the pin (only one at a time)", () => {
+    const s = useRoomStore.getState();
+    s.togglePinnedVideo("p1", "camera");
+    s.togglePinnedVideo("p2", "screen");
+    expect(useRoomStore.getState().pinnedVideo).toEqual({ peerId: "p2", source: "screen" });
+    // Same peer, other source: also a replacement, not a toggle-off.
+    s.togglePinnedVideo("p2", "camera");
+    expect(useRoomStore.getState().pinnedVideo).toEqual({ peerId: "p2", source: "camera" });
+  });
+
+  it("survives the pinned camera going away and coming back (tiles are re-keyed)", () => {
+    const s = useRoomStore.getState();
+    s.addVideoTile({ producerId: "prod-1", peerId: "p1", source: "camera" });
+    s.togglePinnedVideo("p1", "camera");
+    // Camera off: the tile (and its producer id) is gone...
+    s.removeVideoTile("prod-1");
+    expect(useRoomStore.getState().pinnedVideo).toEqual(CAM);
+    // ...and back on as a BRAND NEW producer, which the pin still matches.
+    s.addVideoTile({ producerId: "prod-2", peerId: "p1", source: "camera" });
+    const st = useRoomStore.getState();
+    expect(isPinned(st.pinnedVideo, "p1", "camera")).toBe(true);
+    expect(
+      [...st.videoTiles.values()].some((t) => isPinned(st.pinnedVideo, t.peerId, t.source)),
+    ).toBe(true);
+  });
+
+  it("survives a mode rebuild / reconnect, which drops every tile", () => {
+    const s = useRoomStore.getState();
+    s.togglePinnedVideo("p1", "camera");
+    s.clearVideoTiles();
+    expect(useRoomStore.getState().pinnedVideo).toEqual(CAM);
+  });
+
+  it("removePeer clears a pin on the departed peer only", () => {
+    const s = useRoomStore.getState();
+    s.addPeer("p1", "Alice");
+    s.addPeer("p2", "Bob");
+    s.togglePinnedVideo("p2", "screen");
+    s.removePeer("p1");
+    expect(useRoomStore.getState().pinnedVideo).toEqual({ peerId: "p2", source: "screen" });
+    s.removePeer("p2");
+    expect(useRoomStore.getState().pinnedVideo).toBe(null);
+  });
+
+  it("removePeer clears the pin even when the peer also had a speaker badge", () => {
+    const s = useRoomStore.getState();
+    s.addPeer("p1", "Alice");
+    s.setSpeakerBadges({ p1: 1, p2: 2 });
+    s.togglePinnedVideo("p1", "camera");
+    s.removePeer("p1");
+    const st = useRoomStore.getState();
+    expect(st.pinnedVideo).toBe(null);
+    expect(st.speakerBadges).toEqual({ p2: 2 });
+  });
+
+  it("re-points a pin on OUR OWN camera when a reconnect gives us a new peer id", () => {
+    const s = useRoomStore.getState();
+    s.setRoom("lounge", "Alice", "sock-1");
+    s.togglePinnedVideo("sock-1", "camera");
+    // Rejoin under a new socket id.
+    useRoomStore.getState().setRoom("lounge", "Alice", "sock-2");
+    expect(useRoomStore.getState().pinnedVideo).toEqual({ peerId: "sock-2", source: "camera" });
+  });
+
+  it("leaves a pin on SOMEONE ELSE alone across our own rejoin", () => {
+    const s = useRoomStore.getState();
+    s.setRoom("lounge", "Alice", "sock-1");
+    s.togglePinnedVideo("p2", "camera");
+    useRoomStore.getState().setRoom("lounge", "Alice", "sock-2");
+    expect(useRoomStore.getState().pinnedVideo).toEqual({ peerId: "p2", source: "camera" });
+  });
+
+  it("setPinnedVideo sets and clears directly", () => {
+    const s = useRoomStore.getState();
+    s.setPinnedVideo({ peerId: "p9", source: "screen" });
+    expect(useRoomStore.getState().pinnedVideo).toEqual({ peerId: "p9", source: "screen" });
+    s.setPinnedVideo(null);
+    expect(useRoomStore.getState().pinnedVideo).toBe(null);
+  });
+
+  it("isPinned matches peer AND source, and is false for no pin", () => {
+    expect(isPinned(null, "p1", "camera")).toBe(false);
+    expect(isPinned(CAM, "p1", "camera")).toBe(true);
+    expect(isPinned(CAM, "p1", "screen")).toBe(false);
+    expect(isPinned(CAM, "p2", "camera")).toBe(false);
   });
 });

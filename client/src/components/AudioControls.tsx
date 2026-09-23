@@ -14,6 +14,8 @@ import {
   Radio,
   Settings,
   Megaphone,
+  NotebookPen,
+  MicOff as MuteAllIcon,
 } from "lucide-react";
 import { useRoomStore } from "../stores/room";
 import { apiUrl } from "../lib/runtime-config";
@@ -34,7 +36,21 @@ interface AudioControlsProps {
   onStopStreaming: () => Promise<void>;
   // Announce + briefly number the people talking now / who talked recently.
   onAnnounceSpeakers: () => void;
+  // Open (creating on first use) the room's shared note in a new tab.
+  onOpenNotes: () => void;
   onLeave: () => void;
+  // MODERATED rooms: which controls this peer may use (all default to true, so
+  // an ordinary room renders every control as always). A control the policy
+  // denies is NOT rendered — and leaves the toolbar's arrow order too.
+  canShare?: boolean;
+  canStreamAudio?: boolean;
+  canDuck?: boolean;
+  canRecord?: boolean;
+  canLiveStream?: boolean;
+  canNotes?: boolean;
+  // Moderated rooms: "mute everyone" (only rendered when allowed).
+  canMuteAll?: boolean;
+  onMuteAll?: () => void;
 }
 
 export function AudioControls({
@@ -46,7 +62,16 @@ export function AudioControls({
   onStartStreaming,
   onStopStreaming,
   onAnnounceSpeakers,
+  onOpenNotes,
   onLeave,
+  canShare = true,
+  canStreamAudio = true,
+  canDuck = true,
+  canRecord = true,
+  canLiveStream = true,
+  canNotes = true,
+  canMuteAll = false,
+  onMuteAll,
 }: AudioControlsProps) {
   const isMuted = useRoomStore((s) => s.isMuted);
   const hasMic = useRoomStore((s) => s.hasMic);
@@ -54,8 +79,16 @@ export function AudioControls({
   const isStreamingFile = useRoomStore((s) => s.fileStreamName != null);
   const duckingEnabled = useRoomStore((s) => s.duckingEnabled);
   const isRecording = useRoomStore((s) => s.isRecording);
+  // A video room's recording downloads as an MP4 (every camera/screen in a grid
+  // with the room's audio on top); an audio room stays Ogg/Opus. Only the
+  // suggested file name is picked here — the server sets the real one.
+  const roomIsVideo = useRoomStore((s) => s.roomIsVideo);
   const recordingId = useRoomStore((s) => s.recordingId);
   const isStreaming = useRoomStore((s) => s.isStreaming);
+  // Shared notes: whether the feature is configured on this instance (gates the
+  // button) and whether the room already has a note (label: open vs create).
+  const notesEnabled = useRoomStore((s) => s.notesEnabled);
+  const notesUrl = useRoomStore((s) => s.notesUrl);
 
   // The gear (device pickers) and the streaming button each open a popover.
   // Only one is open at a time — opening one closes the other.
@@ -63,6 +96,11 @@ export function AudioControls({
   const [streamOpen, setStreamOpen] = useState(false);
   const settingsPanelRef = useRef<HTMLDivElement>(null);
   const streamPanelRef = useRef<HTMLDivElement>(null);
+  // Lost the privilege mid-call (an admin revoked us): the button goes, so its
+  // popover can't stay open in front of a control that no longer exists.
+  useEffect(() => {
+    if (!canLiveStream) setStreamOpen(false);
+  }, [canLiveStream]);
 
   // Roving tabindex: the toolbar is a single tab stop and left/right arrows
   // move focus between its controls (ARIA toolbar pattern).
@@ -101,13 +139,15 @@ export function AudioControls({
 
   const orderedIds = [
     "mute",
-    "share",
-    "file",
-    "duck",
-    "record",
+    ...(canMuteAll ? ["mute-all"] : []),
+    ...(canShare ? ["share"] : []),
+    ...(canStreamAudio ? ["file"] : []),
+    ...(canDuck ? ["duck"] : []),
+    ...(canRecord ? ["record"] : []),
     ...(recordingId ? ["download", "download-tracks"] : []),
-    "stream",
+    ...(canLiveStream ? ["stream"] : []),
     "speakers",
+    ...(notesEnabled && canNotes ? ["notes"] : []),
     "settings",
     "leave",
   ];
@@ -214,78 +254,100 @@ export function AudioControls({
           {!hasMic || isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </button>
 
-        <button
-          {...item("share")}
-          onClick={onToggleAudioShare}
-          className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
-            isSharingAudio
-              ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
-              : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
-          }`}
-          aria-label={isSharingAudio ? m.controls_stop_share() : m.controls_share()}
-          title={isSharingAudio ? m.controls_stop_share_title() : m.controls_share_title()}
-        >
-          {isSharingAudio ? (
-            <ScreenShareOff className="h-5 w-5" />
-          ) : (
-            <ScreenShare className="h-5 w-5" />
-          )}
-        </button>
+        {/* Moderated room: mute every other participant at once (soft — they
+            can unmute themselves). Only rendered when this peer may. */}
+        {canMuteAll && (
+          <button
+            {...item("mute-all")}
+            onClick={onMuteAll}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-amber-500/20 text-amber-300 transition-all hover:bg-amber-500/30"
+            aria-label={m.controls_mute_all()}
+            title={m.controls_mute_all_title()}
+          >
+            <MuteAllIcon className="h-5 w-5" />
+          </button>
+        )}
 
-        <button
-          {...item("file")}
-          onClick={onToggleFileStream}
-          className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
-            isStreamingFile
-              ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
-              : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
-          }`}
-          aria-label={isStreamingFile ? m.controls_stop_file() : m.controls_stream_file()}
-          title={isStreamingFile ? m.controls_stop_file_title() : m.controls_stream_file_title()}
-        >
-          <FileMusic className="h-5 w-5" />
-        </button>
+        {canShare && (
+          <button
+            {...item("share")}
+            onClick={onToggleAudioShare}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+              isSharingAudio
+                ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
+                : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
+            }`}
+            aria-label={isSharingAudio ? m.controls_stop_share() : m.controls_share()}
+            title={isSharingAudio ? m.controls_stop_share_title() : m.controls_share_title()}
+          >
+            {isSharingAudio ? (
+              <ScreenShareOff className="h-5 w-5" />
+            ) : (
+              <ScreenShare className="h-5 w-5" />
+            )}
+          </button>
+        )}
+
+        {canStreamAudio && (
+          <button
+            {...item("file")}
+            onClick={onToggleFileStream}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+              isStreamingFile
+                ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
+                : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
+            }`}
+            aria-label={isStreamingFile ? m.controls_stop_file() : m.controls_stream_file()}
+            title={isStreamingFile ? m.controls_stop_file_title() : m.controls_stream_file_title()}
+          >
+            <FileMusic className="h-5 w-5" />
+          </button>
+        )}
 
         {/* Auto-ducking toggle (room-wide). Default on shows as a normal control;
             turning it OFF tints it amber to flag that music no longer dips under
             voice for anyone in the room. */}
-        <button
-          {...item("duck")}
-          onClick={onToggleDucking}
-          className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
-            duckingEnabled
-              ? "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
-              : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"
-          }`}
-          aria-label={duckingEnabled ? m.controls_ducking_disable() : m.controls_ducking_enable()}
-          title={duckingEnabled ? m.controls_ducking_on_title() : m.controls_ducking_off_title()}
-        >
-          <AudioLines className="h-5 w-5" />
-        </button>
+        {canDuck && (
+          <button
+            {...item("duck")}
+            onClick={onToggleDucking}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+              duckingEnabled
+                ? "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
+                : "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30"
+            }`}
+            aria-label={duckingEnabled ? m.controls_ducking_disable() : m.controls_ducking_enable()}
+            title={duckingEnabled ? m.controls_ducking_on_title() : m.controls_ducking_off_title()}
+          >
+            <AudioLines className="h-5 w-5" />
+          </button>
+        )}
 
-        <button
-          {...item("record")}
-          onClick={onToggleRecording}
-          className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
-            isRecording
-              ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-              : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
-          }`}
-          aria-label={isRecording ? m.controls_stop_recording() : m.controls_record()}
-          title={isRecording ? m.controls_stop_recording_title() : m.controls_record_title()}
-        >
-          {isRecording ? (
-            <Square className="h-4 w-4 fill-current" />
-          ) : (
-            <Circle className="h-5 w-5 fill-red-500 text-red-500" />
-          )}
-        </button>
+        {canRecord && (
+          <button
+            {...item("record")}
+            onClick={onToggleRecording}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+              isRecording
+                ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
+            }`}
+            aria-label={isRecording ? m.controls_stop_recording() : m.controls_record()}
+            title={isRecording ? m.controls_stop_recording_title() : m.controls_record_title()}
+          >
+            {isRecording ? (
+              <Square className="h-4 w-4 fill-current" />
+            ) : (
+              <Circle className="h-5 w-5 fill-red-500 text-red-500" />
+            )}
+          </button>
+        )}
 
         {recordingId && (
           <a
             {...item("download")}
             href={apiUrl(`/api/recordings/${encodeURIComponent(recordingId)}/download`)}
-            download={`sonicroom-${recordingId}.ogg`}
+            download={`sonicroom-${recordingId}.${roomIsVideo ? "mp4" : "ogg"}`}
             className="flex h-11 items-center gap-2 rounded-full bg-sonic-700 px-4 text-sonic-200 transition-all hover:bg-sonic-600"
             aria-label={m.controls_download_recording()}
             title={isRecording ? m.controls_download_active_title() : m.controls_download_title()}
@@ -314,23 +376,26 @@ export function AudioControls({
         )}
 
         {/* Live streaming: opens the Icecast target popover (where you start). A
-            live stream tints it purple to match the header's LIVE badge. */}
-        <button
-          {...item("stream")}
-          onClick={openStream}
-          className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
-            isStreaming
-              ? "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
-              : streamOpen
-                ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
-                : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
-          }`}
-          aria-label={m.settings_streaming_heading()}
-          aria-expanded={streamOpen}
-          title={isStreaming ? m.room_streaming_title() : m.streaming_start_title()}
-        >
-          <Radio className={`h-5 w-5 ${isStreaming ? "animate-pulse" : ""}`} />
-        </button>
+            live stream tints it purple to match the header's LIVE badge. Not
+            rendered when this peer may not stream (moderated room). */}
+        {canLiveStream && (
+          <button
+            {...item("stream")}
+            onClick={openStream}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+              isStreaming
+                ? "bg-purple-500/20 text-purple-300 hover:bg-purple-500/30"
+                : streamOpen
+                  ? "bg-sonic-accent text-white hover:bg-sonic-accent/90"
+                  : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
+            }`}
+            aria-label={m.settings_streaming_heading()}
+            aria-expanded={streamOpen}
+            title={isStreaming ? m.room_streaming_title() : m.streaming_start_title()}
+          >
+            <Radio className={`h-5 w-5 ${isStreaming ? "animate-pulse" : ""}`} />
+          </button>
+        )}
 
         {/* Announce (and briefly number on their tiles) who's talking now or
             talked recently — a momentary readout, not a toggle. Same action as
@@ -344,6 +409,26 @@ export function AudioControls({
         >
           <Megaphone className="h-5 w-5" />
         </button>
+
+        {/* Shared notes: open (creating on first use) this room's collaborative
+            NoteLab note in a new tab. Tinted when a note already exists. Hidden
+            entirely unless the instance has NOTELAB_URL configured, or this peer
+            may not open notes (moderated room). */}
+        {notesEnabled && canNotes && (
+          <button
+            {...item("notes")}
+            onClick={onOpenNotes}
+            className={`flex h-11 w-11 items-center justify-center rounded-full transition-all ${
+              notesUrl
+                ? "bg-sonic-accent/20 text-sonic-accent hover:bg-sonic-accent/30"
+                : "bg-sonic-700 text-sonic-200 hover:bg-sonic-600"
+            }`}
+            aria-label={notesUrl ? m.controls_notes_open() : m.controls_notes()}
+            title={notesUrl ? m.controls_notes_open_title() : m.controls_notes_title()}
+          >
+            <NotebookPen className="h-5 w-5" />
+          </button>
+        )}
 
         <button
           {...item("settings")}

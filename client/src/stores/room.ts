@@ -2,6 +2,12 @@ import { create } from "zustand";
 import type { ChatMessage } from "../lib/chat";
 import { getLocale, setLocale as applyParaglideLocale, type Locale } from "../lib/i18n";
 import { isIOS } from "../lib/microphone";
+import type { ModerationPolicy } from "../lib/moderation";
+import {
+  normalizeBackgroundChoice,
+  DEFAULT_BACKGROUND,
+  type BackgroundChoice,
+} from "../lib/video/backgrounds";
 import { speak } from "../lib/tts";
 
 // Keep the in-memory chat bounded; the server caps history too. Newest last.
@@ -59,6 +65,20 @@ function saveString(key: string, value: string) {
     localStorage.setItem(key, value);
   } catch {
     // Persistence is best-effort; keep the in-memory value regardless.
+  }
+}
+
+// Same, but says whether it stuck. Only the background image needs to know: it
+// is by far the biggest thing we store (a few hundred KB against localStorage's
+// ~5 MB budget), so it's the one value that can realistically hit the quota —
+// and the honest thing to tell the user is "it works now but won't be
+// remembered", not to fail or to stay silent.
+function saveStringChecked(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -169,6 +189,72 @@ export type ChatAnnounceMode = "polite" | "assertive" | "tts" | "off";
 
 const CHAT_ANNOUNCE_KEY = "sonicroom:chatAnnounceMode";
 
+// VIDEO rooms only. Face-centering guidance (spoken hints while your camera is
+// on) is opt-OUT — default on, persisted. The Claude API key for "describe this
+// video" is the user's own, kept in THIS browser only (never sent to the
+// SonicRoom server) — same "remember my settings" treatment as the Icecast
+// password.
+const VIDEO_GUIDANCE_KEY = "sonicroom:videoGuidance";
+const CLAUDE_API_KEY_KEY = "sonicroom:claudeApiKey";
+
+function loadVideoGuidance(): boolean {
+  try {
+    return localStorage.getItem(VIDEO_GUIDANCE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+// The camera background, chosen in the LOBBY (see components/BackgroundPicker)
+// and read once at startCamera. A persisted preference like the mic device, so
+// it carries lobby→call and survives reloads. The custom image is stored beside
+// it as a downscaled JPEG data URL — a couple of hundred KB, which is why
+// fileToBackgroundDataUrl caps and re-encodes before it ever gets here.
+const VIDEO_BACKGROUND_KEY = "sonicroom:videoBackground";
+const VIDEO_BACKGROUND_IMAGE_KEY = "sonicroom:videoBackgroundImage";
+
+function loadVideoBackground(customImage: string): BackgroundChoice {
+  // Normalize on the way in: a preset id from an older build, or a "custom"
+  // whose image has since been cleared, degrades to "none" rather than leaving
+  // the compositor with a choice it can't honour.
+  return normalizeBackgroundChoice(loadString(VIDEO_BACKGROUND_KEY), {
+    hasCustomImage: customImage !== "",
+  });
+}
+
+// An incoming camera/screen video tile (video rooms only): one remote producer
+// owned by `peerId`. The MediaStream itself lives in the video controller
+// (lib/video/video-media.ts) — the store holds only this serialisable record.
+export interface VideoTile {
+  producerId: string;
+  peerId: string;
+  source: "camera" | "screen";
+}
+
+// A pinned video (video rooms only): one peer's camera or screen blown up to
+// fill the stage, everyone else demoted to a thumbnail strip. Purely a LOCAL
+// view choice — never signaled, so pinning someone changes nothing for them.
+//
+// Pinned by (peerId, source), NOT by producerId: a camera turned off and back
+// on is a BRAND NEW producer, and pinning the producer would silently drop the
+// pin every time. While the pinned picture is off the stage just falls back to
+// the grid and the pin waits; it fills the screen again by itself when the
+// camera returns. The pin is only cleared outright when the peer leaves
+// (removePeer) or we do (reset).
+export interface PinnedVideo {
+  peerId: string;
+  source: "camera" | "screen";
+}
+
+// Whether `pin` targets exactly this peer's camera/screen.
+export function isPinned(
+  pin: PinnedVideo | null,
+  peerId: string,
+  source: "camera" | "screen",
+): boolean {
+  return pin != null && pin.peerId === peerId && pin.source === source;
+}
+
 function loadChatAnnounceMode(): ChatAnnounceMode {
   const v = loadString(CHAT_ANNOUNCE_KEY);
   return v === "assertive" || v === "tts" || v === "off" ? v : "polite";
@@ -205,6 +291,15 @@ export interface PeerState {
   // yourself. Distinct from `isMuted` (the peer's own mic mute, server-reported)
   // and from room-wide deafen.
   localMuted: boolean;
+  // VIDEO rooms only: whether this peer currently has their camera on / is
+  // sharing their screen's picture (drives the participant-list indicators +
+  // the "Describe X's video / screen" options). Always false in audio rooms.
+  hasVideo: boolean;
+  hasScreen: boolean;
+  // MODERATED rooms only: this peer is one of the room's administrators (shown
+  // in the row + its accessible name; gates admin-on-admin actions). Always
+  // false in an ordinary room.
+  isAdmin: boolean;
 }
 
 export type RoomMode = "p2p" | "sfu";
@@ -315,6 +410,10 @@ interface RoomState {
   //   to be let in, so the Room shows a "waiting" screen instead of the spinner.
   joinRequests: JoinRequest[];
   awaitingApproval: boolean;
+  // Set on OUR side while a RESERVED room we're joining hasn't been opened by
+  // its host yet (the server refused the join with `reserved`); the hook polls
+  // until the room is live and re-joins by itself. Drives the waiting screen.
+  awaitingHost: boolean;
 
   // Whether the current room is publicly listed. Gates the vote-to-kick UI
   // (only public rooms can vote-kick). Seeded from the join response and flipped
@@ -323,6 +422,49 @@ interface RoomState {
   // Set true when WE were voted out of the room. Room.tsx shows a dedicated
   // "you were removed" screen; cleared on reset (leaving / next join).
   kicked: boolean;
+
+  // MODERATED room ("sala moderada"): the fixed privilege policy from the join
+  // response, or null for an ordinary private/public room (the default — every
+  // admin control is gated on it, so ordinary rooms are untouched). isAdmin:
+  // whether WE are an administrator; adminIds: who is (mirrored onto each
+  // PeerState.isAdmin). Seeded from the join response, updated by
+  // `admins-changed` broadcasts. See lib/moderation.ts.
+  moderation: ModerationPolicy | null;
+  isAdmin: boolean;
+  adminIds: string[];
+
+  // Shared notes (NoteLab). notesEnabled: whether this instance has the feature
+  // configured (server-side NOTELAB_URL) — gates the "Notes" button / Alt+N.
+  // notesUrl: the room's collaborative note URL once anyone has opened it, else
+  // null. Both seeded from the join response; notesUrl also arrives via a
+  // `notes-updated` broadcast when someone else creates the note.
+  notesEnabled: boolean;
+  notesUrl: string | null;
+
+  // Room TYPE (video rooms). roomIsVideo comes from the join response (sticky
+  // server-side) — the ONLY thing that loads the video UI/media; false for
+  // every audio room. isVideoOn: our own camera (always starts off; you never
+  // enter with video on). videoTiles: the incoming camera/screen tiles, keyed
+  // by producerId. localVideoSeq bumps whenever our local camera stream
+  // changes so the self tile re-attaches. videoGuidanceEnabled: the spoken
+  // face-centering hints toggle (persisted, default on). claudeApiKey: the
+  // user's own key for "describe this video" (persisted in this browser only).
+  roomIsVideo: boolean;
+  isVideoOn: boolean;
+  videoTiles: Map<string, VideoTile>;
+  localVideoSeq: number;
+  // The locally pinned camera/screen, or null (the default: an even grid).
+  pinnedVideo: PinnedVideo | null;
+  videoGuidanceEnabled: boolean;
+  claudeApiKey: string;
+
+  // Camera background (lobby-configured, persisted). videoBackground is the
+  // choice — "none" (the default: the raw camera is produced and the
+  // compositor never even loads), "blur", "custom", or a preset id.
+  // videoBackgroundImage is the user's own image as a data URL, "" when they
+  // haven't picked one. Read at startCamera; the call window has no switcher.
+  videoBackground: BackgroundChoice;
+  videoBackgroundImage: string;
 
   // Peers
   peers: Map<string, PeerState>;
@@ -371,8 +513,30 @@ interface RoomState {
   announceChat: (message: string) => void;
   setJoinRequests: (requests: JoinRequest[]) => void;
   setAwaitingApproval: (awaiting: boolean) => void;
+  setAwaitingHost: (awaiting: boolean) => void;
   setRoomIsPublic: (isPublic: boolean) => void;
   setKicked: (kicked: boolean) => void;
+  setModeration: (policy: ModerationPolicy | null) => void;
+  // Replace the admin set (ids); re-flags every peer + our own isAdmin.
+  setAdmins: (adminIds: string[]) => void;
+  setNotesEnabled: (enabled: boolean) => void;
+  setNotesUrl: (url: string | null) => void;
+  setRoomIsVideo: (isVideo: boolean) => void;
+  setVideoOn: (on: boolean) => void;
+  addVideoTile: (tile: VideoTile) => void;
+  removeVideoTile: (producerId: string) => void;
+  clearVideoTiles: () => void;
+  setPinnedVideo: (pin: PinnedVideo | null) => void;
+  // Pin that camera/screen, or unpin it if it is already the pinned one.
+  togglePinnedVideo: (peerId: string, source: "camera" | "screen") => void;
+  bumpLocalVideo: () => void;
+  setVideoGuidanceEnabled: (enabled: boolean) => void;
+  setVideoBackground: (choice: BackgroundChoice) => void;
+  // Returns false when the image was applied but couldn't be persisted.
+  setVideoBackgroundImage: (dataUrl: string) => boolean;
+  setClaudeApiKey: (key: string) => void;
+  setPeerVideo: (peerId: string, hasVideo: boolean) => void;
+  setPeerScreen: (peerId: string, hasScreen: boolean) => void;
   addMessage: (message: ChatMessage) => void;
   addPeer: (peerId: string, displayName: string) => void;
   removePeer: (peerId: string) => void;
@@ -433,8 +597,23 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   chatAnnounceSeq: 0,
   joinRequests: [],
   awaitingApproval: false,
+  awaitingHost: false,
   roomIsPublic: false,
   kicked: false,
+  moderation: null,
+  isAdmin: false,
+  adminIds: [],
+  notesEnabled: false,
+  notesUrl: null,
+  roomIsVideo: false,
+  isVideoOn: false,
+  videoTiles: new Map(),
+  localVideoSeq: 0,
+  pinnedVideo: null,
+  videoGuidanceEnabled: loadVideoGuidance(),
+  claudeApiKey: loadString(CLAUDE_API_KEY_KEY),
+  videoBackgroundImage: loadString(VIDEO_BACKGROUND_IMAGE_KEY),
+  videoBackground: loadVideoBackground(loadString(VIDEO_BACKGROUND_IMAGE_KEY)),
   peers: new Map(),
   speakerBadges: {},
   messages: [],
@@ -447,7 +626,20 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     set({ locale });
   },
   setConnected: (connected) => set({ connected }),
-  setRoom: (roomName, displayName, localPeerId) => set({ roomName, displayName, localPeerId }),
+  setRoom: (roomName, displayName, localPeerId) =>
+    set((st) => ({
+      roomName,
+      displayName,
+      localPeerId,
+      // A reconnect rejoins under a NEW socket id, so a pin on OUR own camera
+      // would otherwise point at the old, dead id and never resolve again.
+      // (A pin on someone ELSE who reconnected is cleaned up by the rejoin's
+      // peer reconciliation, which removePeer's their old id.)
+      pinnedVideo:
+        st.pinnedVideo && st.localPeerId != null && st.pinnedVideo.peerId === st.localPeerId
+          ? { ...st.pinnedVideo, peerId: localPeerId }
+          : st.pinnedVideo,
+    })),
   setMode: (mode) => set({ mode }),
   setHasMic: (hasMic) => set({ hasMic }),
   setMuted: (isMuted) => set({ isMuted }),
@@ -518,8 +710,98 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   announce: (message) => set((s) => ({ announcement: message, announceSeq: s.announceSeq + 1 })),
   setJoinRequests: (joinRequests) => set({ joinRequests }),
   setAwaitingApproval: (awaitingApproval) => set({ awaitingApproval }),
+  setAwaitingHost: (awaitingHost) => set({ awaitingHost }),
   setRoomIsPublic: (roomIsPublic) => set({ roomIsPublic }),
   setKicked: (kicked) => set({ kicked }),
+  setModeration: (moderation) => set({ moderation }),
+  setAdmins: (adminIds) =>
+    set((state) => {
+      const ids = new Set(adminIds);
+      const peers = new Map(state.peers);
+      for (const [id, peer] of peers) {
+        const isAdmin = ids.has(id);
+        if (peer.isAdmin !== isAdmin) peers.set(id, { ...peer, isAdmin });
+      }
+      return {
+        adminIds,
+        isAdmin: state.localPeerId != null && ids.has(state.localPeerId),
+        peers,
+      };
+    }),
+  setNotesEnabled: (notesEnabled) => set({ notesEnabled }),
+  setNotesUrl: (notesUrl) => set({ notesUrl }),
+  setRoomIsVideo: (roomIsVideo) => set({ roomIsVideo }),
+  setVideoOn: (isVideoOn) => set({ isVideoOn }),
+  addVideoTile: (tile) =>
+    set((s) => {
+      const videoTiles = new Map(s.videoTiles);
+      videoTiles.set(tile.producerId, tile);
+      return { videoTiles };
+    }),
+  removeVideoTile: (producerId) =>
+    set((s) => {
+      if (!s.videoTiles.has(producerId)) return s;
+      const videoTiles = new Map(s.videoTiles);
+      videoTiles.delete(producerId);
+      return { videoTiles };
+    }),
+  clearVideoTiles: () => set((s) => (s.videoTiles.size === 0 ? s : { videoTiles: new Map() })),
+  // NOT cleared by clearVideoTiles: a mode rebuild / reconnect drops every tile
+  // and re-consumes the same producers moments later, and the pin must survive
+  // that the same way it survives a camera blink.
+  setPinnedVideo: (pin) => set({ pinnedVideo: pin }),
+  togglePinnedVideo: (peerId, source) =>
+    set((s) => ({
+      pinnedVideo: isPinned(s.pinnedVideo, peerId, source) ? null : { peerId, source },
+    })),
+  bumpLocalVideo: () => set((s) => ({ localVideoSeq: s.localVideoSeq + 1 })),
+  setVideoGuidanceEnabled: (videoGuidanceEnabled) => {
+    saveString(VIDEO_GUIDANCE_KEY, String(videoGuidanceEnabled));
+    set({ videoGuidanceEnabled });
+  },
+  setClaudeApiKey: (claudeApiKey) => {
+    saveString(CLAUDE_API_KEY_KEY, claudeApiKey);
+    set({ claudeApiKey });
+  },
+  setVideoBackground: (choice) =>
+    set((s) => {
+      const videoBackground = normalizeBackgroundChoice(choice, {
+        hasCustomImage: s.videoBackgroundImage !== "",
+      });
+      saveString(VIDEO_BACKGROUND_KEY, videoBackground);
+      return { videoBackground };
+    }),
+  // Clearing the image ("") must also drop a "custom" selection, or the
+  // compositor would be asked for a picture that no longer exists.
+  setVideoBackgroundImage: (dataUrl) => {
+    const persisted = saveStringChecked(VIDEO_BACKGROUND_IMAGE_KEY, dataUrl);
+    set((s) => {
+      const videoBackground = dataUrl
+        ? s.videoBackground
+        : s.videoBackground === "custom"
+          ? DEFAULT_BACKGROUND
+          : s.videoBackground;
+      if (videoBackground !== s.videoBackground) saveString(VIDEO_BACKGROUND_KEY, videoBackground);
+      return { videoBackgroundImage: dataUrl, videoBackground };
+    });
+    return persisted;
+  },
+  setPeerVideo: (peerId, hasVideo) =>
+    set((state) => {
+      const peer = state.peers.get(peerId);
+      if (!peer || peer.hasVideo === hasVideo) return state;
+      const peers = new Map(state.peers);
+      peers.set(peerId, { ...peer, hasVideo });
+      return { peers };
+    }),
+  setPeerScreen: (peerId, hasScreen) =>
+    set((state) => {
+      const peer = state.peers.get(peerId);
+      if (!peer || peer.hasScreen === hasScreen) return state;
+      const peers = new Map(state.peers);
+      peers.set(peerId, { ...peer, hasScreen });
+      return { peers };
+    }),
 
   // Room-event announcement (recording/share/music/mute…): speak it AND log it
   // into the chat history as a "system" entry, so chat is the single timeline
@@ -601,6 +883,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         kickVotes: 0,
         iVotedKick: false,
         localMuted: false,
+        hasVideo: false,
+        hasScreen: false,
+        isAdmin: state.adminIds.includes(peerId),
       });
       return { peers };
     }),
@@ -609,14 +894,17 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     set((state) => {
       const peers = new Map(state.peers);
       peers.delete(peerId);
+      // A pin on someone who LEFT is dead, not waiting: drop it (unlike a camera
+      // going off, which keeps the pin so it restores when they come back).
+      const pinned = state.pinnedVideo?.peerId === peerId ? { pinnedVideo: null } : null;
       // Drop a departed peer from the transient talkers highlight so a stale
       // badge can't linger (the tile is gone anyway).
       if (peerId in state.speakerBadges) {
         const speakerBadges = { ...state.speakerBadges };
         delete speakerBadges[peerId];
-        return { peers, speakerBadges };
+        return { peers, speakerBadges, ...pinned };
       }
-      return { peers };
+      return { peers, ...pinned };
     }),
 
   setPeerSpeaking: (peerId, speaking) =>
@@ -730,8 +1018,23 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       chatAnnounceSeq: 0,
       joinRequests: [],
       awaitingApproval: false,
+      awaitingHost: false,
       roomIsPublic: false,
       kicked: false,
+      moderation: null,
+      isAdmin: false,
+      adminIds: [],
+      // Notes are per-room: drop the URL on leave. notesEnabled is re-seeded
+      // from the next join response anyway, so resetting it is harmless.
+      notesEnabled: false,
+      notesUrl: null,
+      // Video is per-room live state; the guidance toggle + API key are
+      // persisted preferences and survive.
+      roomIsVideo: false,
+      isVideoOn: false,
+      videoTiles: new Map(),
+      localVideoSeq: 0,
+      pinnedVideo: null,
       peers: new Map(),
       speakerBadges: {},
       messages: [],

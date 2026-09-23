@@ -1,16 +1,30 @@
 import { useState, useCallback, useRef, useEffect, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Headphones, ArrowRight, Globe, DoorOpen } from "lucide-react";
+import { Headphones, ArrowRight, Globe, DoorOpen, Video, ShieldCheck } from "lucide-react";
 import { MicPreview } from "./MicPreview";
 import { LanguageSelect } from "./LanguageSelect";
+import { BackgroundPicker } from "./BackgroundPicker";
 import { Footer } from "./Footer";
 import { getLocale } from "../lib/i18n";
 import { getInstanceName, getDefaultDisplayName } from "../lib/branding";
 import { apiUrl } from "../lib/runtime-config";
+import { iosForcedByUrl } from "../lib/microphone";
+import { roomTypeFromParam, type RoomType } from "../lib/video/room-type";
+import {
+  loadLastPolicy,
+  saveRoomPolicy,
+  type KickPolicy,
+  type ModerationPolicy,
+  type Who,
+  type WhoNoNobody,
+} from "../lib/moderation";
 import { m } from "../paraglide/messages.js";
 
+// Room names are case-insensitive; lowercase is the canonical form (the
+// server normalizes too — see roomNameSchema), so the link we navigate to is
+// already the one everyone else shares.
 function sanitize(input: string): string {
-  return input.replace(/[^a-zA-Z0-9_-]/g, "");
+  return input.replace(/[^a-zA-Z0-9_-]/g, "").toLowerCase();
 }
 
 // `?p2p=off` (also accepts false/0/no/disable/disabled) means P2P is disabled —
@@ -37,7 +51,31 @@ function isMicDisabled(value: string | null): boolean {
 interface PublicRoom {
   name: string;
   participants: string[];
+  isVideo?: boolean;
+  isModerated?: boolean;
 }
+
+// The "who may do it" comboboxes of the admin options, one per policy field.
+// `nobody` is only offered where the server accepts it (see moderation-util).
+type WhoField =
+  | "recording"
+  | "shareAudio"
+  | "streamAudio"
+  | "liveStreaming"
+  | "chat"
+  | "notes"
+  | "mutePeer"
+  | "muteAll";
+type WhoNoNobodyField = "ducking" | "approveJoins";
+const WHO_OPTIONS: readonly Who[] = ["admins", "everyone", "nobody"];
+const WHO_NO_NOBODY_OPTIONS: readonly WhoNoNobody[] = ["admins", "everyone"];
+const KICK_OPTIONS: readonly KickPolicy[] = [
+  "admins",
+  "admins_vote",
+  "everyone",
+  "everyone_vote",
+  "nobody",
+];
 
 // Poll the public room directory so the lobby list stays fresh — the visitor
 // isn't on a socket yet, so there's no push channel.
@@ -54,6 +92,18 @@ export function Lobby() {
   const [joinWithoutMic, setJoinWithoutMic] = useState(() =>
     isMicDisabled(searchParams.get("mic")),
   );
+  // Room TYPE — audio call is ALWAYS the default; "Video call" must be picked
+  // (or carried in by `?video=on` from a shared link). See lib/video/room-type.
+  const [roomType, setRoomType] = useState<RoomType>(() =>
+    roomTypeFromParam(searchParams.get("video")),
+  );
+  // "Admin options": create a MODERATED room (you become its admin) with this
+  // privilege policy. Off by default; the policy itself starts from the last
+  // one this browser used, so a regular host doesn't re-pick every combobox.
+  const [moderated, setModerated] = useState(false);
+  const [policy, setPolicy] = useState<ModerationPolicy>(loadLastPolicy);
+  const setPolicyField = <K extends keyof ModerationPolicy>(key: K, value: ModerationPolicy[K]) =>
+    setPolicy((p) => ({ ...p, [key]: value }));
   const [publicRooms, setPublicRooms] = useState<PublicRoom[]>([]);
   // Roving active option in the public-room listbox (-1 = none yet), mirroring
   // the chat message list's keyboard model. Tracked by index and clamped as the
@@ -112,9 +162,12 @@ export function Lobby() {
   // that — and note that even if the visitor unticks it, the room stays public:
   // the server's isPublic flag is sticky and never downgraded for an existing
   // room (joining a same-named room can only ever keep/turn it public).
-  const selectPublicRoom = useCallback((name: string) => {
+  const selectPublicRoom = useCallback((name: string, isVideo?: boolean) => {
     setRoomName(name);
     setMakePublic(true);
+    // A listed video room is already a video room (sticky server-side) — reflect
+    // that so the visitor isn't surprised; it never flips a room the other way.
+    if (isVideo) setRoomType("video");
     setError("");
     setAnnouncement(m.lobby_public_room_selected({ name }));
     setAnnounceSeq((s) => s + 1);
@@ -162,7 +215,8 @@ export function Lobby() {
       case " ":
         e.preventDefault();
         if (activeRoomIdx >= 0 && publicRooms[activeRoomIdx]) {
-          selectPublicRoom(publicRooms[activeRoomIdx].name);
+          const room = publicRooms[activeRoomIdx];
+          selectPublicRoom(room.name, room.isVideo);
         }
         break;
     }
@@ -193,6 +247,9 @@ export function Lobby() {
 
       // Store display name for the Room component
       sessionStorage.setItem("sonicroom:displayName", trimmedName);
+      // Hand the moderated-room policy (or none) to the Room, keyed by room name
+      // — the server applies it only if this join actually creates the room.
+      saveRoomPolicy(sanitizedRoom, moderated ? policy : null);
       // Carry the room options into the room URL: `?p2p=off` pins the SFU and
       // `?public=true` lists the room in the lobby's public directory.
       const params = new URLSearchParams();
@@ -200,10 +257,64 @@ export function Lobby() {
       if (makePublic) params.set("public", "true");
       // Listen + text-chat only — no mic prompt (see Room's ?mic=off handling).
       if (joinWithoutMic) params.set("mic", "off");
+      // Video call: only ever set explicitly — audio is the default, so the
+      // param is simply absent for an audio room.
+      if (roomType === "video") params.set("video", "on");
+      // Carry a forced iOS audio path through to the room URL so it survives a
+      // reload there. It has no toggle — it's a manual override read at module
+      // load in lib/microphone.ts, not lobby state.
+      if (iosForcedByUrl) params.set("ios", "on");
       const qs = params.toString();
       navigate(`/room/${sanitizedRoom}${qs ? `?${qs}` : ""}`);
     },
-    [roomName, displayName, navigate, disableP2p, makePublic, joinWithoutMic],
+    [
+      roomName,
+      displayName,
+      navigate,
+      disableP2p,
+      makePublic,
+      joinWithoutMic,
+      roomType,
+      moderated,
+      policy,
+    ],
+  );
+
+  // One labelled combobox of the privileges fieldset.
+  const whoLabel = (v: string) =>
+    v === "admins"
+      ? m.lobby_who_admins()
+      : v === "everyone"
+        ? m.lobby_who_everyone()
+        : v === "nobody"
+          ? m.lobby_who_nobody()
+          : v === "admins_vote"
+            ? m.lobby_kick_admins_vote()
+            : m.lobby_kick_everyone_vote();
+  const whoSelect = (
+    key: WhoField | WhoNoNobodyField | "kick",
+    label: string,
+    options: readonly string[],
+    helpId?: string,
+  ) => (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={`priv-${key}`} className="text-sm text-sonic-200">
+        {label}
+      </label>
+      <select
+        id={`priv-${key}`}
+        value={policy[key]}
+        onChange={(e) => setPolicyField(key, e.target.value as never)}
+        aria-describedby={helpId}
+        className="w-full rounded-lg border border-sonic-600 bg-sonic-700 px-3 py-2 text-sm text-sonic-100 focus:border-sonic-accent focus:outline-none"
+      >
+        {options.map((v) => (
+          <option key={v} value={v}>
+            {whoLabel(v)}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 
   // Localized participant list ("a, b and c"), so the public room rows read
@@ -260,6 +371,64 @@ export function Lobby() {
               />
             </div>
 
+            {/* Room type. A radio group (fieldset/legend) with "Audio call"
+                ALWAYS selected by default — SonicRoom is audio-first, and video
+                is a deliberate per-room choice (also `?video=on`). Like the
+                public flag it's sticky server-side once any joiner sets it. */}
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-sonic-200">
+                {m.lobby_room_type_legend()}
+              </legend>
+              <div className="space-y-2">
+                <div>
+                  <label className="flex cursor-pointer select-none items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="room-type"
+                      value="audio"
+                      checked={roomType === "audio"}
+                      onChange={() => setRoomType("audio")}
+                      aria-describedby="room-type-audio-help"
+                      className="mt-0.5 h-4 w-4 border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                    />
+                    <span className="text-sm font-medium text-sonic-200">
+                      {m.lobby_room_type_audio()}
+                    </span>
+                  </label>
+                  <p id="room-type-audio-help" className="mt-1 pl-[26px] text-xs text-sonic-400">
+                    {m.lobby_room_type_audio_help()}
+                  </p>
+                </div>
+                <div>
+                  <label className="flex cursor-pointer select-none items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="room-type"
+                      value="video"
+                      checked={roomType === "video"}
+                      onChange={() => setRoomType("video")}
+                      aria-describedby="room-type-video-help"
+                      className="mt-0.5 h-4 w-4 border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                    />
+                    <span className="flex items-center gap-1.5 text-sm font-medium text-sonic-200">
+                      <Video className="h-4 w-4 text-sonic-accent" aria-hidden="true" />
+                      {m.lobby_room_type_video()}
+                    </span>
+                  </label>
+                  <p id="room-type-video-help" className="mt-1 pl-[26px] text-xs text-sonic-400">
+                    {m.lobby_room_type_video_help()}
+                  </p>
+                </div>
+              </div>
+            </fieldset>
+
+            {/* The camera background is chosen here, before the call, and only
+                for a video room — the call window deliberately has no switcher.
+                Mounting it under the room-type choice is what makes that read
+                as one decision; it also means the picker's thumbnails are only
+                ever fetched by someone who actually picked "Video call". */}
+            {roomType === "video" && <BackgroundPicker />}
+
             <div>
               <label
                 htmlFor="display-name"
@@ -309,13 +478,17 @@ export function Lobby() {
                 >
                   {publicRooms.map((room, i) => {
                     const participantsText = listFmt.format(room.participants);
-                    const label =
+                    const baseLabel =
                       room.participants.length > 0
                         ? m.lobby_public_room_with_participants({
                             name: room.name,
                             participants: participantsText,
                           })
                         : m.lobby_public_room_empty({ name: room.name });
+                    let label = room.isVideo
+                      ? `${baseLabel}, ${m.lobby_public_room_video_fragment()}`
+                      : baseLabel;
+                    if (room.isModerated) label += `, ${m.lobby_public_room_moderated_fragment()}`;
                     return (
                       <li
                         key={room.name}
@@ -327,7 +500,7 @@ export function Lobby() {
                           if (el) roomOptionRefs.current.set(room.name, el);
                           else roomOptionRefs.current.delete(room.name);
                         }}
-                        onClick={() => selectPublicRoom(room.name)}
+                        onClick={() => selectPublicRoom(room.name, room.isVideo)}
                         className={`group flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 transition-colors ${
                           i === activeRoomIdx
                             ? "border-sonic-accent bg-sonic-accent/15"
@@ -339,8 +512,20 @@ export function Lobby() {
                           aria-hidden="true"
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-sonic-100">
+                          <span className="flex items-center gap-1.5 truncate text-sm font-medium text-sonic-100">
                             {room.name}
+                            {room.isVideo && (
+                              <Video
+                                className="h-3.5 w-3.5 shrink-0 text-sonic-accent"
+                                aria-hidden="true"
+                              />
+                            )}
+                            {room.isModerated && (
+                              <ShieldCheck
+                                className="h-3.5 w-3.5 shrink-0 text-amber-300"
+                                aria-hidden="true"
+                              />
+                            )}
                           </span>
                           {participantsText && (
                             <span className="block truncate text-xs text-sonic-400">
@@ -405,6 +590,93 @@ export function Lobby() {
               <p id="make-public-sticky" className="mt-1 pl-[26px] text-xs italic text-sonic-400">
                 {m.lobby_make_public_sticky()}
               </p>
+            </div>
+
+            {/* Admin options — creates a MODERATED room: the creator is its
+                administrator and this policy (fixed for the room's lifetime)
+                says what participants may do. Ticking it unfolds the
+                privileges fieldset; the policy is handed to the Room via
+                sessionStorage on join (see lib/moderation.ts). */}
+            <div>
+              <label className="flex cursor-pointer select-none items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="admin-options"
+                  name="admin-options"
+                  checked={moderated}
+                  onChange={(e) => setModerated(e.target.checked)}
+                  aria-describedby="admin-options-help"
+                  aria-controls="admin-privileges"
+                  aria-expanded={moderated}
+                  className="mt-0.5 h-4 w-4 rounded border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                />
+                <span className="flex items-center gap-1.5 text-sm font-medium text-sonic-200">
+                  <ShieldCheck className="h-4 w-4 text-amber-300" aria-hidden="true" />
+                  {m.lobby_admin_options()}
+                </span>
+              </label>
+              <p id="admin-options-help" className="mt-1 pl-[26px] text-xs text-sonic-400">
+                {m.lobby_admin_options_help()}
+              </p>
+              {moderated && (
+                <fieldset
+                  id="admin-privileges"
+                  className="mt-3 space-y-3 rounded-lg border border-sonic-600 p-3"
+                >
+                  <legend className="px-1 text-sm font-medium text-sonic-200">
+                    {m.lobby_privileges_legend()}
+                  </legend>
+                  <div>
+                    <label className="flex cursor-pointer select-none items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        id="priv-multiple-admins"
+                        checked={policy.multipleAdmins}
+                        onChange={(e) => setPolicyField("multipleAdmins", e.target.checked)}
+                        aria-describedby="priv-multiple-admins-help"
+                        className="mt-0.5 h-4 w-4 rounded border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                      />
+                      <span className="text-sm text-sonic-200">
+                        {m.lobby_priv_multiple_admins()}
+                      </span>
+                    </label>
+                    <p
+                      id="priv-multiple-admins-help"
+                      className="mt-1 pl-[26px] text-xs text-sonic-400"
+                    >
+                      {m.lobby_priv_multiple_admins_help()}
+                    </p>
+                  </div>
+                  {whoSelect("recording", m.lobby_priv_recording(), WHO_OPTIONS)}
+                  {whoSelect("shareAudio", m.lobby_priv_share_audio(), WHO_OPTIONS)}
+                  {whoSelect("streamAudio", m.lobby_priv_stream_audio(), WHO_OPTIONS)}
+                  {whoSelect("ducking", m.lobby_priv_ducking(), WHO_NO_NOBODY_OPTIONS)}
+                  {whoSelect("liveStreaming", m.lobby_priv_live_streaming(), WHO_OPTIONS)}
+                  {whoSelect("approveJoins", m.lobby_priv_approve_joins(), WHO_NO_NOBODY_OPTIONS)}
+                  {whoSelect("chat", m.lobby_priv_chat(), WHO_OPTIONS)}
+                  {whoSelect("notes", m.lobby_priv_notes(), WHO_OPTIONS)}
+                  {whoSelect("mutePeer", m.lobby_priv_mute_peer(), WHO_OPTIONS)}
+                  {whoSelect("muteAll", m.lobby_priv_mute_all(), WHO_OPTIONS)}
+                  {whoSelect("kick", m.lobby_priv_kick(), KICK_OPTIONS, "priv-kick-help")}
+                  <p id="priv-kick-help" className="text-xs text-sonic-400">
+                    {m.lobby_priv_kick_help()}
+                  </p>
+                  <div>
+                    <label className="flex cursor-pointer select-none items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        id="priv-hide-powered-by"
+                        checked={policy.hidePoweredBy}
+                        onChange={(e) => setPolicyField("hidePoweredBy", e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-sonic-600 bg-sonic-700 accent-sonic-accent"
+                      />
+                      <span className="text-sm text-sonic-200">
+                        {m.lobby_priv_hide_powered_by()}
+                      </span>
+                    </label>
+                  </div>
+                </fieldset>
+              )}
             </div>
 
             {/* Join without a microphone — for people who have no mic or can't /

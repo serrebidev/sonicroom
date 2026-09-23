@@ -1,3 +1,6 @@
+// MUST stay first: populates process.env from the repo-root .env before any
+// other module is evaluated (several read process.env as they load).
+import "./load-env.js";
 import express from "express";
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
@@ -6,9 +9,17 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createWorker } from "mediasoup";
 import type { Worker } from "mediasoup/types";
-import { workerSettings, numWorkers } from "./mediasoup-config.js";
-import { setWorkers, getPublicRooms } from "./room-manager.js";
+import {
+  workerSettings,
+  resolveWorkerCount,
+  transportOptions,
+  announcedAddresses,
+} from "./mediasoup-config.js";
+import { setWorkers, getPublicRooms, getRoomInfo, getRooms } from "./room-manager.js";
+import { roomNameSchema } from "./signaling/schemas.js";
 import { createSignalingServer } from "./signaling.js";
+import { ReservationStore, reservationsFilePath } from "./reservations.js";
+import { createAdminRouter } from "./admin.js";
 import { RecordingManager, type SpawnedProcess } from "./recording.js";
 import { StreamManager } from "./streaming.js";
 import { createZipStream } from "./zip-stream.js";
@@ -26,17 +37,6 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load local secrets/config from the repo-root .env (NOTY_* notification target,
-// etc.) before anything reads process.env. tsx/Node don't auto-load it, and it's
-// gitignored + hidden from the app UI on purpose; an absent file is fine (the
-// .env-gated features simply stay off). Resolved from this file, not cwd, since
-// `pnpm --filter server start` runs with the server package as cwd.
-try {
-  process.loadEnvFile(path.resolve(__dirname, "../../.env"));
-} catch {
-  /* no .env present — fine */
-}
-
 const PORT = parseInt(process.env.PORT || "3100", 10);
 const AUDIO_LIBRARY_DIR = process.env.AUDIO_LIBRARY_DIR || "/var/lib/sonicroom/media";
 
@@ -46,10 +46,20 @@ const AUDIO_LIBRARY_DIR = process.env.AUDIO_LIBRARY_DIR || "/var/lib/sonicroom/m
 // client is rebranded without a rebuild. Defaults to "SonicRoom".
 const INSTANCE_NAME = process.env.INSTANCE_NAME?.trim() || "SonicRoom";
 
+// Where this instance's clients mint ephemeral TURN credentials (our coturn runs
+// with `use-auth-secret`, so the long-lived secret never leaves the relay host).
+// Injected into the served index.html alongside INSTANCE_NAME, so an operator
+// points a deployment at their own minter with no client rebuild. Unset keeps
+// the client's built-in default (see client/src/lib/runtime-config.ts).
+const TURN_CREDENTIAL_URL = process.env.TURN_CREDENTIAL_URL?.trim() || "";
+
 async function main() {
-  // Create mediasoup workers
+  // Create mediasoup workers — one per core unless MEDIASOUP_WORKERS pins the
+  // count (resolved here, not at module load, so it sees the .env above).
+  const { count: workerCount, warning: workerWarning } = resolveWorkerCount();
+  if (workerWarning) console.warn(workerWarning);
   const workers: Worker[] = [];
-  for (let i = 0; i < numWorkers; i++) {
+  for (let i = 0; i < workerCount; i++) {
     const worker = await createWorker(workerSettings);
     worker.on("died", () => {
       console.error(`Worker ${worker.pid} died, exiting...`);
@@ -66,7 +76,10 @@ async function main() {
 
   const recordingManager = new RecordingManager();
   const streamManager = new StreamManager();
-  createSignalingServer(httpServer, recordingManager, streamManager);
+  // Host-keyed room reservations (reservations.ts): a JSON file written by
+  // `pnpm reserve`, re-read on change; the server never writes it.
+  const reservations = new ReservationStore(reservationsFilePath());
+  createSignalingServer(httpServer, recordingManager, streamManager, reservations);
   // Health check
   app.get("/health", (_req, res) => {
     res.json({ status: "ok", workers: workers.length });
@@ -77,6 +90,31 @@ async function main() {
   // (the visitor isn't connected to a socket yet), so it's a plain GET.
   app.get("/api/public-rooms", (_req, res) => {
     res.json({ rooms: getPublicRooms() });
+  });
+
+  // Look up ONE room by name, public or private: 200 + occupancy if it's live,
+  // 404 if it isn't. A room only exists while it holds at least one peer, so a
+  // 404 means "nobody is in a room by that name" — it is NOT proof the name is
+  // unused, and a 200 is not an invitation (joining still goes through the
+  // knock gate / IP bans in signaling). Unauthenticated like the rest of /api,
+  // and it answers for private rooms too, so it does leak "is anyone in <name>
+  // right now" to anyone who can guess the name; only the count is exposed,
+  // never the participants. Gate it if that matters for your deployment.
+  app.get("/api/rooms/:name", (req, res) => {
+    const parsed = roomNameSchema.safeParse(req.params.name);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid room name" });
+      return;
+    }
+    const info = getRoomInfo(parsed.data);
+    // `reserved`: the name is held by a host (reservations.ts). On a 404 it
+    // tells an early visitor "wait for the host" apart from "nobody's here".
+    const reserved = reservations.has(parsed.data);
+    if (!info) {
+      res.status(404).json({ exists: false, name: parsed.data, reserved, error: "Room not found" });
+      return;
+    }
+    res.json({ exists: true, reserved, ...info });
   });
 
   // Audio sources for the in-call music/file streamer. The library is a
@@ -213,17 +251,24 @@ async function main() {
   });
 
   // Recording download — mixes all participants' captured audio into a single
-  // Ogg/Opus file and streams it. Works at any time while recording continues;
-  // the capture processes are never interrupted. Keyed by the recording id
-  // (a capability token handed to clients), not the room name.
+  // Ogg/Opus file and streams it. In a VIDEO room, where the recording also
+  // captured picture, it streams an MP4 instead: everyone's camera/screen in a
+  // grid with that same audio mix on top. Works at any time while recording
+  // continues; the capture processes are never interrupted. Keyed by the
+  // recording id (a capability token handed to clients), not the room name.
   app.get("/api/recordings/:id/download", (req, res) => {
-    const proc = recordingManager.mixByRecordingId(req.params.id);
-    if (!proc || !proc.stdout) {
+    const mix = recordingManager.mixByRecordingId(req.params.id);
+    if (!mix || !mix.proc.stdout) {
       res.status(404).json({ error: "No active recording with that id, or nothing captured yet" });
       return;
     }
-    res.setHeader("Content-Type", "audio/ogg");
-    res.setHeader("Content-Disposition", `attachment; filename="sonicroom-${req.params.id}.ogg"`);
+    const { container, contentType } = mix;
+    const proc = mix.proc as SpawnedProcess & { stdout: NodeJS.ReadableStream };
+    res.setHeader("Content-Type", contentType);
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="sonicroom-${req.params.id}.${container}"`,
+    );
 
     proc.stderr?.on("data", (d: Buffer) => console.error(`[mix] ${d.toString().trim()}`));
     proc.stdout.pipe(res);
@@ -243,7 +288,9 @@ async function main() {
   });
 
   // Per-track download — packs each participant's captured audio into its own
-  // file inside one streamed .zip (no mixing). Each track is padded to the full
+  // file inside one streamed .zip (no mixing). In a VIDEO room a participant's
+  // entry is instead an MP4 of their picture with their own voice on it (and
+  // their screen share with the share's audio) — see pairTracks. Each track is padded to the full
   // recording span: leading silence equal to its start offset + trailing
   // silence to a shared length, so the unzipped files are all the same length
   // and aligned on the same time boundaries (drop them straight into a DAW).
@@ -306,12 +353,34 @@ async function main() {
   // runtime config into the HTML.
   const clientDist = path.resolve(__dirname, "../../client/dist");
   const indexHtmlPath = path.join(clientDist, "index.html");
+
+  // Operator admin UI (/admin + /api/admin/*): reservations + live rooms. OFF
+  // unless ADMIN_UI_PASSWORD is set — then /admin falls through to the SPA
+  // below like any unknown route. Never linked from the client. See admin.ts.
+  const ADMIN_UI_PASSWORD = process.env.ADMIN_UI_PASSWORD?.trim();
+  if (ADMIN_UI_PASSWORD) {
+    app.use(
+      createAdminRouter({
+        password: ADMIN_UI_PASSWORD,
+        reservations,
+        filePath: reservationsFilePath(),
+        liveRooms: () =>
+          Array.from(getRooms().keys())
+            .map((name) => getRoomInfo(name))
+            .filter((r): r is NonNullable<typeof r> => r != null),
+        publicUrl: process.env.PUBLIC_URL?.trim() || undefined,
+      }),
+    );
+  }
+
   app.use(express.static(clientDist, { index: false }));
 
-  // Inject the operator-configurable instance name into the served index.html so
-  // the pre-built static client can be rebranded via INSTANCE_NAME in .env with
-  // no rebuild: an inline config script the client reads before it mounts (see
-  // client/src/lib/branding.ts), plus the static <title>. Read fresh per request
+  // Inject this instance's operator-configurable runtime config into the served
+  // index.html so the pre-built static client picks it up with no rebuild:
+  // INSTANCE_NAME (rebranding — an inline config script the client reads before
+  // it mounts, see client/src/lib/branding.ts, plus the static <title>) and
+  // TURN_CREDENTIAL_URL (the ephemeral-TURN minter to ask, omitted when unset so
+  // the client keeps its built-in default). Read fresh per request
   // (not cached) so a client-only `pnpm build` — which changes the asset hashes
   // referenced in index.html — is picked up on the next load without a restart.
   const renderIndexHtml = (): string | null => {
@@ -324,7 +393,10 @@ async function main() {
     // JS object literal; escape "<" so a name containing "</script>" can't break
     // out of the inline <script>. Injected right after <head> so it runs before
     // the (deferred) app bundle.
-    const configJson = JSON.stringify({ instanceName: INSTANCE_NAME }).replace(/</g, "\\u003c");
+    const configJson = JSON.stringify({
+      instanceName: INSTANCE_NAME,
+      ...(TURN_CREDENTIAL_URL ? { turnCredentialUrl: TURN_CREDENTIAL_URL } : {}),
+    }).replace(/</g, "\\u003c");
     html = html.replace(
       "<head>",
       `<head><script>window.__SONICROOM_CONFIG__=${configJson};</script>`,
@@ -347,6 +419,27 @@ async function main() {
 
   httpServer.listen(PORT, () => {
     console.log(`SonicRoom server listening on port ${PORT}`);
+    // Reads (and logs) the reservations file once at startup, so a missing or
+    // unreadable one is visible here rather than on the first join.
+    const rs = reservations.status();
+    if (rs.count === 0 && !rs.error)
+      console.log("[reservations] none (see `pnpm reserve` or /admin)");
+    console.log(
+      ADMIN_UI_PASSWORD ? "[admin] UI enabled at /admin" : "[admin] UI off (no ADMIN_UI_PASSWORD)",
+    );
+    // Announcing the wrong address is the single most common reason media never
+    // connects, so say out loud what ICE will hand out. Several addresses is
+    // normal for a home instance (public + LAN) — see mediasoup-config.ts.
+    const announced = announcedAddresses(transportOptions.listenInfos ?? []);
+    if (announced.length > 0) {
+      console.log(`Announcing ICE candidates on: ${announced.join(", ")}`);
+    } else {
+      console.warn(
+        "No ANNOUNCED_IP/ANNOUNCED_IP6 set — media will only connect from this machine. " +
+          "Set ANNOUNCED_IP (comma-separated for e.g. public IP + LAN IP behind NAT), " +
+          "or ANNOUNCE_LOCAL_IPS=true to announce this host's own addresses.",
+      );
+    }
   });
 
   // Clean up recordings and live streams (ffmpeg processes, temp files) on

@@ -4,6 +4,7 @@ import { getRooms } from "./room-manager.js";
 import { RateLimiter } from "./chat-util.js";
 import type { RecordingManager } from "./recording.js";
 import type { StreamManager } from "./streaming.js";
+import type { ReservationStore } from "./reservations.js";
 import { createRoomHelpers } from "./signaling/room-helpers.js";
 import type { ConnectionContext, ConnectionSession } from "./signaling/context.js";
 import { registerSessionHandlers } from "./signaling/handlers/session.js";
@@ -12,11 +13,15 @@ import { registerStreamHandlers } from "./signaling/handlers/streams.js";
 import { registerRecordingHandlers } from "./signaling/handlers/recording.js";
 import { registerStreamingHandlers } from "./signaling/handlers/streaming.js";
 import { registerModerationHandlers } from "./signaling/handlers/moderation.js";
+import { registerNotesHandlers } from "./signaling/handlers/notes.js";
+import { registerVideoHandlers } from "./signaling/handlers/video.js";
+import { registerAdminHandlers } from "./signaling/handlers/admin.js";
 
 export function createSignalingServer(
   httpServer: HttpServer,
   recordingManager: RecordingManager,
   streamManager: StreamManager,
+  reservations: ReservationStore,
 ) {
   const io = new Server(httpServer, {
     cors: { origin: "*" },
@@ -76,6 +81,7 @@ export function createSignalingServer(
       chatLimiter,
       kickLimiter,
       helpers,
+      reservations,
       session,
     };
 
@@ -85,6 +91,9 @@ export function createSignalingServer(
     registerRecordingHandlers(ctx);
     registerStreamingHandlers(ctx);
     registerModerationHandlers(ctx);
+    registerNotesHandlers(ctx);
+    registerVideoHandlers(ctx);
+    registerAdminHandlers(ctx);
   });
 
   return { io };

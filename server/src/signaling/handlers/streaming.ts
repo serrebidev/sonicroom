@@ -2,6 +2,7 @@ import type { ProducerInfo } from "../../recording.js";
 import type { IcecastConfig } from "../../streaming-util.js";
 import { icecastConfigSchema } from "../schemas.js";
 import type { ConnectionContext } from "../context.js";
+import { allowed } from "../../moderation-util.js";
 
 // --- Live streaming to Icecast (room-wide; forces SFU like recording) ---
 // The starter supplies the Icecast target; the server runs the mixer ffmpeg.
@@ -17,6 +18,11 @@ export function registerStreamingHandlers(ctx: ConnectionContext) {
         return;
       }
       const room = session.currentRoom;
+      // Moderated room: live streaming may be admins-only or off.
+      if (!allowed(room.moderation, room.admins.has(socket.id), "liveStreaming")) {
+        cb({ ok: false, error: "forbidden" });
+        return;
+      }
 
       if (streamManager.isStreaming(room.name)) {
         cb({ ok: true });
@@ -36,6 +42,9 @@ export function registerStreamingHandlers(ctx: ConnectionContext) {
       const producers: ProducerInfo[] = [];
       for (const [peerId, peer] of room.peers) {
         for (const [producerId, producer] of peer.producers) {
+          // Audio only — the mixer is an Opus/MP3 pipeline (video rooms'
+          // camera/screen producers are never mixed).
+          if (producer.kind !== "audio") continue;
           const src = (producer.appData?.source as string) ?? "voice";
           producers.push({ producerId, peerId, label: peer.displayName, source: src });
         }
@@ -61,6 +70,10 @@ export function registerStreamingHandlers(ctx: ConnectionContext) {
         return;
       }
       const room = session.currentRoom;
+      if (!allowed(room.moderation, room.admins.has(socket.id), "liveStreaming")) {
+        cb({ ok: false, error: "forbidden" });
+        return;
+      }
       await streamManager.stop(room.name);
       io.to(room.name).emit("streaming-stopped", {});
       // Streaming no longer pins SFU — fall back to P2P if <=2 peers remain.

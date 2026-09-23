@@ -38,7 +38,19 @@ import {
   announce_peer_stream_stopped,
   announce_your_stream_stopped,
   announce_you_were_kicked,
+  announce_peer_kicked_by,
+  announce_you_were_kicked_by,
+  announce_moderated_room,
+  announce_moderated_room_you,
   announce_no_mic,
+  announce_notes_failed,
+  announce_video_on,
+  announce_video_off,
+  announce_room_now_video,
+  announce_screen_started,
+  announce_screen_stopped,
+  announce_screen_started_you,
+  announce_screen_stopped_you,
   file_stream_name,
   file_stream_name_titled,
   file_player_streaming,
@@ -59,12 +71,22 @@ import {
   registerStreamingHandlers,
   registerMuteHandlers,
   registerChatHandlers,
+  registerNotesHandlers,
+  registerAdminHandlers,
 } from "../lib/socket/room-event-handlers";
-import { sharedAudioContext, resumeContext } from "../lib/audio/shared-context";
+import type { ModerationPolicy } from "../lib/moderation";
+import {
+  getSharedAudioContext,
+  hasSharedAudioContext,
+  resumeContext,
+} from "../lib/audio/shared-context";
+import type { VideoMedia, VideoSource } from "../lib/video/video-media";
 
-// ICE servers (with optional per-instance overrides) live in runtime-config.ts —
-// `iceServers()` returns the default coturn list on the web and whatever the
-// Electron client injects when pointed at another instance.
+// ICE servers (with optional per-instance overrides) live in runtime-config.ts.
+// `iceServers()` is async: it mints a short-lived TURN credential from the
+// server-side minter (no TURN password is baked into this bundle), falls back to
+// STUN-only if that fails, and returns whatever the Electron client injects when
+// pointed at another instance.
 
 // The shared AudioContext + its keep-alive + the gain-ramp time-constant live in
 // lib/audio/shared-context.ts (imported above); the per-peer gain math + ducking
@@ -80,6 +102,10 @@ import { sharedAudioContext, resumeContext } from "../lib/audio/shared-context";
 // state once more after TOGGLE_DEDUP_MS of quiet — and only if it actually
 // differs from what was last surfaced. So a mash shows at most the first + last.
 const TOGGLE_DEDUP_MS = 1000;
+// How often to re-check whether a RESERVED room has been opened by its host
+// while we wait outside (see waitForReservedRoom). An object so tests can
+// shorten it.
+export const reservedRoomWait = { pollMs: 3000 };
 
 // resumeContext (the keep-alive) lives in lib/audio/shared-context.ts and is
 // already wired to the document gestures / statechange / visibility there.
@@ -173,6 +199,19 @@ export function useMediasoup() {
   // pushed join-approved/-denied handlers resolve/reject it so the blocked join
   // flow continues (re-join) or fails (denied).
   const admissionRef = useRef<{ resolve: () => void; reject: (e: unknown) => void } | null>(null);
+  // Set while a RESERVED room we're joining is not open yet (the host hasn't
+  // arrived): the join loop polls /api/rooms/:name until it's live. leave()
+  // cancels it so a "back to lobby" from the waiting screen stops the poll.
+  const hostWaitRef = useRef<{ cancel: () => void } | null>(null);
+  // Moderated rooms: the local half of a forced mute (set once `mute` exists —
+  // see below) and whether we've announced "moderated room" this session.
+  const forcedMuteRef = useRef<(by: string) => void>(() => {});
+  const moderatedAnnouncedRef = useRef(false);
+  // VIDEO rooms only: the camera/screen/incoming-tile controller. Null in every
+  // audio room — it's created by dynamically importing lib/video/video-media the
+  // first time a join response says `isVideo` (so audio rooms never even load
+  // the code), and every video call site below is `videoRef.current?.…`.
+  const videoRef = useRef<VideoMedia | null>(null);
 
   const store = useRoomStore;
 
@@ -208,13 +247,67 @@ export function useMediasoup() {
     [],
   );
 
+  // Block until a RESERVED room is opened by its host (polling the room
+  // lookup; the visitor isn't in a room yet, so there is no socket event to
+  // wait on). Rejects with "left" when leave() cancels it.
+  const waitForReservedRoom = useCallback(
+    async (roomName: string) => {
+      store.getState().setAwaitingHost(true);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          let cancelled = false;
+          hostWaitRef.current = {
+            cancel: () => {
+              cancelled = true;
+              if (timer !== null) clearTimeout(timer);
+              reject(new Error("left"));
+            },
+          };
+          const poll = async () => {
+            if (cancelled) return;
+            try {
+              const res = await fetch(apiUrl(`/api/rooms/${encodeURIComponent(roomName)}`));
+              const info = (await res.json()) as { exists?: boolean };
+              if (cancelled) return;
+              if (info.exists) return resolve();
+            } catch {
+              /* transient — keep polling */
+            }
+            if (!cancelled) timer = setTimeout(poll, reservedRoomWait.pollMs);
+          };
+          timer = setTimeout(poll, reservedRoomWait.pollMs);
+        });
+      } finally {
+        hostWaitRef.current = null;
+        store.getState().setAwaitingHost(false);
+      }
+    },
+    [store],
+  );
+
+  // Lazily create the video controller (VIDEO rooms only). Idempotent; the module
+  // import is the one and only place video code enters an audio-first bundle.
+  const ensureVideo = useCallback(async (): Promise<VideoMedia> => {
+    if (videoRef.current) return videoRef.current;
+    const { VideoMedia: VideoMediaCtor } = await import("../lib/video/video-media");
+    if (!videoRef.current) {
+      videoRef.current = new VideoMediaCtor(store, emit, {
+        getSendTransport: () => sendTransportRef.current,
+        getRecvTransport: () => recvTransportRef.current,
+        getDevice: () => deviceRef.current,
+      });
+    }
+    return videoRef.current;
+  }, [emit, store]);
+
   // Incoming peer audio: the per-peer pipelines, owner maps, gain math, ducking,
   // and SFU consume all live in PeerAudioRegistry. Constructed once (its methods
   // are stable, so the delegators below carry empty dep arrays). It reads the live
   // SFU device/recvTransport through getters, and the per-render socket through
   // the stable `emit` (which late-binds socketRef at call time).
   const registryRef = useRef(
-    new PeerAudioRegistry(sharedAudioContext, store, emit, {
+    new PeerAudioRegistry(getSharedAudioContext, store, emit, {
       getDevice: () => deviceRef.current,
       getRecvTransport: () => recvTransportRef.current,
     }),
@@ -226,7 +319,7 @@ export function useMediasoup() {
   // send transport / device through getters. The hook keeps the DOM/socket
   // orchestration (getDisplayMedia, the <audio> element, emits, cues).
   const graphRef = useRef(
-    new OutgoingAudioGraph(sharedAudioContext, store, {
+    new OutgoingAudioGraph(getSharedAudioContext, store, {
       getSendTransport: () => sendTransportRef.current,
       getDevice: () => deviceRef.current,
     }),
@@ -240,7 +333,7 @@ export function useMediasoup() {
   // Our outgoing extra microphones (each a separate "mic" producer). Owns the
   // captures + the start/stop/restart serialization; reconciled by the effect below.
   const extraMicsRef = useRef(
-    new ExtraMicController(sharedAudioContext, store, emit, {
+    new ExtraMicController(getSharedAudioContext, store, emit, {
       getSendTransport: () => sendTransportRef.current,
       getDevice: () => deviceRef.current,
       getMode: () => modeRef.current,
@@ -304,6 +397,46 @@ export function useMediasoup() {
   // Announce + briefly number the most recent talkers (W shortcut / toolbar button).
   const announceSpeakers = useCallback(() => detector.announceSpeakers(), [detector]);
 
+  // Open this room's shared NoteLab note in a NEW TAB (never an iframe). If we
+  // already know the URL (the room had a note on join, or a `notes-updated`
+  // arrived), open it straight away. Otherwise ask the server, which creates the
+  // note on first use and reuses it thereafter — so no two people ever make two.
+  // Because that ack is async, we open a placeholder tab synchronously inside the
+  // user gesture (click / Alt+N) so the popup blocker allows it, then point it at
+  // the note once the URL arrives.
+  const openNotes = useCallback(() => {
+    if (!store.getState().notesEnabled) return;
+    const existing = store.getState().notesUrl;
+    if (existing) {
+      window.open(existing, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const tab = window.open("", "_blank");
+    void emit<{ url?: string }>("open-notes", {})
+      .then((res) => {
+        const url = res.url;
+        if (!url) {
+          tab?.close();
+          return;
+        }
+        store.getState().setNotesUrl(url);
+        if (tab && !tab.closed) {
+          // Sever the opener before navigating so the note page can't reach back
+          // into this window; the navigation itself stays in the placeholder tab.
+          tab.opener = null;
+          tab.location.href = url;
+        } else {
+          // Placeholder was blocked/closed — fall back to a direct open.
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      })
+      .catch((err) => {
+        console.warn("[notes] failed to open shared notes:", err);
+        tab?.close();
+        store.getState().announce(announce_notes_failed());
+      });
+  }, [emit, store]);
+
   // The outgoing audio graph (mic gain + soft limiter + the share/file producers)
   // lives in OutgoingAudioGraph. `connectMicToGraph` is a thin stable delegator so
   // the effects that depend on it keep a stable identity.
@@ -324,8 +457,11 @@ export function useMediasoup() {
 
   // All incoming audio plays through the shared context, so the speaker pick
   // is one setSinkId there — it covers every peer, current and future.
+  // Don't force the (iOS-lazy) context into existence just to clear a sink that
+  // was never set — it must be created after the mic opens (shared-context.ts).
   useEffect(() => {
-    applySpeakerToContext(sharedAudioContext, speakerDeviceId);
+    if (!speakerDeviceId && !hasSharedAudioContext()) return;
+    applySpeakerToContext(getSharedAudioContext(), speakerDeviceId);
   }, [speakerDeviceId]);
 
   // Mid-call mic setting change: re-acquire the mic with the selected device
@@ -418,7 +554,7 @@ export function useMediasoup() {
       if (localStream) connectMicToGraph(localStream);
 
       const pc = new RTCPeerConnection({
-        iceServers: iceServers(),
+        iceServers: await iceServers(),
       });
 
       // Send the processed outgoing track (mic gain + limiter, + shared audio),
@@ -499,6 +635,12 @@ export function useMediasoup() {
     recvTransportRef.current?.close();
     recvTransportRef.current = null;
     registry.clearPending();
+    // Video room: close the camera/screen producers (captures kept, re-produced
+    // by setupSfuInner) and drop every incoming video tile (re-consumed from the
+    // next join snapshot / new-producer events).
+    videoRef.current?.closeProducers();
+    videoRef.current?.clearPending();
+    videoRef.current?.cleanupAll();
     // Candidates queued here can only be trailing ones from a dead P2P epoch
     // (a new P2P session's candidates can't arrive before its offer) — drop
     // them so they never flush into a future session's connection.
@@ -558,7 +700,7 @@ export function useMediasoup() {
       );
       const sendTransport = device.createSendTransport({
         ...(sendRes.params as Parameters<typeof device.createSendTransport>[0]),
-        iceServers: iceServers(),
+        iceServers: await iceServers(),
       });
 
       sendTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
@@ -596,7 +738,7 @@ export function useMediasoup() {
       );
       const recvTransport = device.createRecvTransport({
         ...(recvRes.params as Parameters<typeof device.createRecvTransport>[0]),
-        iceServers: iceServers(),
+        iceServers: await iceServers(),
       });
 
       recvTransport.on("connect", async ({ dtlsParameters }, callback, errback) => {
@@ -642,10 +784,13 @@ export function useMediasoup() {
       if (store.getState().fileStreamName) await graph.produceFile();
       // Likewise rebuild any selected extra-mic producers.
       if (store.getState().streamedMicDeviceIds.length > 0) await extraMics.produceAll();
+      // Video room: re-produce our camera / screen picture if they're on.
+      await videoRef.current?.produceAll();
 
       // Consume any producers announced while the transports were still being
       // built (their new-producer events arrived too early and were queued).
       await registry.drainPending();
+      await videoRef.current?.drainPending();
     },
     [emit, connectMicToGraph, ensureLocalStream, graph, extraMics, registry, store],
   );
@@ -670,7 +815,19 @@ export function useMediasoup() {
     async (
       roomName: string,
       displayName: string,
-      opts?: { disableP2p?: boolean; isPublic?: boolean; noMic?: boolean },
+      opts?: {
+        disableP2p?: boolean;
+        isPublic?: boolean;
+        noMic?: boolean;
+        video?: boolean;
+        // Create the room as a MODERATED room with this policy (ignored by the
+        // server if the room already exists). See lib/moderation.ts.
+        moderation?: ModerationPolicy | null;
+        // Host key of a RESERVED room (from the host link's `?host=`, stashed
+        // per room in sessionStorage by Room.tsx). Lets us OPEN the reserved
+        // room and makes us its admin on every join.
+        hostKey?: string | null;
+      },
     ) => {
       // Acquire stereo audio + build the outgoing graph BEFORE connecting so
       // it's ready the moment we (re)join. The mic, AudioContext and outgoing
@@ -745,9 +902,17 @@ export function useMediasoup() {
             peerId: string;
             displayName: string;
             muted?: boolean;
-            producers: Array<{ producerId: string; source: string; title?: string }>;
+            producers: Array<{
+              producerId: string;
+              kind?: string;
+              source: string;
+              title?: string;
+            }>;
           }>;
           mode: RoomMode;
+          // Room type (sticky server-side). True ONLY for a video room — the
+          // single switch that loads the video controller + UI.
+          isVideo?: boolean;
           recording: { recordingId: string } | null;
           streaming?: boolean;
           voiceActive?: boolean;
@@ -756,6 +921,14 @@ export function useMediasoup() {
           isPublic?: boolean;
           kickVotes?: Array<{ targetId: string; votes: number }>;
           messages: ChatMessage[];
+          // Shared-notes feature availability + this room's note URL (if any).
+          notesEnabled?: boolean;
+          notesUrl?: string | null;
+          // MODERATED room: its policy (null otherwise), whether we're an admin,
+          // and the admin list.
+          moderation?: ModerationPolicy | null;
+          isAdmin?: boolean;
+          admins?: Array<{ peerId: string; displayName: string }>;
         };
         const joinPayload = {
           roomName,
@@ -763,6 +936,12 @@ export function useMediasoup() {
           disableP2p: opts?.disableP2p,
           // List this room in the lobby's public directory (sticky server-side).
           isPublic: opts?.isPublic,
+          // Make this a VIDEO call (sticky server-side). Absent for audio rooms.
+          video: opts?.video,
+          // Create a MODERATED room (only honoured when this join creates it).
+          moderation: opts?.moderation ?? undefined,
+          // Host key of a reserved room, if we hold one (see opts).
+          hostKey: opts?.hostKey || undefined,
           joinToken,
           // On a reconnect mid-share, re-pin SFU so the share rebuilds.
           sharing: store.getState().isSharingAudio,
@@ -772,7 +951,20 @@ export function useMediasoup() {
           extraMic: store.getState().streamedMicDeviceIds.length > 0,
         };
 
-        let joinRes = await emit<JoinResponse>("join", joinPayload);
+        // RESERVED room not open yet: the server refuses with `reserved` until
+        // its host (key holder) arrives. Show the waiting screen and poll the
+        // room lookup until the name is live, then join again — which then
+        // lands in the moderated room's knock gate below, as for anyone else.
+        let joinRes: JoinResponse;
+        for (;;) {
+          try {
+            joinRes = await emit<JoinResponse>("join", joinPayload);
+            break;
+          } catch (err) {
+            if (!(err instanceof Error) || err.message !== "reserved") throw err;
+            await waitForReservedRoom(roomName);
+          }
+        }
 
         // Knock-to-join: the room is public + occupied, so we're held at the
         // door. Show the waiting screen and block until a participant decides —
@@ -815,6 +1007,15 @@ export function useMediasoup() {
         store.getState().setStreaming(!!joinRes.streaming);
         // Whether this room is public — gates the vote-to-kick controls.
         store.getState().setRoomIsPublic(!!joinRes.isPublic);
+        // Room type. A video room loads the video controller NOW (before the
+        // snapshot below is consumed, so its camera/screen producers route to
+        // tiles). Audio rooms skip this entirely — nothing video is loaded.
+        store.getState().setRoomIsVideo(!!joinRes.isVideo);
+        if (joinRes.isVideo) await ensureVideo();
+        // Shared-notes availability + the room's note URL (may have been created
+        // while we were away, or by another peer since our last join).
+        store.getState().setNotesEnabled(!!joinRes.notesEnabled);
+        store.getState().setNotesUrl(joinRes.notesUrl ?? null);
 
         // Reconcile the peer list: drop anyone who left while we were
         // disconnected, add newcomers. addPeer resets per-peer state, so only
@@ -836,6 +1037,21 @@ export function useMediasoup() {
         for (const { targetId, votes } of joinRes.kickVotes ?? []) {
           store.getState().setPeerKickVote(targetId, votes, false);
         }
+        // MODERATED room: policy + admins (after the peer list, so each row's
+        // admin flag lands). Announced once per session, not on every rejoin.
+        const admins = joinRes.admins ?? [];
+        store.getState().setModeration(joinRes.moderation ?? null);
+        store.getState().setAdmins(admins.map((a) => a.peerId));
+        if (joinRes.moderation && !moderatedAnnouncedRef.current) {
+          moderatedAnnouncedRef.current = true;
+          store.getState().announceEvent(
+            joinRes.isAdmin
+              ? announce_moderated_room_you()
+              : announce_moderated_room({
+                  admins: admins.map((a) => a.displayName).join(", ") || "—",
+                }),
+          );
+        }
 
         // Producers queued before this ack (stale modeRef during a rejoin) are
         // all covered by the join snapshot below — draining them too would
@@ -853,7 +1069,17 @@ export function useMediasoup() {
           await setupSfu(joinRes.rtpCapabilities);
           for (const peer of joinRes.peers) {
             for (const prod of peer.producers) {
-              await registry.consumeProducer(peer.peerId, prod.producerId, prod.source, prod.title);
+              if (isVideoSource(prod.source)) {
+                // Video rooms only (the server never produces video elsewhere).
+                await videoRef.current?.consume(peer.peerId, prod.producerId, prod.source);
+              } else {
+                await registry.consumeProducer(
+                  peer.peerId,
+                  prod.producerId,
+                  prod.source,
+                  prod.title,
+                );
+              }
             }
           }
         }
@@ -931,6 +1157,15 @@ export function useMediasoup() {
       socket.on("room-public", () => {
         store.getState().setRoomIsPublic(true);
       });
+      // Someone joined with ?video=on and turned this (audio) room into a video
+      // call — sticky, like public. Load the video controller + UI so we can see
+      // their camera; the room is being pinned to the SFU by the same join.
+      socket.on("room-video", () => {
+        if (store.getState().roomIsVideo) return;
+        store.getState().setRoomIsVideo(true);
+        void ensureVideo();
+        store.getState().announceEvent(announce_room_now_video());
+      });
 
       // --- Socket event handlers (attached once; persist across reconnects) ---
       socket.on(
@@ -946,7 +1181,7 @@ export function useMediasoup() {
             ts: joinTs,
             kind: "join",
           });
-          playCue(sharedAudioContext, "join");
+          playCue(getSharedAudioContext(), "join");
           // In P2P mode, the new peer will send us an offer — we wait for it
         },
       );
@@ -961,6 +1196,7 @@ export function useMediasoup() {
           pendingCandidates: pendingCandidatesRef.current,
           registry,
         });
+        videoRef.current?.removeOwnedBy(peerId);
         store.getState().removePeer(peerId);
         if (wasMusic) {
           // A music caster (e.g. Ecobox) going away reads as the music
@@ -977,7 +1213,7 @@ export function useMediasoup() {
             kind: "leave",
           });
         }
-        playCue(sharedAudioContext, "leave");
+        playCue(getSharedAudioContext(), "leave");
       });
 
       // --- Vote to kick (public rooms) ---
@@ -1003,7 +1239,15 @@ export function useMediasoup() {
         }) => {
           const myId = store.getState().localPeerId;
           const mine = voterId != null && voterId === myId;
-          store.getState().setPeerKickVote(targetId, votes, mine ? action === "cast" : undefined);
+          // A recount down to zero (the target became an admin, or every
+          // voter left / lost the vote) also clears OUR pressed state.
+          store
+            .getState()
+            .setPeerKickVote(
+              targetId,
+              votes,
+              mine ? action === "cast" : votes === 0 ? false : undefined,
+            );
           if (action === "recount" || mine) return;
           const voter = voterName || announce_a_participant();
           const target =
@@ -1028,10 +1272,12 @@ export function useMediasoup() {
           peerId,
           displayName,
           reason,
+          by,
         }: {
           peerId: string;
           displayName: string;
-          reason?: "vote" | "caster";
+          reason?: "vote" | "caster" | "admin";
+          by?: string | null;
         }) => {
           const name = store.getState().peers.get(peerId)?.displayName ?? displayName;
           // Tear down their media exactly like a leave.
@@ -1040,22 +1286,29 @@ export function useMediasoup() {
             pendingCandidates: pendingCandidatesRef.current,
             registry,
           });
+          videoRef.current?.removeOwnedBy(peerId);
           store.getState().removePeer(peerId);
           store
             .getState()
             .announceEvent(
-              reason === "caster" ? announce_caster_removed({ name }) : announce_peer_kicked({ name }),
+              reason === "caster"
+                ? announce_caster_removed({ name })
+                : reason === "admin" && by
+                  ? announce_peer_kicked_by({ name, by })
+                  : announce_peer_kicked({ name }),
             );
-          playCue(sharedAudioContext, "leave");
+          playCue(getSharedAudioContext(), "leave");
         },
       );
 
       // WE were voted out. Show the dedicated "removed" screen (Room.tsx) and
       // stop the socket so it doesn't auto-reconnect into the now-banned room.
-      socket.on("you-were-kicked", () => {
+      socket.on("you-were-kicked", ({ by }: { reason?: string; by?: string | null } = {}) => {
         store.getState().setKicked(true);
-        store.getState().announceEvent(announce_you_were_kicked());
-        playCue(sharedAudioContext, "leave");
+        store
+          .getState()
+          .announceEvent(by ? announce_you_were_kicked_by({ by }) : announce_you_were_kicked());
+        playCue(getSharedAudioContext(), "leave");
         socket.disconnect();
       });
 
@@ -1063,6 +1316,8 @@ export function useMediasoup() {
       // server-side). Self-contained — see lib/socket/room-event-handlers.ts.
       registerRecordingHandlers(socket);
       registerStreamingHandlers(socket);
+      // Shared-notes URL sync (someone opened the room's note for the first time).
+      registerNotesHandlers(socket);
 
       // P2P signaling relay
       socket.on(
@@ -1200,7 +1455,12 @@ export function useMediasoup() {
         }) => {
           if (modeRef.current !== "sfu") return;
           try {
-            await registry.consumeProducer(peerId, producerId, source ?? "voice", title);
+            if (isVideoSource(source)) {
+              // Video rooms only — an audio room never receives one of these.
+              await videoRef.current?.consume(peerId, producerId, source);
+            } else {
+              await registry.consumeProducer(peerId, producerId, source ?? "voice", title);
+            }
           } catch (err) {
             console.error("[sfu] consume failed:", err);
           }
@@ -1237,8 +1497,16 @@ export function useMediasoup() {
       socket.on(
         "share-started",
         ({ displayName: name }: { peerId: string; displayName: string }) => {
-          store.getState().announceEvent(announce_share_started({ name }));
-          playCue(sharedAudioContext, "share-start");
+          // In a video room a share is a screen share (picture + sound); in an
+          // audio room it's audio only — announce it as what it is.
+          store
+            .getState()
+            .announceEvent(
+              store.getState().roomIsVideo
+                ? announce_screen_started({ name })
+                : announce_share_started({ name }),
+            );
+          playCue(getSharedAudioContext(), "share-start");
         },
       );
 
@@ -1248,8 +1516,16 @@ export function useMediasoup() {
         "share-stopped",
         ({ peerId, displayName: name }: { peerId: string; displayName: string }) => {
           registry.removeSharesOwnedBy(peerId);
-          store.getState().announceEvent(announce_share_stopped({ name }));
-          playCue(sharedAudioContext, "share-stop");
+          // …and their screen picture, if this is a video room.
+          videoRef.current?.removeOwnedBy(peerId, "screen");
+          store
+            .getState()
+            .announceEvent(
+              store.getState().roomIsVideo
+                ? announce_screen_stopped({ name })
+                : announce_share_stopped({ name }),
+            );
+          playCue(getSharedAudioContext(), "share-stop");
         },
       );
 
@@ -1257,7 +1533,7 @@ export function useMediasoup() {
       // stereo "file" stream arrives separately via new-producer.
       socket.on("file-stream-started", ({ displayName: name }: { displayName: string }) => {
         store.getState().announceEvent(announce_file_stream_started({ name }));
-        playCue(sharedAudioContext, "share-start");
+        playCue(getSharedAudioContext(), "share-start");
       });
 
       // A peer stopped their file stream — tear down their file "music stream"
@@ -1267,7 +1543,7 @@ export function useMediasoup() {
         ({ peerId, displayName: name }: { peerId: string; displayName: string }) => {
           registry.removeFilesOwnedBy(peerId);
           store.getState().announceEvent(announce_file_stream_stopped({ name }));
-          playCue(sharedAudioContext, "share-stop");
+          playCue(getSharedAudioContext(), "share-stop");
         },
       );
 
@@ -1303,16 +1579,18 @@ export function useMediasoup() {
             // Share/file: close the producer + stop local playback in place.
             stopOwnStreamLocalRef.current(source);
             store.getState().announceEvent(announce_your_stream_stopped());
-            playCue(sharedAudioContext, "share-stop");
+            playCue(getSharedAudioContext(), "share-stop");
             return;
           }
-          if (source === "share") registry.removeShareStream(producerId);
-          else if (source === "file") registry.removeFileStream(producerId);
+          if (source === "share") {
+            registry.removeShareStream(producerId);
+            // The server closed their screen picture with the share (video rooms).
+            videoRef.current?.removeOwnedBy(ownerId, "screen");
+          } else if (source === "file") registry.removeFileStream(producerId);
           else registry.removeMicStream(producerId);
-          const name =
-            store.getState().peers.get(ownerId)?.displayName ?? announce_a_participant();
+          const name = store.getState().peers.get(ownerId)?.displayName ?? announce_a_participant();
           store.getState().announceEvent(announce_peer_stream_stopped({ name }));
-          playCue(sharedAudioContext, "share-stop");
+          playCue(getSharedAudioContext(), "share-stop");
         },
       );
 
@@ -1344,12 +1622,31 @@ export function useMediasoup() {
         },
       );
 
+      // --- Video rooms: a peer turned their camera on/off. The tile itself
+      // arrives/leaves via new-producer / the tile teardown below; this is the
+      // announcement + cue (rule: room events go to chat via announceEvent). ---
+      socket.on(
+        "video-started",
+        ({ displayName: name }: { peerId: string; displayName: string }) => {
+          store.getState().announceEvent(announce_video_on({ name }));
+          playCue(getSharedAudioContext(), "video-on");
+        },
+      );
+      socket.on(
+        "video-stopped",
+        ({ peerId, displayName: name }: { peerId: string; displayName: string }) => {
+          videoRef.current?.removeOwnedBy(peerId, "camera");
+          store.getState().announceEvent(announce_video_off({ name }));
+          playCue(getSharedAudioContext(), "video-off");
+        },
+      );
+
       // A peer started streaming extra microphone(s) — announce once (the server
       // only sends this on their first one) + cue. Each device's tile arrives
       // separately via new-producer.
       socket.on("mic-stream-started", ({ displayName: name }: { displayName: string }) => {
         store.getState().announceEvent(announce_extra_mic_started({ name }));
-        playCue(sharedAudioContext, "share-start");
+        playCue(getSharedAudioContext(), "share-start");
       });
 
       // A peer stopped one extra mic — tear down that specific tile (addressed by
@@ -1370,13 +1667,15 @@ export function useMediasoup() {
           registry.removeMicStream(producerId);
           if (last) {
             store.getState().announceEvent(announce_extra_mic_stopped({ name }));
-            playCue(sharedAudioContext, "share-stop");
+            playCue(getSharedAudioContext(), "share-stop");
           }
         },
       );
 
       // Remote mute/unmute + incoming chat handlers. See room-event-handlers.ts.
       registerMuteHandlers(socket, surfaceToggle);
+      // Moderated rooms: admin-set changes + forced mutes (never fire elsewhere).
+      registerAdminHandlers(socket, (by) => forcedMuteRef.current(by));
       registerChatHandlers(socket, chatHintGivenRef);
 
       // Resolve once the first connect → join → media setup has completed (or
@@ -1390,6 +1689,7 @@ export function useMediasoup() {
     },
     [
       emit,
+      waitForReservedRoom,
       registry,
       extraMics,
       setupSfu,
@@ -1401,6 +1701,7 @@ export function useMediasoup() {
       surfaceToggle,
       runTransition,
       flushPendingCandidates,
+      ensureVideo,
       store,
     ],
   );
@@ -1420,7 +1721,7 @@ export function useMediasoup() {
     // Coalesced so mashing mute doesn't spam the chat log + cue (see surfaceToggle).
     surfaceToggle("mic", true, () => {
       store.getState().announceEvent(announce_mic_muted());
-      playCue(sharedAudioContext, "mute");
+      playCue(getSharedAudioContext(), "mute");
     });
   }, [emit, store, surfaceToggle]);
 
@@ -1435,7 +1736,7 @@ export function useMediasoup() {
     store.getState().setMuted(false);
     surfaceToggle("mic", false, () => {
       store.getState().announceEvent(announce_mic_unmuted());
-      playCue(sharedAudioContext, "unmute");
+      playCue(getSharedAudioContext(), "unmute");
     });
   }, [emit, store, surfaceToggle]);
 
@@ -1443,6 +1744,19 @@ export function useMediasoup() {
     if (store.getState().isMuted) await unmute();
     else await mute();
   }, [mute, unmute, store]);
+
+  // An admin muted US for everyone (moderated room): apply the local half of a
+  // mute — track off, producer paused, store — WITHOUT the producer-pause emit
+  // (the server already paused it and flagged us muted) and without the
+  // "you muted" announcement (the handler announces who did it). Reached from
+  // the socket handler through a ref, since it's registered inside join()
+  // before `mute` exists.
+  forcedMuteRef.current = () => {
+    const track = localStreamRef.current?.getAudioTracks()[0];
+    if (track) track.enabled = false;
+    if (modeRef.current === "sfu" && producerRef.current) producerRef.current.pause();
+    store.getState().setMuted(true);
+  };
 
   const toggleDeafen = useCallback(() => {
     store.getState().setDeafened(!store.getState().isDeafened);
@@ -1483,12 +1797,18 @@ export function useMediasoup() {
   const stopAudioShare = useCallback(async () => {
     if (!store.getState().isSharingAudio) return;
     graph.teardownShareLocal();
+    // Video room: the share's picture goes with it.
+    videoRef.current?.detachScreen();
     // Tell the server: drop us from the sharer set (may release the SFU pin)
-    // and close the server-side producer so peers' tiles disappear.
+    // and close the server-side producer(s) so peers' tiles disappear.
     await emit("stop-share").catch(() => {});
     // Local feedback; peers get theirs via the share-stopped broadcast.
-    store.getState().announceEvent(announce_share_stopped_you());
-    playCue(sharedAudioContext, "share-stop");
+    store
+      .getState()
+      .announceEvent(
+        store.getState().roomIsVideo ? announce_screen_stopped_you() : announce_share_stopped_you(),
+      );
+    playCue(getSharedAudioContext(), "share-stop");
   }, [store, graph, emit]);
 
   const startAudioShare = useCallback(async () => {
@@ -1517,7 +1837,11 @@ export function useMediasoup() {
     }
 
     const audioTracks = displayStream.getAudioTracks();
-    if (audioTracks.length === 0) {
+    const videoTrack = displayStream.getVideoTracks()[0];
+    // Audio room: the share is audio-only, so no audio means nothing to share.
+    // Video room: a share without audio is still a (silent) screen share.
+    const video = store.getState().roomIsVideo ? videoRef.current : null;
+    if (audioTracks.length === 0 && !(video && videoTrack)) {
       displayStream.getTracks().forEach((t) => t.stop());
       alert(
         'No audio was shared. When choosing what to share, tick "Share system audio" (entire screen) or "Share tab audio" (Chrome tab). On Firefox/Safari this is not supported.',
@@ -1525,15 +1849,23 @@ export function useMediasoup() {
       return;
     }
 
-    // Discard the video track — we don't need to send any video
-    displayStream.getVideoTracks().forEach((t) => t.stop());
+    if (video && videoTrack) {
+      // Video room: the screen's PICTURE is produced too (a separate "screen"
+      // producer, routed by the SFU the room is already pinned to).
+      await video.attachScreen(videoTrack);
+    } else {
+      // Audio room (or no picture): discard the video track — audio only, as
+      // always. Capturing extra devices/sharing never sends video here.
+      displayStream.getVideoTracks().forEach((t) => t.stop());
+    }
 
-    // Route the shared audio into its OWN destination (not the voice graph), so
-    // it becomes a separate high-bitrate stereo producer.
-    graph.attachShare(audioTracks, displayStream);
+    // Route the shared audio (if any) into its OWN destination (not the voice
+    // graph), so it becomes a separate high-bitrate stereo producer.
+    if (audioTracks.length > 0) graph.attachShare(audioTracks, displayStream);
 
-    // Fire when the user hits the browser's "Stop sharing" UI
-    audioTracks[0].addEventListener("ended", () => {
+    // Fire when the user hits the browser's "Stop sharing" UI (whichever track
+    // the browser ends first).
+    (audioTracks[0] ?? videoTrack).addEventListener("ended", () => {
       stopAudioShare();
     });
 
@@ -1548,8 +1880,12 @@ export function useMediasoup() {
     if (wasSfu) await graph.produceShare();
 
     // Local feedback; peers get theirs via the share-started broadcast.
-    store.getState().announceEvent(announce_share_started_you());
-    playCue(sharedAudioContext, "share-start");
+    store
+      .getState()
+      .announceEvent(
+        store.getState().roomIsVideo ? announce_screen_started_you() : announce_share_started_you(),
+      );
+    playCue(getSharedAudioContext(), "share-start");
   }, [store, graph, stopAudioShare, emit]);
 
   const toggleAudioShare = useCallback(async () => {
@@ -1592,7 +1928,7 @@ export function useMediasoup() {
       // pin) and close the server-side producer so peers' tiles disappear.
       await emit("stop-file-stream").catch(() => {});
       store.getState().announceEvent(announcement ?? announce_file_stream_stopped_you());
-      playCue(sharedAudioContext, "share-stop");
+      playCue(getSharedAudioContext(), "share-stop");
     },
     [store, teardownFileLocal, emit],
   );
@@ -1601,14 +1937,20 @@ export function useMediasoup() {
   // handler registered in join() (see stopOwnStreamLocalRef). The share teardown
   // lives on the graph; the file teardown is the hook's (owns the <audio> element).
   useEffect(() => {
-    stopOwnStreamLocalRef.current = (source) =>
-      source === "share" ? graph.teardownShareLocal() : teardownFileLocal();
+    stopOwnStreamLocalRef.current = (source) => {
+      if (source === "share") {
+        graph.teardownShareLocal();
+        videoRef.current?.detachScreen();
+      } else {
+        teardownFileLocal();
+      }
+    };
   }, [graph, teardownFileLocal]);
 
   const startFileSource = useCallback(
     async (src: string, name: string, objectUrl?: string) => {
       graph.ensure();
-      resumeContext(sharedAudioContext);
+      resumeContext(getSharedAudioContext());
 
       const firstStart = store.getState().fileStreamName == null;
 
@@ -1667,7 +2009,7 @@ export function useMediasoup() {
         await emit("start-file-stream").catch(() => {});
         if (wasSfu) await graph.produceFile();
         store.getState().announceEvent(announce_file_stream_started_you());
-        playCue(sharedAudioContext, "share-start");
+        playCue(getSharedAudioContext(), "share-start");
       } else {
         // Replacing the file mid-stream — producer/SFU pin are unchanged, but the
         // persisted producer still carries the OLD file's title, so push the new
@@ -1824,7 +2166,7 @@ export function useMediasoup() {
       const trimmed = text.trim();
       if (!trimmed) return { ok: false, reason: "empty" };
       if (!chatLimiterRef.current.tryConsume()) {
-        playCue(sharedAudioContext, "thunk");
+        playCue(getSharedAudioContext(), "thunk");
         return { ok: false, reason: "rate_limited" };
       }
       try {
@@ -1832,7 +2174,7 @@ export function useMediasoup() {
         return { ok: true };
       } catch {
         // Server rejected (its budget was also spent via the API, or transient).
-        playCue(sharedAudioContext, "thunk");
+        playCue(getSharedAudioContext(), "thunk");
         return { ok: false, reason: "rate_limited" };
       }
     },
@@ -1840,6 +2182,8 @@ export function useMediasoup() {
   );
 
   const leave = useCallback(() => {
+    // Stop waiting for a reserved room's host, if we were.
+    hostWaitRef.current?.cancel();
     // Tear down any active file stream (stops the <audio>, revokes its URL).
     fileAbortRef.current?.abort();
     fileAbortRef.current = null;
@@ -1860,6 +2204,9 @@ export function useMediasoup() {
     // Tear down every outgoing extra mic — the capture + Web Audio nodes are
     // app-owned (stopTracks:false producers), so they'd leak across rooms otherwise.
     extraMics.teardownAll();
+    // Video room: stop our camera/screen captures + drop every tile. The
+    // controller itself is kept (it's per-session, cheap, and reusable).
+    videoRef.current?.teardownAll();
     // Incoming-stream owner maps are owned by PeerAudioRegistry and already
     // cleared by registry.cleanupAll() (via teardownP2p/teardownSfu above).
     // Cancel any pending coalesced mute/duck announcements.
@@ -1872,6 +2219,7 @@ export function useMediasoup() {
     socketRef.current?.disconnect();
     socketRef.current = null;
     deviceRef.current = null;
+    moderatedAnnouncedRef.current = false;
     store.getState().reset();
   }, [teardownP2p, teardownSfu, graph, extraMics, store]);
 
@@ -1895,7 +2243,7 @@ export function useMediasoup() {
   const voteKick = useCallback(
     (targetId: string, vote: boolean) => {
       emit("vote-kick", { targetId, vote }).catch(() => {
-        playCue(sharedAudioContext, "thunk");
+        playCue(getSharedAudioContext(), "thunk");
       });
     },
     [emit],
@@ -1909,7 +2257,7 @@ export function useMediasoup() {
   const kickCaster = useCallback(
     (targetId: string) => {
       emit("kick-caster", { targetId }).catch(() => {
-        playCue(sharedAudioContext, "thunk");
+        playCue(getSharedAudioContext(), "thunk");
       });
     },
     [emit],
@@ -1922,10 +2270,70 @@ export function useMediasoup() {
   const stopPeerStream = useCallback(
     (producerId: string) => {
       emit("stop-peer-stream", { producerId }).catch(() => {
-        playCue(sharedAudioContext, "thunk");
+        playCue(getSharedAudioContext(), "thunk");
       });
     },
     [emit],
+  );
+
+  // --- MODERATED rooms only (the server refuses each of these elsewhere).
+  // None updates local state optimistically: the server broadcasts the
+  // authoritative result (admins-changed / peer-muted / all-muted /
+  // peer-kicked), which every client — including us — renders and announces.
+  // A rejection (not allowed, rate-limited, …) thunks. ---
+  // Name / revoke a co-admin.
+  const setAdmin = useCallback(
+    (targetId: string, admin: boolean) => {
+      emit("set-admin", { targetId, admin }).catch(() => {
+        playCue(getSharedAudioContext(), "thunk");
+      });
+    },
+    [emit],
+  );
+  // Mute one participant for everyone (soft: they can unmute themselves).
+  const mutePeer = useCallback(
+    (targetId: string) => {
+      emit("mute-peer", { targetId }).catch(() => {
+        playCue(getSharedAudioContext(), "thunk");
+      });
+    },
+    [emit],
+  );
+  // Mute everyone else at once.
+  const muteAll = useCallback(() => {
+    emit("mute-all", {}).catch(() => {
+      playCue(getSharedAudioContext(), "thunk");
+    });
+  }, [emit]);
+  // Remove a participant at once (no vote).
+  const kickPeer = useCallback(
+    (targetId: string) => {
+      emit("kick-peer", { targetId }).catch(() => {
+        playCue(getSharedAudioContext(), "thunk");
+      });
+    },
+    [emit],
+  );
+
+  // --- Video rooms only. Each is a no-op when the controller was never loaded
+  // (i.e. in an audio room), so the UI can call them unconditionally. ---
+  // Our camera on/off (the V shortcut / the video toolbar button).
+  const toggleVideo = useCallback(async () => {
+    if (!store.getState().roomIsVideo) return;
+    const video = await ensureVideo();
+    await video.toggleCamera();
+  }, [store, ensureVideo]);
+
+  // Have Claude describe a snapshot of a peer's camera/screen (or our own camera).
+  const describeVideo = useCallback((peerId: string, source: VideoSource) => {
+    void videoRef.current?.describe(peerId, source);
+  }, []);
+
+  // Stream getters for the video tiles (VideoStage / VideoControls).
+  const getLocalVideoStream = useCallback(() => videoRef.current?.getLocalStream() ?? null, []);
+  const getVideoStream = useCallback(
+    (producerId: string) => videoRef.current?.getStream(producerId) ?? null,
+    [],
   );
 
   // While anyone is waiting at the door, loop the knock cue so participants
@@ -1936,7 +2344,7 @@ export function useMediasoup() {
   const someoneKnocking = useRoomStore((s) => s.joinRequests.length > 0);
   useEffect(() => {
     if (!someoneKnocking) return;
-    return startKnockLoop(sharedAudioContext);
+    return startKnockLoop(getSharedAudioContext());
   }, [someoneKnocking]);
 
   useEffect(() => {
@@ -1952,6 +2360,10 @@ export function useMediasoup() {
     voteKick,
     kickCaster,
     stopPeerStream,
+    setAdmin,
+    mutePeer,
+    muteAll,
+    kickPeer,
     mute,
     unmute,
     toggleMute,
@@ -1975,6 +2387,17 @@ export function useMediasoup() {
     setStreamMonitorVolume,
     sendChatMessage,
     announceSpeakers,
+    openNotes,
+    toggleVideo,
+    describeVideo,
+    getLocalVideoStream,
+    getVideoStream,
     peerAudiosRef,
   };
+}
+
+// Which producer sources are VIDEO (camera / screen picture) — only ever seen
+// in a video room; everything else is audio and goes to the audio registry.
+function isVideoSource(source: string | undefined): source is VideoSource {
+  return source === "camera" || source === "screen";
 }

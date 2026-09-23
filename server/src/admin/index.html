@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>SonicRoom admin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f6f7f9;
+        --fg: #15181d;
+        --muted: #5b6270;
+        --panel: #ffffff;
+        --line: #d5d9e0;
+        --accent: #2f6fed;
+        --danger: #b3261e;
+        --ok: #1b7f3b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1216;
+          --fg: #e8eaee;
+          --muted: #a0a7b4;
+          --panel: #171b21;
+          --line: #2c323b;
+          --accent: #7aa2ff;
+          --danger: #ff8a80;
+          --ok: #7ad99a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 1.5rem 1rem 3rem;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          15px/1.5 system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        max-width: 64rem;
+        margin-inline: auto;
+      }
+      h1 {
+        font-size: 1.5rem;
+        margin: 0 0 1rem;
+      }
+      h2 {
+        font-size: 1.15rem;
+        margin: 0 0 0.75rem;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.25rem;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+      input[type="text"],
+      input[type="password"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 0.45rem 0.6rem;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        gap: 0.9rem;
+        margin-bottom: 0.9rem;
+      }
+      fieldset {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.75rem 1rem 0.25rem;
+        margin: 0 0 1rem;
+      }
+      legend {
+        font-weight: 700;
+        padding: 0 0.3rem;
+      }
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 500;
+        margin: 0.4rem 0;
+      }
+      .check input {
+        width: 1.1rem;
+        height: 1.1rem;
+      }
+      button {
+        padding: 0.5rem 0.9rem;
+        border-radius: 6px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
+      }
+      button.danger {
+        color: var(--danger);
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible,
+      a:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 2px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.45rem 0.5rem;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: var(--muted);
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .status {
+        min-height: 1.5rem;
+        margin: 0.5rem 0;
+        font-weight: 600;
+      }
+      .status.error {
+        color: var(--danger);
+      }
+      .status.ok {
+        color: var(--ok);
+      }
+      .links {
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin-top: 1rem;
+      }
+      .links code {
+        display: block;
+        word-break: break-all;
+        margin: 0.25rem 0 0.5rem;
+        font-size: 0.95rem;
+      }
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top">
+      <h1>SonicRoom admin</h1>
+      <button id="logout" type="button" hidden>Log out</button>
+    </div>
+    <p id="live" class="status" role="status" aria-live="polite" aria-atomic="true"></p>
+
+    <section id="login" hidden aria-labelledby="login-h">
+      <h2 id="login-h">Log in</h2>
+      <form id="login-form">
+        <div class="row">
+          <div>
+            <label for="password">Admin password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+        </div>
+        <button class="primary" type="submit">Log in</button>
+      </form>
+    </section>
+
+    <div id="panel" hidden>
+      <section aria-labelledby="reserve-h">
+        <h2 id="reserve-h">Reserve a room</h2>
+        <p class="muted">
+          The room can then only be opened with the host link, opens as a moderated room with the
+          privileges below, stays moderated while the host is away, and the host is its
+          administrator on every visit. The host link is shown once — it is not stored.
+        </p>
+        <form id="reserve-form">
+          <div class="row">
+            <div>
+              <label for="name">Room name</label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                required
+                pattern="[A-Za-z0-9_-]{1,64}"
+                autocomplete="off"
+              />
+              <span class="muted" id="name-hint"
+                >Letters, digits, hyphen, underscore. Case-insensitive.</span
+              >
+            </div>
+            <div>
+              <label for="days">Expires in (days)</label>
+              <input id="days" name="days" type="number" min="0" max="3650" value="30" />
+              <span class="muted">0 = never</span>
+            </div>
+            <div>
+              <label for="note">Note (optional)</label>
+              <input id="note" name="note" type="text" maxlength="200" />
+            </div>
+          </div>
+          <fieldset>
+            <legend>Participant privileges</legend>
+            <div class="row" id="policy-fields"></div>
+            <label class="check"
+              ><input type="checkbox" name="multipleAdmins" /> Allow several administrators</label
+            >
+            <label class="check"
+              ><input type="checkbox" name="hidePoweredBy" /> Hide the "Powered by" link</label
+            >
+          </fieldset>
+          <button class="primary" type="submit">Reserve</button>
+        </form>
+        <div id="result" class="links" hidden tabindex="-1" aria-labelledby="result-h">
+          <h3 id="result-h" style="margin: 0 0 0.5rem"></h3>
+          <strong>Host link (give ONLY to the host):</strong>
+          <code id="host-link"></code>
+          <strong>Public link (advertise this one):</strong>
+          <code id="public-link"></code>
+          <div class="actions">
+            <button type="button" id="copy-host">Copy host link</button>
+            <button type="button" id="copy-public">Copy public link</button>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="res-h">
+        <div class="top">
+          <h2 id="res-h">Reservations</h2>
+          <button type="button" id="refresh">Refresh</button>
+        </div>
+        <p class="muted" id="file"></p>
+        <div style="overflow-x: auto">
+          <table id="res-table">
+            <thead>
+              <tr>
+                <th scope="col">Room</th>
+                <th scope="col">Expires</th>
+                <th scope="col">Note</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="res-empty" class="muted" hidden>No reservations.</p>
+      </section>
+
+      <section aria-labelledby="rooms-h">
+        <h2 id="rooms-h">Live rooms</h2>
+        <div style="overflow-x: auto">
+          <table id="rooms-table">
+            <thead>
+              <tr>
+                <th scope="col">Room</th>
+                <th scope="col">People</th>
+                <th scope="col">Type</th>
+                <th scope="col">Transport</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <p id="rooms-empty" class="muted" hidden>No rooms are live right now.</p>
+      </section>
+    </div>
+
+    <script>
+      (() => {
+        const $ = (id) => document.getElementById(id);
+        const live = $("live");
+        const say = (msg, kind) => {
+          live.textContent = msg;
+          live.className = "status" + (kind ? " " + kind : "");
+        };
+        const HEADERS = { "X-SonicRoom-Admin": "1", "Content-Type": "application/json" };
+        const api = async (method, url, body) => {
+          const res = await fetch(url, {
+            method,
+            headers: HEADERS,
+            credentials: "same-origin",
+            body: body === undefined ? undefined : JSON.stringify(body),
+          });
+          let data = null;
+          try {
+            data = await res.json();
+          } catch {
+            /* no body */
+          }
+          if (res.status === 401 && !url.endsWith("/login")) {
+            showLogin();
+            throw new Error("Session expired — log in again.");
+          }
+          if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+          return data;
+        };
+
+        // Policy fields, mirroring the lobby's "Participant privileges".
+        const WHO = [
+          ["admins", "Administrators only"],
+          ["everyone", "Everyone"],
+          ["nobody", "Nobody"],
+        ];
+        const WHO_NO_NOBODY = WHO.slice(0, 2);
+        const KICK = [
+          ["admins", "Administrators, directly"],
+          ["admins_vote", "Administrators, by vote"],
+          ["everyone", "Everyone, directly"],
+          ["everyone_vote", "Everyone, by vote"],
+          ["nobody", "Nobody"],
+        ];
+        const FIELDS = [
+          ["recording", "Recording", WHO, "admins"],
+          ["shareAudio", "Share system/tab audio", WHO, "everyone"],
+          ["streamAudio", "Stream a file/URL or extra mics", WHO, "everyone"],
+          ["ducking", "Turn auto-ducking on/off", WHO_NO_NOBODY, "everyone"],
+          ["liveStreaming", "Live streaming (Icecast)", WHO, "admins"],
+          ["approveJoins", "Approve people at the door", WHO_NO_NOBODY, "admins"],
+          ["chat", "Write in the chat", WHO, "everyone"],
+          ["notes", "Open the shared notes", WHO, "everyone"],
+          ["mutePeer", "Mute one participant for everyone", WHO, "admins"],
+          ["muteAll", "Mute everyone", WHO, "admins"],
+          ["kick", "Remove participants", KICK, "admins"],
+        ];
+        const policyBox = $("policy-fields");
+        for (const [key, label, options, def] of FIELDS) {
+          const wrap = document.createElement("div");
+          const l = document.createElement("label");
+          l.htmlFor = "policy-" + key;
+          l.textContent = label;
+          const sel = document.createElement("select");
+          sel.id = "policy-" + key;
+          sel.name = key;
+          for (const [v, text] of options) {
+            const o = document.createElement("option");
+            o.value = v;
+            o.textContent = text;
+            if (v === def) o.selected = true;
+            sel.appendChild(o);
+          }
+          wrap.append(l, sel);
+          policyBox.appendChild(wrap);
+        }
+
+        const showLogin = () => {
+          $("panel").hidden = true;
+          $("logout").hidden = true;
+          $("login").hidden = false;
+          $("password").focus();
+        };
+        const showPanel = async () => {
+          $("login").hidden = true;
+          $("panel").hidden = false;
+          $("logout").hidden = false;
+          await refresh();
+        };
+
+        const fmtDate = (iso) => (iso ? new Date(iso).toLocaleString() : "never");
+
+        const refresh = async () => {
+          const data = await api("GET", "/api/admin/state");
+          $("file").textContent = "Stored in " + data.file;
+          const rb = $("res-table").querySelector("tbody");
+          rb.textContent = "";
+          $("res-empty").hidden = data.reservations.length > 0;
+          $("res-table").hidden = data.reservations.length === 0;
+          for (const r of data.reservations) {
+            const tr = document.createElement("tr");
+            const cells = [
+              r.name,
+              fmtDate(r.expiresAt),
+              r.note || "",
+              r.live ? "Open (host is in)" : "Reserved, not open",
+            ];
+            for (const c of cells) {
+              const td = document.createElement("td");
+              td.textContent = c;
+              tr.appendChild(td);
+            }
+            const td = document.createElement("td");
+            td.className = "actions";
+            const copy = document.createElement("button");
+            copy.type = "button";
+            copy.textContent = "Copy public link";
+            copy.setAttribute("aria-label", "Copy public link for " + r.name);
+            copy.onclick = () => copyText(r.publicLink, "Public link for " + r.name + " copied.");
+            const rot = document.createElement("button");
+            rot.type = "button";
+            rot.textContent = "New host link";
+            rot.setAttribute("aria-label", "New host link for " + r.name);
+            rot.onclick = async () => {
+              if (!confirm("Issue a new host link for " + r.name + "? The old one stops working."))
+                return;
+              try {
+                const out = await api(
+                  "POST",
+                  "/api/admin/reservations/" + encodeURIComponent(r.name) + "/rotate",
+                );
+                showResult("New host link for " + out.name, out.links);
+                say("Host link rotated for " + out.name + ".", "ok");
+                await refresh();
+              } catch (e) {
+                say(e.message, "error");
+              }
+            };
+            const del = document.createElement("button");
+            del.type = "button";
+            del.className = "danger";
+            del.textContent = "Remove";
+            del.setAttribute("aria-label", "Remove reservation for " + r.name);
+            del.onclick = async () => {
+              if (
+                !confirm(
+                  "Remove the reservation for " +
+                    r.name +
+                    "? Anyone will be able to open it again.",
+                )
+              )
+                return;
+              try {
+                await api("DELETE", "/api/admin/reservations/" + encodeURIComponent(r.name));
+                say("Reservation for " + r.name + " removed.", "ok");
+                await refresh();
+              } catch (e) {
+                say(e.message, "error");
+              }
+            };
+            td.append(copy, rot, del);
+            tr.appendChild(td);
+            rb.appendChild(tr);
+          }
+          const tb = $("rooms-table").querySelector("tbody");
+          tb.textContent = "";
+          $("rooms-empty").hidden = data.rooms.length > 0;
+          $("rooms-table").hidden = data.rooms.length === 0;
+          for (const room of data.rooms) {
+            const tr = document.createElement("tr");
+            const type = [
+              room.isModerated ? "moderated" : null,
+              room.reserved ? "reserved" : null,
+              room.isPublic ? "public" : "private",
+              room.isVideo ? "video" : "audio",
+            ]
+              .filter(Boolean)
+              .join(", ");
+            const people =
+              room.participants -
+              room.casters +
+              (room.casters ? " + " + room.casters + " caster" : "");
+            for (const c of [room.name, String(people), type, room.mode.toUpperCase()]) {
+              const td = document.createElement("td");
+              td.textContent = c;
+              tr.appendChild(td);
+            }
+            tb.appendChild(tr);
+          }
+        };
+
+        const copyText = async (text, okMsg) => {
+          try {
+            await navigator.clipboard.writeText(text);
+            say(okMsg, "ok");
+          } catch {
+            say("Could not copy — select the link and copy it by hand.", "error");
+          }
+        };
+
+        let lastLinks = null;
+        const showResult = (title, links) => {
+          lastLinks = links;
+          $("result-h").textContent = title;
+          $("host-link").textContent = links.host;
+          $("public-link").textContent = links.public;
+          $("result").hidden = false;
+          $("result").focus();
+        };
+        $("copy-host").onclick = () => lastLinks && copyText(lastLinks.host, "Host link copied.");
+        $("copy-public").onclick = () =>
+          lastLinks && copyText(lastLinks.public, "Public link copied.");
+
+        $("login-form").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          say("");
+          try {
+            await api("POST", "/api/admin/login", { password: $("password").value });
+            $("password").value = "";
+            await showPanel();
+            say("Logged in.", "ok");
+          } catch (err) {
+            say(
+              err.message === "bad_password"
+                ? "Wrong password."
+                : err.message === "rate_limited"
+                  ? "Too many attempts — wait a minute."
+                  : err.message,
+              "error",
+            );
+          }
+        });
+
+        $("logout").onclick = async () => {
+          try {
+            await api("POST", "/api/admin/logout");
+          } catch {
+            /* ignore */
+          }
+          showLogin();
+          say("Logged out.", "ok");
+        };
+
+        $("refresh").onclick = () =>
+          refresh().then(
+            () => say("Refreshed.", "ok"),
+            (e) => say(e.message, "error"),
+          );
+
+        $("reserve-form").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const f = e.target;
+          const policy = {};
+          for (const [key] of FIELDS) policy[key] = f.elements[key].value;
+          policy.multipleAdmins = f.elements.multipleAdmins.checked;
+          policy.hidePoweredBy = f.elements.hidePoweredBy.checked;
+          const body = {
+            name: f.elements.name.value.trim(),
+            days: Number(f.elements.days.value),
+            note: f.elements.note.value.trim(),
+            policy,
+          };
+          try {
+            const out = await api("POST", "/api/admin/reservations", body);
+            showResult((out.replaced ? "Re-reserved " : "Reserved ") + out.name, out.links);
+            say(
+              (out.replaced ? "Re-reserved " : "Reserved ") +
+                out.name +
+                (out.expiresAt ? ", expires " + fmtDate(out.expiresAt) : ", never expires") +
+                ".",
+              "ok",
+            );
+            await refresh();
+          } catch (err) {
+            say(err.message, "error");
+          }
+        });
+
+        api("GET", "/api/admin/session").then(showPanel, showLogin);
+      })();
+    </script>
+  </body>
+</html>

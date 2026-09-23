@@ -13,13 +13,17 @@ interface ChatProps {
   // Changes whenever the caller wants the composer (re)focused even though the
   // panel is already open — e.g. handing focus back after the join modal closes.
   focusSignal?: number;
+  // MODERATED rooms: whether this peer may write. "off" / "admins-only" replace
+  // the composer with a notice — the list stays, since every announcement is
+  // logged here (and read back with Alt+1..0) regardless of chat rights.
+  composer?: "on" | "off" | "admins-only";
 }
 
 // In-room chat. Order matters for accessibility: the message list (a listbox
 // you arrow through) comes BEFORE the composer, so screen-reader users land on
 // history first. New messages are announced and chimed elsewhere (the hook);
 // this panel is just the visible list + editor.
-export function Chat({ onSend, onClose, focusSignal }: ChatProps) {
+export function Chat({ onSend, onClose, focusSignal, composer = "on" }: ChatProps) {
   const messages = useRoomStore((s) => s.messages);
   const announce = useRoomStore((s) => s.announce);
   const chatAnnounceMode = useRoomStore((s) => s.chatAnnounceMode);
@@ -219,40 +223,46 @@ export function Chat({ onSend, onClose, focusSignal }: ChatProps) {
       )}
 
       {/* Composer (after the list). Multiline; Enter sends, Shift+Enter newline. */}
-      <form
-        className="flex items-end gap-2 border-t border-sonic-700 p-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submit();
-        }}
-      >
-        <label className="sr-only" htmlFor="chat-input">
-          {m.chat_composer_label()}
-        </label>
-        <textarea
-          id="chat-input"
-          ref={textareaRef}
-          rows={2}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onComposerKeyDown}
-          aria-describedby="chat-input-help"
-          placeholder={m.chat_placeholder()}
-          className="flex-1 resize-none rounded-lg border border-sonic-600 bg-sonic-900 px-3 py-2 text-sm text-sonic-100 placeholder:text-sonic-500 focus:border-sonic-accent focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={text.trim().length === 0}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sonic-accent text-white transition-all hover:bg-sonic-accent/90 disabled:opacity-40"
-          aria-label={m.chat_send()}
-          title={m.chat_send_title()}
-        >
-          <Send className="h-4 w-4" />
-        </button>
-        <p id="chat-input-help" className="sr-only">
-          {m.chat_help()}
+      {composer !== "on" ? (
+        <p className="border-t border-sonic-700 p-3 text-sm text-sonic-400" role="note">
+          {composer === "admins-only" ? m.chat_admins_only_notice() : m.chat_disabled_notice()}
         </p>
-      </form>
+      ) : (
+        <form
+          className="flex items-end gap-2 border-t border-sonic-700 p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          <label className="sr-only" htmlFor="chat-input">
+            {m.chat_composer_label()}
+          </label>
+          <textarea
+            id="chat-input"
+            ref={textareaRef}
+            rows={2}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={onComposerKeyDown}
+            aria-describedby="chat-input-help"
+            placeholder={m.chat_placeholder()}
+            className="flex-1 resize-none rounded-lg border border-sonic-600 bg-sonic-900 px-3 py-2 text-sm text-sonic-100 placeholder:text-sonic-500 focus:border-sonic-accent focus:outline-none"
+          />
+          <button
+            type="submit"
+            disabled={text.trim().length === 0}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sonic-accent text-white transition-all hover:bg-sonic-accent/90 disabled:opacity-40"
+            aria-label={m.chat_send()}
+            title={m.chat_send_title()}
+          >
+            <Send className="h-4 w-4" />
+          </button>
+          <p id="chat-input-help" className="sr-only">
+            {m.chat_help()}
+          </p>
+        </form>
+      )}
     </aside>
   );
 }

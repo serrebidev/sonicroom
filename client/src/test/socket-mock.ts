@@ -29,6 +29,10 @@ export interface JoinResponse {
   isPublic?: boolean;
   kickVotes?: Array<{ targetId: string; votes: number }>;
   messages: unknown[];
+  // Moderated rooms (see lib/moderation.ts).
+  moderation?: Record<string, unknown> | null;
+  isAdmin?: boolean;
+  admins?: Array<{ peerId: string; displayName: string }>;
 }
 
 export class FakeSocket {

@@ -226,9 +226,26 @@ function createClientWindow(): void {
   clientWindow.setTitle(windowTitle(currentConfig));
 
   // Open target=_blank / external links in the system browser, not a child window.
+  // Our OWN bundled pages are the exception: the footer's screen-reader manual
+  // lives at app://…/manual/<lang>.html, and shell.openExternal can't open an
+  // app:// URL — denying it outright would leave the link doing nothing at all.
+  // Those get a plain child window (no preload, sandboxed: it's a static doc).
   clientWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       void shell.openExternal(url);
+      return { action: "deny" };
+    }
+    if (url.startsWith(`${APP_ORIGIN}/`)) {
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          width: 900,
+          height: 820,
+          backgroundColor: "#09090b",
+          autoHideMenuBar: true,
+          webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+        },
+      };
     }
     return { action: "deny" };
   });

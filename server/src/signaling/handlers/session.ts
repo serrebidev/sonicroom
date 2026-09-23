@@ -1,8 +1,11 @@
 import { z } from "zod";
-import { getOrCreateRoom, createPeer } from "../../room-manager.js";
+import { getOrCreateRoom, getRooms, createPeer } from "../../room-manager.js";
+import { verifyHostKey } from "../../reservations.js";
 import { decideMode } from "../../recording-util.js";
 import { notifyPublicRoomCreated, notifyPublicRoomJoin } from "../../notify.js";
+import { notesEnabled } from "../../notes.js";
 import { joinSchema, chatTextSchema } from "../schemas.js";
+import { allowed } from "../../moderation-util.js";
 import { clientIp } from "../room-helpers.js";
 import type { ConnectionContext } from "../context.js";
 
@@ -18,6 +21,7 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
     chatLimiter,
     kickLimiter,
     helpers,
+    reservations,
     session,
   } = ctx;
 
@@ -29,11 +33,29 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
         role,
         disableP2p,
         isPublic,
+        video,
         sharing,
         fileStreaming,
         extraMic,
         joinToken,
+        moderation,
+        hostKey,
       } = joinSchema.parse(data);
+
+      // RESERVED room name (reservations.ts): only its host — whoever presents
+      // the reservation's key — may OPEN it. Anyone else arriving while nobody
+      // is inside is refused with `reserved` (no room is created, so the name
+      // reads as "not live" until the host shows up; the client waits and
+      // retries by itself). Checked BEFORE getOrCreateRoom so a refused early
+      // visitor doesn't leave an empty, router-holding room behind.
+      const reservation = reservations.get(roomName);
+      const isHost = reservation != null && verifyHostKey(reservation, hostKey);
+      if (reservation && !isHost && !getRooms().has(roomName)) {
+        console.log(`[ws] ${socket.id} refused: ${roomName} is reserved and not open yet`);
+        cb({ ok: false, error: "reserved" });
+        return;
+      }
+
       const room = await getOrCreateRoom(roomName);
       const ip = clientIp(socket);
 
@@ -50,6 +72,9 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       // born) apart from "joined an already-public room", and so the knock
       // gate sees the room's public state as the visitor saw it in the lobby.
       const wasPublic = room.isPublic;
+      // Likewise for the room type, so we can tell peers already inside that
+      // this join just turned the room into a video call.
+      const wasVideo = room.isVideo;
 
       // Knock-to-join: a newcomer to an ALREADY-public, occupied room must be
       // let in by someone inside. Skipping the gate: casters (infra, e.g.
@@ -58,10 +83,18 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       // admitted to this room and not since denied (someone let in earlier who
       // left and came back under the same name). A PRIVATE room never gates —
       // `wasPublic` is false, so anyone with the link joins openly.
+      // A MODERATED room's door is ALWAYS knock-gated (public or not — that is
+      // what its approveJoins setting decides who answers); its admins skip it.
+      // The host of a reserved room (by key) is an admin on every join, exactly
+      // like an admin recognised by token; casters stay infrastructure.
+      const returningAdmin =
+        (joinToken != null && room.adminTokens.has(joinToken)) || (isHost && role !== "caster");
       const alreadyAdmitted =
         (joinToken != null && room.admittedTokens.has(joinToken)) ||
-        room.admittedNames.has(displayName);
-      if (wasPublic && room.peers.size > 0 && role !== "caster" && !alreadyAdmitted) {
+        room.admittedNames.has(displayName) ||
+        returningAdmin;
+      const gated = wasPublic || room.moderation != null;
+      if (gated && room.peers.size > 0 && role !== "caster" && !alreadyAdmitted) {
         room.pendingJoins.set(socket.id, { displayName, token: joinToken ?? "", ip });
         session.pendingRequest = room;
         console.log(`[ws] ${socket.id} knocking on ${roomName} as "${displayName}"`);
@@ -74,7 +107,7 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       }
 
       console.log(
-        `[ws] ${socket.id} joined ${roomName} as "${displayName}"${role ? ` (${role})` : ""}${disableP2p ? " (p2p disabled)" : ""}${isPublic ? " (public)" : ""}`,
+        `[ws] ${socket.id} joined ${roomName} as "${displayName}"${role ? ` (${role})` : ""}${disableP2p ? " (p2p disabled)" : ""}${isPublic ? " (public)" : ""}${video ? " (video)" : ""}${(reservation || moderation) && room.peers.size === 0 ? " (moderated)" : ""}${isHost ? " (host)" : ""}`,
       );
 
       // Admitted (open join, reconnect, or just-approved): remember the token
@@ -85,7 +118,24 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       session.pendingRequest = null;
 
       helpers.wireDucking(room);
-      const peer = createPeer(room, socket.id, displayName, ip);
+      // This join CREATES the room (nobody inside yet): if the joiner asked for
+      // a moderated room, fix its policy now and make them its admin. On an
+      // existing room the field is ignored — the policy never changes.
+      // A RESERVED room takes its policy from the reservation instead (and is
+      // flagged so it stays moderated with no admin inside); the joiner's
+      // lobby fieldset is ignored for it.
+      const creating = room.peers.size === 0;
+      if (creating && reservation) {
+        room.moderation = reservation.moderation;
+        room.reserved = true;
+      } else if (creating && moderation && role !== "caster") {
+        room.moderation = moderation;
+      }
+      const peer = createPeer(room, socket.id, displayName, ip, joinToken ?? "");
+      if (room.moderation && (creating || returningAdmin) && role !== "caster") {
+        room.admins.add(socket.id);
+        if (joinToken) room.adminTokens.add(joinToken);
+      }
 
       // Register a caster / P2P-disable BEFORE deciding the mode, so the join
       // response (and the new peer's own setup) already reflects the
@@ -94,6 +144,8 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       if (disableP2p) room.disableP2p = true;
       // Public listing is sticky for the room's lifetime, like disableP2p.
       if (isPublic) room.isPublic = true;
+      // Video room type is sticky too, and pins the SFU (see shouldForceSfu).
+      if (video) room.isVideo = true;
       // A peer reconnecting mid-share re-pins SFU before the mode is decided,
       // so the rejoin lands straight in SFU and its share producer rebuilds.
       if (sharing) room.sharers.add(socket.id);
@@ -113,6 +165,12 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
         displayName,
       });
 
+      // This join just made an existing audio room a video room (the flag is
+      // sticky, so it can only ever go audio → video). Tell everyone already
+      // inside so they load their video UI/media too — the joiner learns it from
+      // `isVideo` in its own join response.
+      if (room.isVideo && !wasVideo) socket.to(roomName).emit("room-video", {});
+
       // Ping the operator's off-box noty daemon on public-room activity
       // (target + on/off live in .env, hidden from users). Fire-and-forget:
       // either the room was just made public (born) or it already was.
@@ -130,8 +188,8 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
 
       // A newcomer who lands while others are still knocking sees them too,
       // so they can help admit/deny (the broadcast above only reached peers
-      // who were already in the room).
-      if (room.pendingJoins.size > 0) {
+      // who were already in the room) — if they're allowed to decide.
+      if (room.pendingJoins.size > 0 && helpers.canApproveJoins(room, socket.id)) {
         socket.emit("join-requests", {
           requests: Array.from(room.pendingJoins.entries()).map(([id, p]) => ({
             id,
@@ -141,9 +199,11 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
       }
 
       // Send existing peers to the new joiner. Each producer carries its
-      // `source` ("voice" | "music") so a late joiner can label/treat the
-      // music caster as a media source without waiting for a new-producer event,
-      // plus its `title` (device/file detail) so media tiles read in full at once.
+      // `source` ("voice" | "music" | … | "camera" | "screen") and `kind` so a
+      // late joiner can label/treat the music caster as a media source — or
+      // route a video producer to its video tile — without waiting for a
+      // new-producer event, plus its `title` (device/file detail) so media
+      // tiles read in full at once.
       const existingPeers = Array.from(room.peers.entries())
         .filter(([id]) => id !== socket.id)
         .map(([id, p]) => ({
@@ -152,6 +212,7 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
           muted: p.muted,
           producers: Array.from(p.producers.values()).map((prod) => ({
             producerId: prod.id,
+            kind: prod.kind,
             source: (prod.appData?.source as string) ?? "voice",
             title: (prod.appData?.title as string) || undefined,
           })),
@@ -170,6 +231,9 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
         // Whether this room is publicly listed — gates the vote-to-kick UI
         // (only public rooms can vote-kick; private rooms are link-gated).
         isPublic: room.isPublic,
+        // Room type. The client loads its video UI/media ONLY when this is
+        // true — an audio room never renders or captures any video.
+        isVideo: room.isVideo,
         // Current vote-to-kick tallies so a (re)joiner renders existing votes
         // (their own vote state always starts clear — votes are per session).
         kickVotes: Array.from(room.kickVotes.entries()).map(([targetId, voters]) => ({
@@ -189,7 +253,29 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
         duckingEnabled: room.duckingEnabled,
         // Recent chat so a late joiner can read/announce the last messages.
         messages: room.messages,
+        // Whether shared notes are configured for this instance (gates the
+        // "Notes" button / Alt+N) and this room's note URL if one exists yet.
+        notesEnabled: notesEnabled(),
+        notesUrl: helpers.canOpenNotes(room, socket.id) ? room.notesUrl : null,
+        // MODERATED room: its fixed policy (null for an ordinary room), whether
+        // WE are an admin, and who the admins are. The client gates its
+        // controls on these; the server enforces them regardless.
+        moderation: room.moderation,
+        isAdmin: room.admins.has(socket.id),
+        admins: helpers.adminList(room),
       });
+
+      // This join created a moderated room, or an admin came back: tell the
+      // others (a fresh room has nobody else to tell; harmless).
+      if (room.admins.has(socket.id) && room.peers.size > 1) {
+        helpers.emitAdminsChanged(room, {
+          peerId: socket.id,
+          displayName,
+          isAdmin: true,
+          reason: "named",
+          by: null,
+        });
+      }
 
       if (decision.action === "switch-to-sfu") {
         // A new peer pushed the room into SFU — switch everyone ELSE over.
@@ -235,6 +321,13 @@ export function registerSessionHandlers(ctx: ConnectionContext) {
     const parsed = z.object({ text: chatTextSchema }).safeParse(data);
     if (!parsed.success) {
       cb?.({ ok: false, error: parsed.error.issues[0]?.message ?? "Invalid message" });
+      return;
+    }
+    // Moderated room: chat may be admins-only or off entirely.
+    if (
+      !allowed(session.currentRoom.moderation, session.currentRoom.admins.has(socket.id), "chat")
+    ) {
+      cb?.({ ok: false, error: "forbidden" });
       return;
     }
     if (!chatLimiter.tryConsume(socket.id, Date.now())) {

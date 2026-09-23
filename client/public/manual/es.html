@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>SonicRoom — manual para usuarios de lector de pantalla</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --fg: #16181d;
+      --muted: #4a4f5a;
+      --accent: #1451b4;
+      --accent-fg: #ffffff;
+      --rule: #c9ced8;
+      --panel: #f1f3f7;
+      --code-bg: #eceff4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1116;
+        --fg: #eceff4;
+        --muted: #b3bac6;
+        --accent: #7ab5ff;
+        --accent-fg: #0f1116;
+        --rule: #3a4150;
+        --panel: #191d25;
+        --code-bg: #232833;
+      }
+    }
+
+    html {
+      font-size: 112.5%;
+      /* Painted on <html> as well as <body> so the gutters either side of the
+         centred column match the page rather than showing the UA canvas. */
+      background: var(--bg);
+      color: var(--fg);
+    }
+    body {
+      margin: 0 auto;
+      padding: 2rem 1.25rem 6rem;
+      max-width: 46rem;
+      background: var(--bg);
+      color: var(--fg);
+      font-family:
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+      line-height: 1.65;
+      overflow-wrap: break-word;
+    }
+
+    a {
+      color: var(--accent);
+    }
+    a:focus-visible,
+    :focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    header#title-block-header {
+      border-bottom: 2px solid var(--rule);
+      padding-bottom: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    h1.title {
+      font-size: 1.9rem;
+      line-height: 1.25;
+      margin: 0 0 0.35rem;
+    }
+    p.subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      font-weight: 400;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.25;
+      margin: 2.25rem 0 0.75rem;
+    }
+    h1 {
+      font-size: 1.6rem;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 0.35rem;
+    }
+    h2 {
+      font-size: 1.25rem;
+    }
+    h3 {
+      font-size: 1.08rem;
+    }
+
+    nav#TOC {
+      background: var(--panel);
+      border: 1px solid var(--rule);
+      border-radius: 0.6rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    nav#TOC h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+    }
+    nav#TOC ul {
+      padding-left: 1.2rem;
+      margin-bottom: 0;
+    }
+    nav#TOC li {
+      margin: 0.2rem 0;
+    }
+
+    .manual-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+      align-items: baseline;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 0.9rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .manual-nav strong {
+      font-weight: 600;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0 1.5rem;
+      font-size: 0.98rem;
+    }
+    caption {
+      text-align: left;
+      color: var(--muted);
+      padding-bottom: 0.35rem;
+    }
+    th,
+    td {
+      border: 1px solid var(--rule);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    thead th {
+      background: var(--panel);
+    }
+    tbody tr:nth-child(even) td {
+      background: color-mix(in srgb, var(--panel) 55%, transparent);
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.1em 0.35em;
+      border-radius: 0.25rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--rule);
+      border-radius: 0.5rem;
+      padding: 0.85rem 1rem;
+      overflow-x: auto;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0;
+      padding: 0.5rem 1rem;
+      border-left: 4px solid var(--accent);
+      background: var(--panel);
+      color: var(--fg);
+    }
+    blockquote p {
+      margin: 0.25rem 0;
+    }
+
+    hr {
+      border: 0;
+      border-top: 1px solid var(--rule);
+      margin: 2.5rem 0;
+    }
+
+    ol,
+    ul {
+      padding-left: 1.4rem;
+    }
+    li {
+      margin: 0.3rem 0;
+    }
+
+    @media print {
+      body {
+        max-width: none;
+      }
+      nav#TOC,
+      .manual-nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+<nav class="manual-nav" aria-label="Navegación del manual">
+  <a href="/">Volver a SonicRoom</a>
+  <span><strong>Otros idiomas:</strong>
+    <a href="./en.html" hreflang="en" lang="en">English</a>
+    <a href="./fr.html" hreflang="fr" lang="fr">Français</a>
+  </span>
+</nav>
+<header id="title-block-header">
+<h1 class="title">SonicRoom — manual para usuarios de lector de
+pantalla</h1>
+<p class="subtitle">Cómo configurar tu lector de pantalla, cómo funciona
+el teclado y todos los atajos</p>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Contenido</h2>
+<ul>
+<li><a href="#lee-esto-antes-que-nada"
+id="toc-lee-esto-antes-que-nada">Lee esto antes que nada</a></li>
+<li><a href="#configurar-tu-lector-de-pantalla"
+id="toc-configurar-tu-lector-de-pantalla">Configurar tu lector de
+pantalla</a>
+<ul>
+<li><a href="#nvda" id="toc-nvda">NVDA</a></li>
+<li><a href="#jaws" id="toc-jaws">JAWS</a></li>
+<li><a href="#narrador-windows" id="toc-narrador-windows">Narrador
+(Windows)</a></li>
+<li><a href="#voiceover-macos" id="toc-voiceover-macos">VoiceOver
+(macOS)</a></li>
+<li><a href="#orca-linux" id="toc-orca-linux">Orca (Linux)</a></li>
+<li><a href="#iphone-ipad-y-android"
+id="toc-iphone-ipad-y-android">iPhone, iPad y Android</a></li>
+<li><a href="#una-prueba-de-diez-segundos"
+id="toc-una-prueba-de-diez-segundos">Una prueba de diez
+segundos</a></li>
+</ul></li>
+<li><a href="#cómo-funciona-el-teclado-en-toda-la-aplicación"
+id="toc-cómo-funciona-el-teclado-en-toda-la-aplicación">Cómo funciona el
+teclado en toda la aplicación</a></li>
+<li><a href="#el-vestíbulo" id="toc-el-vestíbulo">El vestíbulo</a></li>
+<li><a href="#la-sala-parte-por-parte"
+id="toc-la-sala-parte-por-parte">La sala, parte por parte</a>
+<ul>
+<li><a href="#cabecera" id="toc-cabecera">Cabecera</a></li>
+<li><a href="#lista-de-participantes"
+id="toc-lista-de-participantes">Lista de participantes</a></li>
+<li><a href="#opciones-de-participante"
+id="toc-opciones-de-participante">Opciones de participante</a></li>
+<li><a href="#panel-de-chat" id="toc-panel-de-chat">Panel de
+chat</a></li>
+<li><a href="#la-barra-de-controles-de-audio"
+id="toc-la-barra-de-controles-de-audio">La barra de controles de
+audio</a></li>
+<li><a href="#pie-de-página" id="toc-pie-de-página">Pie de
+página</a></li>
+</ul></li>
+<li><a href="#todos-los-atajos-de-teclado"
+id="toc-todos-los-atajos-de-teclado">Todos los atajos de teclado</a>
+<ul>
+<li><a href="#letras-sueltas" id="toc-letras-sueltas">Letras
+sueltas</a></li>
+<li><a href="#con-alt" id="toc-con-alt">Con Alt</a></li>
+<li><a href="#navegación-y-cierre"
+id="toc-navegación-y-cierre">Navegación y cierre</a></li>
+</ul></li>
+<li><a href="#enterarte-de-lo-que-pasa"
+id="toc-enterarte-de-lo-que-pasa">Enterarte de lo que pasa</a></li>
+<li><a href="#hablar-y-escuchar" id="toc-hablar-y-escuchar">Hablar y
+escuchar</a></li>
+<li><a href="#meter-audio-en-la-sala"
+id="toc-meter-audio-en-la-sala">Meter audio en la sala</a>
+<ul>
+<li><a href="#audio-de-pantalla-o-pestaña-a"
+id="toc-audio-de-pantalla-o-pestaña-a">Audio de pantalla o pestaña
+(<code>A</code>)</a></li>
+<li><a href="#un-archivo-un-enlace-o-un-archivo-del-servidor-f"
+id="toc-un-archivo-un-enlace-o-un-archivo-del-servidor-f">Un archivo, un
+enlace o un archivo del servidor (<code>F</code>)</a></li>
+</ul></li>
+<li><a href="#grabar-y-retransmitir-en-directo"
+id="toc-grabar-y-retransmitir-en-directo">Grabar y retransmitir en
+directo</a></li>
+<li><a href="#videollamadas"
+id="toc-videollamadas">Videollamadas</a></li>
+<li><a href="#salas-públicas-llamar-a-la-puerta-y-votar"
+id="toc-salas-públicas-llamar-a-la-puerta-y-votar">Salas públicas,
+llamar a la puerta y votar</a></li>
+<li><a href="#salas-moderadas-con-administradores"
+id="toc-salas-moderadas-con-administradores">Salas moderadas (con
+administradores)</a>
+<ul>
+<li><a href="#salas-reservadas-una-sala-que-te-han-dado-de-antemano"
+id="toc-salas-reservadas-una-sala-que-te-han-dado-de-antemano">Salas
+reservadas (una sala que te han dado de antemano)</a></li>
+</ul></li>
+<li><a href="#notas-compartidas" id="toc-notas-compartidas">Notas
+compartidas</a></li>
+<li><a href="#opciones-que-puedes-poner-en-la-barra-de-direcciones"
+id="toc-opciones-que-puedes-poner-en-la-barra-de-direcciones">Opciones
+que puedes poner en la barra de direcciones</a></li>
+<li><a href="#cuando-algo-no-funciona"
+id="toc-cuando-algo-no-funciona">Cuando algo no funciona</a></li>
+<li><a href="#referencia-rápida-de-teclas"
+id="toc-referencia-rápida-de-teclas">Referencia rápida de
+teclas</a></li>
+</ul>
+</nav>
+<h1 id="lee-esto-antes-que-nada">Lee esto antes que nada</h1>
+<p><strong>SonicRoom es una aplicación, no una página web.</strong></p>
+<p>Esa sola frase explica casi todos los problemas con los que se topa
+la gente. SonicRoom se ejecuta en un navegador, pero nada dentro de ella
+se comporta como un artículo que se lee. No hay un documento por el que
+desplazarse. Hay barras de herramientas, listas y diálogos, y se manejan
+como se maneja un programa de escritorio: <strong>el tabulador se mueve
+entre las partes y las flechas se mueven dentro de cada
+parte</strong>.</p>
+<p>Los lectores de pantalla no saben esto por sí solos. Tal como vienen
+de fábrica, NVDA, JAWS, el Narrador y Orca ponen delante de ti una
+<em>copia virtual</em> de la página e interceptan tus teclas, de modo
+que la <code>H</code> salta a un encabezado y la <code>B</code> salta a
+un botón. Eso está muy bien en un periódico y muy mal aquí, porque en
+SonicRoom la <code>M</code> silencia tu micrófono, la <code>R</code>
+inicia una grabación y la <code>W</code> te dice quién ha estado
+hablando. Si tu lector de pantalla se traga esas teclas, nunca llegarán
+a la aplicación.</p>
+<p>Así que lo primero, antes de entrar en ninguna sala, es poner el
+lector de pantalla en el modo en que la aplicación recibe las
+pulsaciones. Cada lector lo llama de una manera. La sección siguiente
+explica cómo.</p>
+<p>Si solo recuerdas una cosa, que sea esta: <strong>cuando una letra
+suelta no hace nada, estás en el modo equivocado.</strong></p>
+<hr />
+<h1 id="configurar-tu-lector-de-pantalla">Configurar tu lector de
+pantalla</h1>
+<h2 id="nvda">NVDA</h2>
+<p>NVDA llama a los dos modos <strong>modo exploración</strong> y
+<strong>modo foco</strong>.</p>
+<ul>
+<li>El modo exploración es el modo de lectura. Las letras sueltas son
+órdenes de navegación y nunca llegan a la página.</li>
+<li>El modo foco pasa cada pulsación directamente a la aplicación. Este
+es el modo que SonicRoom necesita.</li>
+</ul>
+<p><strong>Se alterna con <code>NVDA</code> +
+<code>Espacio</code>.</strong> Oirás un sonido grave y corto al entrar
+en modo foco, y otro más agudo al volver al modo exploración. Algunas
+voces además dicen «modo foco» y «modo exploración» en voz alta.</p>
+<p>NVDA ya pasa solo a modo foco cuando aterrizas en un cuadro de
+edición o en un control parecido, así que a menudo estarás en modo foco
+sin pedirlo. Lo que <strong>no</strong> hará por sí solo es cambiar
+cuando estás sobre un botón normal — y ese es justamente el momento en
+que quieres pulsar <code>M</code> o <code>R</code>. Pulsa
+<code>NVDA</code> + <code>Espacio</code> y quédate en modo foco durante
+toda la llamada.</p>
+<p>Si quieres que NVDA sea más decidido, abre <strong>menú de NVDA →
+Preferencias → Opciones → Modo exploración</strong> (o pulsa
+<code>NVDA</code> + <code>Control</code> + <code>B</code>) y activa
+<em>Modo foco automático al cambiar el foco</em> y <em>Modo foco
+automático al mover el cursor</em>.</p>
+<h2 id="jaws">JAWS</h2>
+<p>JAWS llama a su modo de lectura <strong>cursor virtual</strong> (a
+veces «cursor virtual de PC») y a su modo de paso <strong>modo
+formularios</strong>.</p>
+<p><strong>Lo recomendable en SonicRoom es desactivar el cursor virtual
+del todo: pulsa <code>tecla JAWS</code> + <code>Z</code></strong> (la
+tecla JAWS es <code>Insert</code> de forma predeterminada, o
+<code>Bloq Mayús</code> en la distribución de portátil). JAWS dirá
+«cursor virtual de PC desactivado». A partir de ahí, todas las teclas
+que pulses van a SonicRoom.</p>
+<p>También <em>puedes</em> confiar en el modo formularios automático —
+JAWS entra en modo formularios al pulsar <code>Enter</code> sobre un
+control y sale con el <code>+</code> del teclado numérico. Funciona,
+pero aquí te complica la vida por dos motivos: las órdenes de una sola
+letra de SonicRoom no están asociadas a controles de formulario, así que
+el modo formularios automático no se activará para ellas; y SonicRoom
+usa <code>Escape</code> para cosas de verdad (cerrar el chat, cerrar un
+diálogo, detener un archivo que está sonando), tecla que el modo
+formularios puede interceptar.</p>
+<p>Desactivar el cursor virtual con <code>tecla JAWS</code> +
+<code>Z</code> evita los dos problemas. Vuelve a pulsarlo para recuperar
+el cursor virtual al salir de la llamada.</p>
+<h2 id="narrador-windows">Narrador (Windows)</h2>
+<p>El Narrador llama a su modo de lectura <strong>modo de
+exploración</strong> (<em>Scan Mode</em>). <strong>Desactívalo</strong>
+con <code>Bloq Mayús</code> + <code>Espacio</code>. El Narrador dirá
+«exploración desactivada». Con el modo de exploración desactivado, el
+tabulador y las flechas se comportan como describe este manual y las
+letras sueltas llegan a la aplicación.</p>
+<h2 id="voiceover-macos">VoiceOver (macOS)</h2>
+<p>La trampa equivalente en VoiceOver es la <strong>Navegación
+rápida</strong>. Con la navegación rápida activada, las flechas son
+órdenes de VoiceOver y nunca llegan a la página.</p>
+<p><strong>Desactívala pulsando a la vez las flechas izquierda y
+derecha.</strong> VoiceOver dirá «Navegación rápida desactivada».</p>
+<p>Después de eso:</p>
+<ul>
+<li><code>Tab</code> y <code>Mayús</code> + <code>Tab</code> se mueven
+entre las partes de la aplicación.</li>
+<li>Las flechas se mueven dentro de una barra de herramientas o de una
+lista, tal como se describe más abajo.</li>
+<li>Las letras sueltas (<code>M</code>, <code>A</code>, <code>R</code>,
+<code>W</code>…) llegan a SonicRoom siempre que el foco del teclado no
+esté dentro de un campo de texto.</li>
+</ul>
+<p><code>VO</code> en los atajos significa <code>Control</code> +
+<code>Opción</code>. Puede que necesites <code>VO</code> +
+<code>Mayús</code> + <code>Flecha abajo</code> para interactuar con el
+grupo de contenido web antes de que VoiceOver siga el foco dentro de la
+aplicación.</p>
+<h2 id="orca-linux">Orca (Linux)</h2>
+<p>Orca tiene <strong>modo navegación</strong> y <strong>modo
+foco</strong> en el contenido web, igual que NVDA. Orca cambia solo a
+modo foco en los controles de formulario; para cambiar a mano, pulsa
+<code>modificador de Orca</code> + <code>A</code> (el modificador de
+Orca es <code>Insert</code> en la distribución de escritorio y
+<code>Bloq Mayús</code> en la de portátil).</p>
+<h2 id="iphone-ipad-y-android">iPhone, iPad y Android</h2>
+<p>SonicRoom funciona con VoiceOver y TalkBack, y todos los botones,
+listas y diálogos están etiquetados. Los atajos de una sola letra
+necesitan un teclado físico, así que en una pantalla táctil usa los
+botones: todo lo que hace un atajo tiene un botón en la barra de
+herramientas o en la lista de participantes.</p>
+<p>Dos cosas se comportan distinto en iOS: Safari no puede mostrar el
+vídeo a pantalla completa (la aplicación lo dice en voz alta en lugar de
+dejar un botón muerto), y el motor de audio solo arranca después de que
+toques la pantalla una vez, algo de lo que SonicRoom se encarga en tu
+primer toque.</p>
+<h2 id="una-prueba-de-diez-segundos">Una prueba de diez segundos</h2>
+<p>Entra en una sala tú solo, asegúrate de que el foco
+<strong>no</strong> está en el cuadro de chat y pulsa <code>M</code>. Si
+oyes el sonido de silencio y «Micrófono silenciado», estás listo. Si tu
+lector de pantalla dice algo sobre un encabezado, una lista o «no hay
+siguiente elemento», sigues en el modo de lectura: vuelve atrás y
+cámbialo.</p>
+<hr />
+<h1 id="cómo-funciona-el-teclado-en-toda-la-aplicación">Cómo funciona el
+teclado en toda la aplicación</h1>
+<p>Tres reglas cubren la aplicación entera.</p>
+<p><strong>1. El tabulador se mueve entre partes. Las flechas se mueven
+dentro de una parte.</strong></p>
+<p>Una barra de herramientas de once botones es <strong>una
+sola</strong> parada del tabulador, no once. Una lista de veinte
+participantes es una sola parada. Esto es a propósito: significa que
+puedes recorrer toda la aplicación en cinco o seis pulsaciones de
+tabulador en lugar de cuarenta, y es como han funcionado siempre las
+aplicaciones de escritorio. También significa que pulsar el tabulador
+dentro de una barra de herramientas <strong>no</strong> te lleva al
+botón siguiente: eso lo hace la <code>Flecha derecha</code>.</p>
+<p><strong>2. Barras de herramientas: <code>Flecha izquierda</code> y
+<code>Flecha derecha</code>.</strong></p>
+<p>SonicRoom tiene dos barras de herramientas, ambas al final de la
+llamada: los controles de audio (siempre) y los controles de vídeo (solo
+en videollamadas). Dentro de cualquiera de las dos:</p>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 74%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Hace</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Flecha derecha</code></td>
+<td>Botón siguiente (vuelve al primero al llegar al final)</td>
+</tr>
+<tr class="even">
+<td><code>Flecha izquierda</code></td>
+<td>Botón anterior (vuelve al último al llegar al principio)</td>
+</tr>
+<tr class="odd">
+<td><code>Inicio</code></td>
+<td>Primer botón</td>
+</tr>
+<tr class="even">
+<td><code>Fin</code></td>
+<td>Último botón</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> o <code>Espacio</code></td>
+<td>Pulsar el botón en el que estás</td>
+</tr>
+<tr class="even">
+<td><code>Tab</code></td>
+<td>Salir de la barra de herramientas</td>
+</tr>
+</tbody>
+</table>
+<p><strong>3. Listas: <code>Flecha arriba</code> y
+<code>Flecha abajo</code>, y luego <code>Enter</code>.</strong></p>
+<p>La lista de participantes, el historial de chat, la lista de salas
+públicas del vestíbulo y el explorador de archivos del servidor son
+todas listas del mismo estilo:</p>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Hace</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Flecha abajo</code> / <code>Flecha arriba</code></td>
+<td>Elemento siguiente / anterior</td>
+</tr>
+<tr class="even">
+<td><code>Inicio</code> / <code>Fin</code></td>
+<td>Primer / último elemento</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> o <code>Espacio</code></td>
+<td>Abrir o activar el elemento</td>
+</tr>
+<tr class="even">
+<td><code>Escape</code> o <code>Retroceso</code></td>
+<td>Volver un nivel (en las opciones de participante y en el explorador
+de archivos)</td>
+</tr>
+</tbody>
+</table>
+<p>Tu lector de pantalla anuncia cada elemento a medida que llegas a él,
+junto con su estado: silenciado, hablando, compartiendo vídeo, etc.</p>
+<p><strong>Los deslizadores</strong> (tu nivel de micrófono, el volumen
+de otra persona) están dentro de la lista de opciones de participante.
+Sobre un deslizador, la <code>Flecha izquierda</code> y la
+<code>Flecha derecha</code> cambian el valor y dicen el porcentaje
+nuevo; <code>Inicio</code> y <code>Fin</code> saltan al mínimo y al
+máximo. Las flechas arriba y abajo conservan su función habitual de
+pasar a la opción siguiente.</p>
+<p><strong><code>Escape</code> cierra cosas.</strong> El panel de chat,
+los ajustes de audio, los ajustes de retransmisión, el selector de
+origen de audio, el cuadro de la clave de API, el reproductor de archivo
+y la pantalla completa de vídeo se cierran todos con
+<code>Escape</code>, y el foco vuelve al control desde el que los
+abriste. La única excepción es el diálogo de «alguien quiere entrar»,
+que hay que responder.</p>
+<hr />
+<h1 id="el-vestíbulo">El vestíbulo</h1>
+<p>El vestíbulo es la primera pantalla. Es un formulario corriente, así
+que puedes leerlo en modo exploración si lo prefieres, pero la lista de
+salas públicas necesita las flechas, con lo que el modo foco sigue
+siendo más cómodo.</p>
+<p>En orden, de arriba abajo:</p>
+<ol type="1">
+<li><strong>Idioma</strong> — un cuadro combinado. Cambiarlo reetiqueta
+todo al momento, en el vestíbulo y en una llamada, sin recargar
+nada.</li>
+<li><strong>Nombre de la sala</strong> — letras, números, guiones y
+guiones bajos, hasta 64 caracteres. Cualquier otra cosa se descarta
+mientras escribes. Si todavía no hay nadie en una sala con ese nombre,
+al escribirlo la creas.</li>
+<li><strong>Tipo de sala</strong> — dos botones de opción,
+<strong>Llamada de audio</strong> y <strong>Videollamada</strong>. El
+audio es siempre lo predeterminado. Se elige con las flechas. Esta
+decisión es permanente durante toda la vida de la sala, y decide si las
+cámaras existen siquiera.</li>
+<li><strong>Fondo de vídeo</strong> — solo aparece si has elegido
+<em>Videollamada</em>. Véase <a
+href="#videollamadas">Videollamadas</a>.</li>
+<li><strong>Nombre visible</strong> — el nombre que oirán todos cuando
+entres, hables o envíes un mensaje.</li>
+<li><strong>Salas públicas</strong> — una lista de las salas abiertas a
+cualquiera en este momento, con quién está en cada una. Solo aparece si
+hay al menos una. Llega con las flechas a una sala y pulsa
+<code>Enter</code> para que su nombre se rellene solo; el foco vuelve al
+nombre visible para que solo tengas que escribir tu nombre.</li>
+<li><strong>Nivel de micrófono</strong> — un botón
+<strong>Probar</strong>, un deslizador de <strong>nivel de
+micrófono</strong> y un medidor de nivel en vivo. Pulsa Probar y te
+oirás a ti mismo (usa auriculares); tu lector de pantalla te avisará
+cuando el nivel pase entre <em>silencio</em>, <em>bajo</em>,
+<em>bueno</em> y <em>alto</em>. Sube el deslizador hasta que diga bueno.
+Ese nivel se lleva a la llamada. Merece la pena hacerlo una vez:
+muchísimos micrófonos de portátil suenan demasiado bajos de
+fábrica.</li>
+<li><strong>Desactivar P2P</strong> — una casilla. Con dos personas,
+SonicRoom os conecta normalmente de forma directa. Marca esto para pasar
+siempre por el servidor. Casi nadie lo necesita.</li>
+<li><strong>Hacer pública esta sala</strong> — una casilla. Aparece en
+la lista pública y activa las reglas de llamar a la puerta y de votación
+para expulsar que se describen más abajo. En cuanto alguien hace pública
+una sala, sigue siéndolo hasta que se vaya todo el mundo; desmarcarlo
+después no lo deshace.</li>
+<li><strong>Entrar sin micrófono</strong> — una casilla. Escuchas y usas
+el chat de texto, y el navegador nunca pide permiso para el micrófono.
+Si no tienes micrófono, o rechazas el permiso, acabas en este modo de
+todas formas.</li>
+<li><strong>Entrar en la sala</strong> — el botón de envío. También vale
+pulsar <code>Enter</code> desde cualquiera de los campos de texto.</li>
+</ol>
+<hr />
+<h1 id="la-sala-parte-por-parte">La sala, parte por parte</h1>
+<h2 id="cabecera">Cabecera</h2>
+<p>Dice el nombre de la sala y el nombre de esta instancia de SonicRoom,
+después las etiquetas que correspondan — <strong>VÍDEO</strong> en una
+videollamada, <strong>REC</strong> mientras se graba la llamada,
+<strong>LIVE</strong> mientras se retransmite hacia fuera —, después el
+número de personas presentes, después el botón de <strong>chat</strong>
+(que además lleva en su nombre el número de mensajes sin leer) y por
+último el cuadro combinado de idioma.</p>
+<h2 id="lista-de-participantes">Lista de participantes</h2>
+<p>El corazón de la aplicación. Es <strong>una</strong> lista que
+contiene <strong>primero a ti y después a los demás</strong>, y luego
+una fila por cada cosa adicional que se envía a la sala: un emisor de
+música, el audio de una pantalla compartida, un archivo que alguien está
+emitiendo, un micrófono adicional.</p>
+<p>Cada fila se lee como el nombre de la persona seguido de lo que sea
+cierto en ese momento, por ejemplo:</p>
+<blockquote>
+<p>Ana (tú), silenciado, compartiendo vídeo, pulsa Enter para abrir las
+opciones de este participante</p>
+</blockquote>
+<p>Los fragmentos que puedes oír son: <em>tú</em>, <em>solo texto</em>
+(entró sin micrófono), <em>silenciado</em>, <em>hablando</em>,
+<em>compartiendo vídeo</em>, <em>compartiendo pantalla</em>,
+<em>fijado</em>, <em>silenciado por ti</em>, y un recuento de votos
+cuando hay una votación en marcha para expulsar a esa persona.</p>
+<p>Pulsa <code>Enter</code> sobre una fila para abrir las opciones de
+esa persona. Eso sustituye la lista por una segunda lista, y
+<code>Escape</code> o <code>Retroceso</code> te devuelve.</p>
+<h2 id="opciones-de-participante">Opciones de participante</h2>
+<p>Lo que encuentras aquí depende de la fila que hayas abierto.</p>
+<p><strong>En tu propia fila:</strong></p>
+<ul>
+<li><strong>Tu nivel de micrófono</strong> — un deslizador.
+<code>Izquierda</code>/<code>Derecha</code> para cambiar,
+<code>Inicio</code>/<code>Fin</code> para el mínimo y el máximo. Es una
+ganancia que se aplica antes de que tu voz salga de tu equipo, así que
+cambia lo que oye todo el mundo.</li>
+<li><strong>Describir mi vídeo</strong> y <strong>Fijar mi
+vídeo</strong> — solo en videollamadas.</li>
+</ul>
+<p><strong>En la fila de otra persona:</strong></p>
+<ul>
+<li><strong>Volumen de <em>nombre</em></strong> — un deslizador. Solo
+cambia lo que oyes <em>tú</em>.</li>
+<li><strong>Silenciar a <em>nombre</em> para mí</strong> / <strong>Dejar
+de silenciar a <em>nombre</em> para mí</strong> — la calla solo para ti.
+A esa persona no se le dice nada. La etiqueta cambia para decir qué hará
+la próxima pulsación.</li>
+<li><strong>Fijar el vídeo de <em>nombre</em></strong> / <strong>Fijar
+la pantalla de <em>nombre</em></strong> — solo en videollamadas, y es
+puramente un cambio en tu propia pantalla; a la persona que fijas nunca
+se le dice.</li>
+<li><strong>Describir el vídeo de <em>nombre</em></strong> /
+<strong>Describir la pantalla de <em>nombre</em></strong> — solo en
+videollamadas. Véase <a href="#videollamadas">Videollamadas</a>.</li>
+<li><strong>Expulsar a <em>nombre</em></strong> — solo en salas públicas
+con tres o más personas. Véase <a
+href="#salas-públicas-llamar-a-la-puerta-y-votar">Salas públicas, llamar
+a la puerta y votar</a>.</li>
+<li><strong>Expulsar emisor</strong> — quita una fuente que está
+emitiendo música.</li>
+<li><strong>Detener esta transmisión</strong> — detiene un archivo
+compartido, el audio de una pantalla compartida o un micrófono
+adicional.</li>
+</ul>
+<h2 id="panel-de-chat">Panel de chat</h2>
+<p>Se abre con el botón de chat de la cabecera. El panel está dispuesto
+con <strong>el historial primero y el cuadro de mensaje
+después</strong>, a propósito, para que aterrices en lo que se ha dicho
+y no en un campo de edición vacío.</p>
+<ul>
+<li>La lista de mensajes es una lista:
+<code>Arriba</code>/<code>Abajo</code>,
+<code>Inicio</code>/<code>Fin</code>.</li>
+<li><code>Control</code> + <code>C</code> (o <code>Cmd</code> +
+<code>C</code>) sobre un mensaje lo copia.</li>
+<li>En el cuadro de mensaje, <code>Enter</code> envía y
+<code>Mayús</code> + <code>Enter</code> hace un salto de línea.</li>
+<li><strong>Anunciar mensajes nuevos</strong> es un cuadro combinado en
+la cabecera del panel con cuatro opciones: <em>Cortés</em> (se dice
+cuando tu lector de pantalla haga la siguiente pausa), <em>Asertivo</em>
+(interrumpe), <em>En voz alta</em> (la voz del propio navegador, para
+quien no usa lector de pantalla) y <em>Desactivado</em>.</li>
+<li><code>Escape</code> cierra el panel y devuelve el foco al botón de
+chat.</li>
+</ul>
+<p>No hace falta que dejes el panel abierto. Todo lo que ocurre en la
+sala se escribe también en el historial de chat además de decirse en voz
+alta, y <code>Alt</code> más un número lo relee desde donde estés —
+véase <a href="#enterarte-de-lo-que-pasa">Enterarte de lo que
+pasa</a>.</p>
+<h2 id="la-barra-de-controles-de-audio">La barra de controles de
+audio</h2>
+<p>Al final de la ventana. Una sola parada del tabulador;
+<code>Izquierda</code>/<code>Derecha</code> para recorrerla. En
+orden:</p>
+<table>
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 6%" />
+<col style="width: 78%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Botón</th>
+<th>Atajo</th>
+<th>Qué hace</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Silenciar micrófono</td>
+<td><code>M</code></td>
+<td>Te silencia y te vuelve a activar. Desactivado, pero legible, si
+entraste sin micrófono.</td>
+</tr>
+<tr class="even">
+<td>Compartir audio</td>
+<td><code>A</code></td>
+<td>Comparte el sonido de una pantalla o de una pestaña. El navegador
+pregunta cuál, y hay que marcar su casilla de compartir audio.</td>
+</tr>
+<tr class="odd">
+<td>Emitir audio</td>
+<td><code>F</code></td>
+<td>Abre el selector de origen: un archivo de tu ordenador, un enlace o
+un archivo guardado en el servidor.</td>
+</tr>
+<tr class="even">
+<td>Atenuado automático</td>
+<td><code>D</code></td>
+<td>Activa o desactiva la bajada automática de la música cuando alguien
+habla, <strong>para toda la sala</strong>.</td>
+</tr>
+<tr class="odd">
+<td>Grabar llamada</td>
+<td><code>R</code></td>
+<td>Inicia y detiene una grabación de todos en el servidor.</td>
+</tr>
+<tr class="even">
+<td>Descargar</td>
+<td>—</td>
+<td>Aparece cuando existe una grabación. Descarga toda la llamada
+mezclada.</td>
+</tr>
+<tr class="odd">
+<td>Pistas</td>
+<td>—</td>
+<td>Aparece cuando existe una grabación. Descarga un zip con un archivo
+por persona, alineados y rellenados a la misma duración.</td>
+</tr>
+<tr class="even">
+<td>Retransmisión en directo</td>
+<td>—</td>
+<td>Abre el panel donde escribes los datos de un servidor Icecast y
+empiezas a retransmitir la llamada hacia fuera.</td>
+</tr>
+<tr class="odd">
+<td>Quién habla</td>
+<td><code>W</code></td>
+<td>Dice quién habla ahora o ha hablado hace poco, numerados.</td>
+</tr>
+<tr class="even">
+<td>Notas compartidas</td>
+<td><code>Alt</code> + <code>N</code></td>
+<td>Abre el bloc de notas compartido de esta sala en una pestaña nueva.
+Solo está si esta instancia tiene la función configurada.</td>
+</tr>
+<tr class="odd">
+<td>Ajustes de audio</td>
+<td>—</td>
+<td>Selectores de micrófono y altavoces, procesamiento de voz, voz de
+alta fidelidad, micrófonos adicionales.</td>
+</tr>
+<tr class="even">
+<td>Salir</td>
+<td>—</td>
+<td>Sale de la llamada y vuelve al vestíbulo.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="pie-de-página">Pie de página</h2>
+<p>Un enlace al proyecto SonicRoom y el enlace a este manual.</p>
+<hr />
+<h1 id="todos-los-atajos-de-teclado">Todos los atajos de teclado</h1>
+<p>Funcionan en cualquier punto de la llamada <strong>siempre que el
+foco del teclado no esté dentro de un cuadro de texto</strong> y tu
+lector de pantalla esté dejando pasar las teclas. Dejan de funcionar
+mientras hay abierto un diálogo de «alguien quiere entrar», porque ese
+diálogo hay que responderlo primero.</p>
+<h2 id="letras-sueltas">Letras sueltas</h2>
+<table>
+<colgroup>
+<col style="width: 7%" />
+<col style="width: 92%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>M</code></td>
+<td>Silenciar / activar tu micrófono</td>
+</tr>
+<tr class="even">
+<td><code>A</code></td>
+<td>Empezar / dejar de compartir el audio de una pantalla o pestaña</td>
+</tr>
+<tr class="odd">
+<td><code>F</code></td>
+<td>Abrir el selector de «Emitir audio»</td>
+</tr>
+<tr class="even">
+<td><code>D</code></td>
+<td>Atenuado automático activado / desactivado para toda la sala</td>
+</tr>
+<tr class="odd">
+<td><code>R</code></td>
+<td>Iniciar / detener la grabación</td>
+</tr>
+<tr class="even">
+<td><code>W</code></td>
+<td>Quién habla: anuncia a quienes han hablado hace poco, numerados</td>
+</tr>
+<tr class="odd">
+<td><code>V</code></td>
+<td>Cámara activada / desactivada — <strong>solo en
+videollamadas</strong></td>
+</tr>
+<tr class="even">
+<td><code>E</code></td>
+<td>Vídeo a pantalla completa — <strong>solo en
+videollamadas</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>V</code> y <code>E</code> no hacen nada en una llamada de
+audio, así que esas letras quedan libres allí.</p>
+<h2 id="con-alt">Con Alt</h2>
+<table>
+<colgroup>
+<col style="width: 32%" />
+<col style="width: 67%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Alt</code> + <code>1</code> … <code>Alt</code> +
+<code>9</code></td>
+<td>Lee los últimos mensajes en voz alta. <code>1</code> es el más
+reciente, <code>2</code> el anterior, y así.</td>
+</tr>
+<tr class="even">
+<td><code>Alt</code> + <code>0</code></td>
+<td>Lee el décimo mensaje más reciente.</td>
+</tr>
+<tr class="odd">
+<td>El mismo <code>Alt</code> + número dos veces seguidas</td>
+<td>Copia ese mensaje al portapapeles.</td>
+</tr>
+<tr class="even">
+<td><code>Alt</code> + <code>N</code></td>
+<td>Abre las notas compartidas de la sala en una pestaña nueva.</td>
+</tr>
+<tr class="odd">
+<td><code>Ctrl</code> + <code>Mayús</code> + <code>M</code></td>
+<td>Silencia los micrófonos de todos: <strong>solo en salas
+moderadas</strong>, y solo si tienes permiso.</td>
+</tr>
+</tbody>
+</table>
+<p>La relectura con <code>Alt</code> + número es el único conjunto de
+atajos que <strong>también funciona mientras escribes en el cuadro de
+chat</strong>, y funciona esté el panel abierto o cerrado. Lee las
+teclas numéricas físicas, así que le da igual que uses AZERTY, Dvorak o
+cualquier otra distribución.</p>
+<h2 id="navegación-y-cierre">Navegación y cierre</h2>
+<table>
+<colgroup>
+<col style="width: 28%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Tab</code> / <code>Mayús</code> + <code>Tab</code></td>
+<td>Entre las partes de la aplicación</td>
+</tr>
+<tr class="even">
+<td><code>Izquierda</code> / <code>Derecha</code></td>
+<td>Recorrer una barra de herramientas; cambiar un deslizador</td>
+</tr>
+<tr class="odd">
+<td><code>Arriba</code> / <code>Abajo</code></td>
+<td>Recorrer una lista</td>
+</tr>
+<tr class="even">
+<td><code>Inicio</code> / <code>Fin</code></td>
+<td>Primero / último; mínimo / máximo</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> / <code>Espacio</code></td>
+<td>Activar lo que tienes delante</td>
+</tr>
+<tr class="even">
+<td><code>Escape</code></td>
+<td>Cerrar el panel, el diálogo o la pantalla completa</td>
+</tr>
+<tr class="odd">
+<td><code>Retroceso</code></td>
+<td>Salir de las opciones; subir una carpeta</td>
+</tr>
+<tr class="even">
+<td><code>Enter</code></td>
+<td>Enviar un mensaje de chat</td>
+</tr>
+<tr class="odd">
+<td><code>Mayús</code> + <code>Enter</code></td>
+<td>Salto de línea en un mensaje</td>
+</tr>
+<tr class="even">
+<td><code>Control</code> / <code>Cmd</code> + <code>C</code></td>
+<td>Copiar el mensaje en el que estás</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h1 id="enterarte-de-lo-que-pasa">Enterarte de lo que pasa</h1>
+<p>SonicRoom está construido en torno a una regla: <strong>todo lo que
+se le dice a la sala se puede volver a leer después.</strong></p>
+<p>Cada suceso de la sala — alguien ha entrado, alguien se ha
+silenciado, ha empezado una grabación, ha empezado a sonar un archivo,
+han expulsado a alguien — se dice por una región activa <em>y
+además</em> se escribe en el historial del chat como mensaje del
+sistema. Nada se anuncia una vez y se pierde. Si tu lector de pantalla
+estaba ocupado, o estabas escribiendo, o simplemente se te escapó, pulsa
+<code>Alt</code> + <code>1</code> y recorre el historial hacia
+atrás.</p>
+<p>Tres cosas se dicen pero a propósito <em>no</em> se escriben en el
+chat, porque afectan a tu vista y no a la sala: tus cambios de volumen
+locales, silenciar a alguien solo para ti, y fijar un vídeo. Nadie más
+se ve afectado, así que no pintan nada en una línea de tiempo
+compartida.</p>
+<p><strong>Señales sonoras.</strong> Suenan avisos cortos al silenciar y
+activar el micrófono, al entrar o salir alguien, al llegar un mensaje de
+chat, al empezar o terminar una compartición, cuando alguien llama a la
+puerta y cuando una cámara se enciende o se apaga. Son locales — la sala
+no los oye nunca — y están diseñados para distinguirse del habla.</p>
+<p><strong>«Quién habla» (<code>W</code>).</strong> Las voces van y
+vienen y un lector de pantalla no puede seguirlas. Pulsa <code>W</code>
+y SonicRoom nombra a quienes hablan ahora o han hablado hace poco,
+numerados: «1. Ana, 2. Luis, 3. Marta», del más reciente al más antiguo.
+Los mismos números aparecen un momento en sus fichas, así que quien esté
+a tu lado ve la misma lista.</p>
+<hr />
+<h1 id="hablar-y-escuchar">Hablar y escuchar</h1>
+<p><strong>Silénciate</strong> con <code>M</code>, o con el primer botón
+de la barra. El silencio afecta solo a tu voz. Si además estás emitiendo
+un archivo, compartiendo el audio de una pantalla o usando micrófonos
+adicionales, todo eso sigue sonando: se detiene deteniéndolo, no
+silenciándote.</p>
+<p><strong>Tu propio nivel</strong> es el deslizador de tu fila en la
+lista de participantes, y también el del vestíbulo. Súbelo si te dicen
+que se te oye poco.</p>
+<p><strong>El nivel de otra persona</strong> es el deslizador de
+<em>su</em> fila en la lista de participantes. Ese solo cambia lo que
+oyes tú.</p>
+<p><strong>El atenuado automático (<code>D</code>)</strong> hace que la
+música baje sola cuando alguien habla y vuelva a subir cuando calla.
+Viene activado y es un ajuste de toda la sala, así que desactivarlo lo
+desactiva para todos. Se anuncia en ambos sentidos.</p>
+<p><strong>Ajustes de audio</strong> (el engranaje de la barra)
+contiene:</p>
+<ul>
+<li><strong>Micrófono</strong> y <strong>Altavoces</strong> — cuadros
+combinados de dispositivo. Los cambios se aplican al momento, en mitad
+de la llamada, y se recuerdan. Los nombres de los dispositivos solo
+aparecen cuando has concedido permiso para el micrófono.</li>
+<li><strong>Procesamiento de voz</strong> — cancelación de eco,
+supresión de ruido y nivelado automático. Activado de forma
+predeterminada. Desactívalo si estás enviando música o tocando un
+instrumento, porque te va a estorbar.</li>
+<li><strong>Voz de alta fidelidad (estéreo)</strong> — envía estéreo a
+más bitrate. Desactivado de forma predeterminada, porque la mayoría de
+los micrófonos son mono y le cuesta ancho de banda a todos los demás. Se
+aplica a tu <strong>siguiente</strong> llamada, no a la que estás.</li>
+<li><strong>Micrófonos adicionales para emitir</strong> — una lista de
+casillas, una por cada dispositivo de entrada que tengas aparte del
+micrófono principal, cada una con un par de botones de opción
+<strong>Mono</strong> / <strong>Estéreo</strong>. Marca uno y se envía a
+la sala como una transmisión propia, junto a tu voz, apareciendo como
+una fila propia en la lista de participantes de todo el mundo. Así es
+como se manda una mesa de mezclas, un instrumento o un cable de audio
+virtual. Silenciarte no los silencia; para pararlos, desmárcalos.</li>
+</ul>
+<hr />
+<h1 id="meter-audio-en-la-sala">Meter audio en la sala</h1>
+<h2 id="audio-de-pantalla-o-pestaña-a">Audio de pantalla o pestaña
+(<code>A</code>)</h2>
+<p>Pulsa <code>A</code> y el navegador abre su propio selector — un
+diálogo del sistema, no de SonicRoom, así que tu lector de pantalla lo
+trata como una ventana aparte. Elige una pantalla, ventana o pestaña
+<strong>y marca la casilla que comparte su audio</strong>; sin esa
+casilla la compartición va muda. Chrome y Edge son los que mejor lo
+hacen; el soporte de Firefox para compartir el audio del sistema es
+limitado o inexistente según la plataforma.</p>
+<p>El audio compartido se salta el procesamiento y el limitador de tu
+micrófono, para que la música conserve su dinámica. En una llamada de
+audio la imagen se descarta y solo se envía el sonido. <code>A</code>
+otra vez lo detiene.</p>
+<h2 id="un-archivo-un-enlace-o-un-archivo-del-servidor-f">Un archivo, un
+enlace o un archivo del servidor (<code>F</code>)</h2>
+<p><code>F</code> abre el diálogo <strong>Emitir audio</strong>, que
+ofrece tres orígenes:</p>
+<ul>
+<li><strong>Elegir del ordenador</strong> — un selector de
+archivos.</li>
+<li><strong>URL de audio</strong> — un cuadro de edición. Pega cualquier
+enlace público: un MP3 directo, una radio por internet o una página de
+un sitio de vídeo o de música, de la que el servidor extrae el audio por
+ti.</li>
+<li><strong>Archivos del servidor</strong> — un árbol de carpetas de
+audio guardado en el servidor, que puedes explorar. Recórrelo con las
+flechas, <code>Enter</code> en una carpeta para entrar,
+<code>Enter</code> en un archivo para reproducirlo,
+<code>Retroceso</code> para subir una carpeta. Los nombres largos se
+recortan visualmente pero se leen enteros.</li>
+</ul>
+<p>En cuanto algo suena aparece una ventanita de <strong>Emisión de
+archivo</strong> y el foco cae en su botón de reproducir/pausar, así que
+<code>Espacio</code> pausa al instante. También tiene un deslizador de
+<strong>tu volumen</strong>, que solo cambia tu propia escucha — la sala
+oye siempre el archivo a nivel completo — y un botón de parar.
+<code>Escape</code> en cualquier punto de esa ventana detiene la emisión
+y la cierra.</p>
+<p>Pulsar <code>F</code> otra vez mientras algo suena vuelve a abrir el
+selector y te deja cambiar de origen sin reiniciar la emisión.</p>
+<hr />
+<h1 id="grabar-y-retransmitir-en-directo">Grabar y retransmitir en
+directo</h1>
+<p><strong>La grabación (<code>R</code>)</strong> se hace en el
+servidor, así que captura a todo el mundo a plena calidad
+independientemente de lo que haga tu equipo. Empezar y parar se anuncia
+a toda la sala y aparece una etiqueta <strong>REC</strong> en la
+cabecera: a nadie se le graba sin decírselo.</p>
+<p>En cuanto existe una grabación aparecen dos botones más en la
+barra:</p>
+<ul>
+<li><strong>Descargar</strong> — toda la llamada mezclada en un archivo.
+Puedes pulsarlo con la grabación todavía en marcha: descarga todo lo
+grabado hasta ese momento y la grabación continúa.</li>
+<li><strong>Pistas</strong> — un zip con un archivo por persona, cada
+uno rellenado y alineado en el tiempo para que cuadren al soltarlos en
+un editor de audio.</li>
+</ul>
+<p>En una videollamada, la descarga de la llamada entera es un archivo
+de vídeo con las cámaras y las pantallas de todos en una cuadrícula; en
+una llamada de audio es un archivo de audio, como siempre.</p>
+<p><strong>La retransmisión en directo</strong> (el botón de radio de la
+barra) envía toda la llamada mezclada a un servidor Icecast que indiques
+tú. El panel pide servidor, puerto, punto de montaje, usuario,
+contraseña, formato y bitrate, y los recuerda en este navegador. Esos
+datos no se le enseñan nunca al resto de la sala: lo único que reciben
+es una etiqueta <strong>LIVE</strong> y el aviso de que ha empezado la
+retransmisión, y de quién.</p>
+<hr />
+<h1 id="videollamadas">Videollamadas</h1>
+<p>Una sala es una videollamada solo si se creó como tal — el botón de
+opción <strong>Videollamada</strong> del vestíbulo, que después ya no se
+puede deshacer. En una llamada de audio nada de esto existe: ni cámara,
+ni <code>V</code>, ni <code>E</code>, y compartir tu pantalla sigue
+enviando solo su sonido.</p>
+<p><strong>Todo el mundo entra con la cámara apagada</strong>, siempre.
+Nada enciende tu cámara salvo tú.</p>
+<ul>
+<li><strong><code>V</code></strong> enciende y apaga tu cámara. Se le
+dice a todo el mundo, en voz alta y en el historial del chat.</li>
+<li><strong><code>E</code></strong> hace que el área de vídeo ocupe la
+pantalla; <code>E</code> otra vez o <code>Escape</code> sale. Se anuncia
+en los dos sentidos. En Safari de iOS, que no tiene pantalla completa
+para elementos de la página, SonicRoom lo dice en lugar de no hacer
+nada.</li>
+<li><strong>Fijar</strong> hace que una cámara o una pantalla ocupe el
+área de vídeo solo para ti. Está en las opciones de cada participante
+(«Fijar el vídeo de <em>nombre</em>»), no se comunica a nadie, y a la
+persona que fijas no se le dice. Si apaga su cámara, la fijación se
+mantiene y espera: se te avisa de que está esperando, y se te avisa otra
+vez cuando la imagen vuelve.</li>
+</ul>
+<p><strong>La guía para centrar la cara</strong> es el botón que hay
+junto al de la cámara, activado de forma predeterminada. Mientras tu
+cámara está encendida, SonicRoom observa tu propia imagen y dice
+correcciones cortas — «muévete a tu derecha», «muévete hacia arriba»,
+«estás centrado», «tu cara no se ve en el encuadre» — en una región
+activa asertiva, para que interrumpan en lugar de hacer cola. Las
+direcciones se dan desde tu punto de vista, no desde el de la imagen.
+Repite la misma indicación cada tres segundos mientras siga siendo
+válida, dice «centrado» una vez cuando lo consigues, y se calla.
+Desactívala con el mismo botón cuando hayas terminado de colocarte.</p>
+<p><strong>«Describir el vídeo de <em>nombre</em>»</strong> está en las
+opciones de cada participante, incluida la tuya. Toma un solo fotograma
+y le pide a Claude que lo describa en unas frases, leyendo el texto que
+se vea, en el idioma en que tengas la interfaz. La descripción se
+registra en el chat como todo lo demás, así que <code>Alt</code> +
+<code>1</code> la vuelve a leer.</p>
+<p>Para esto hace falta <strong>tu propia clave de API de
+Claude</strong>, que se introduce con el botón de la llave de la barra
+de vídeo. Se guarda solo en este navegador y la petición va de tu
+navegador directamente a Claude: nunca pasa por el servidor de
+SonicRoom.</p>
+<p><strong>Los fondos de vídeo</strong> se eligen en el
+<strong>vestíbulo</strong>, bajo el botón de opción
+<em>Videollamada</em>, y nunca dentro de la llamada — así la imagen
+queda decidida antes de enviar nada. Las opciones son sin fondo,
+desenfoque, una de seis imágenes incluidas, o una imagen tuya. Todo se
+hace dentro de tu navegador, así que la sala solo recibe la imagen ya
+compuesta y nunca tu entorno real. Si tu navegador no puede hacerlo,
+SonicRoom lo dice en voz alta y envía tu cámara tal cual en lugar de
+fallar en silencio.</p>
+<hr />
+<h1 id="salas-públicas-llamar-a-la-puerta-y-votar">Salas públicas,
+llamar a la puerta y votar</h1>
+<p><strong>En las salas normales de SonicRoom no hay moderadores ni
+dueños.</strong> Nadie puede expulsar a nadie por su cuenta. A cambio,
+las salas públicas tienen dos reglas colectivas. (Las <strong>salas
+moderadas</strong>, con administradores, son otra cosa: véase el
+capítulo siguiente.)</p>
+<p><strong>Llamar a la puerta.</strong> Cuando una sala es pública y
+alguien nuevo pide entrar, todos los que ya están dentro oyen unos
+golpes y reciben un diálogo con el nombre de esa persona y los botones
+<strong>Permitir</strong> y <strong>Rechazar</strong> (y
+<strong>Permitir a todos</strong> / <strong>Rechazar a todos</strong>
+cuando hay varios esperando). El foco va directo al primer botón
+Permitir, y el tabulador da vueltas dentro del diálogo. No se puede
+cerrar con <code>Escape</code>: es el único diálogo que hay que
+responder. Puede responderlo cualquiera; vale la primera respuesta.
+Rechazar a alguien también le impide volver a esa sala.</p>
+<p>Mientras tanto, quien llama oye «Esperando a que alguien de la sala
+te deje entrar…» y tiene un botón de cancelar.</p>
+<p><strong>Votar para expulsar.</strong> Solo en salas públicas, y solo
+con <strong>tres o más personas</strong> presentes. Por debajo de tres
+la opción ni se ofrece, así que nunca puede usarla una persona contra
+otra. El umbral es <em>al menos la mitad</em>, contando a la persona
+afectada: 2 votos de 3, 2 de 4, 3 de 5.</p>
+<p>La opción está en la lista de opciones de cada participante. Su
+nombre lleva el recuento en marcha — «Expulsar a Ana (2 votos)» — y cada
+voto y cada retirada se anuncia a toda la sala, con nombres. Elegirla
+otra vez retira tu voto. Como el umbral depende de cuánta gente hay, que
+alguien se vaya puede ser justo lo que haga que una votación ya iniciada
+llegue al límite.</p>
+<hr />
+<h1 id="salas-moderadas-con-administradores">Salas moderadas (con
+administradores)</h1>
+<p>Además de las salas privadas y públicas, que no tienen moderadores,
+puedes crear una <strong>sala moderada</strong>: una sala con
+<strong>administradores</strong>, pensada para tertulias y programas con
+presentador, donde alguien tiene que poder silenciar a quien se ha
+olvidado de mutearse o expulsar a un trol al instante. Todo lo que sigue
+solo existe en este tipo de sala; una sala normal no cambia en nada.</p>
+<p><strong>Crearla.</strong> En el vestíbulo, marca la casilla
+<strong>«Opciones de administrador»</strong>. Se despliega un grupo
+llamado <strong>«Privilegios de participantes»</strong> con una casilla
+(«Permitir varios administradores») y una lista desplegable por cada
+acción: grabar, compartir audio, emitir audio, activar o desactivar el
+atenuado automático, retransmitir en directo, aprobar la entrada de
+nuevos participantes, usar el chat, abrir las notas compartidas,
+silenciar a un participante para todos, silenciar los micrófonos de
+todos y expulsar. En cada una eliges <strong>Solo
+administradores</strong>, <strong>Todos</strong> o
+<strong>Nadie</strong> (expulsar añade <strong>con votación</strong>).
+La última casilla oculta el enlace «Con tecnología de SonicRoom» dentro
+de la sala. Estas opciones se fijan al crear la sala y no cambian
+mientras exista; el navegador recuerda tu última configuración para la
+próxima vez.</p>
+<p><strong>Quién es administrador.</strong> Quien crea la sala. Si has
+permitido varios administradores, en las opciones de cualquier
+participante encontrarás <strong>«Nombrar administrador»</strong> (y
+<strong>«Quitar administrador»</strong> para deshacerlo). Los
+administradores llevan la palabra «administrador» en su fila de la
+lista. Si te recargas o pierdes la conexión, recuperas el cargo al
+volver.</p>
+<p><strong>Si se van todos los administradores</strong> y queda gente
+dentro, la sala <strong>deja de estar moderada</strong>: se anuncia a
+todo el mundo («El último administrador se ha ido: esta sala ya no está
+moderada»), a todos les vuelven todos los botones, el chat se reabre y
+la sala sigue como una sala privada o pública normal el resto de su
+vida. No se nombra a nadie en su lugar, y un antiguo administrador que
+vuelva entra como participante normal. Si quieres que la sala sobreviva
+a tu ausencia con sus reglas intactas, nombra a un segundo administrador
+antes de irte.</p>
+<p><strong>La puerta.</strong> En una sala moderada
+<strong>siempre</strong> se llama a la puerta, sea pública o no. La
+opción «Aprobar la entrada de nuevos participantes» decide quién oye los
+golpes y recibe el diálogo de Permitir / Rechazar: solo los
+administradores, o todos. Los administradores entran sin llamar.</p>
+<p><strong>Silenciar a alguien para todos.</strong> En las opciones del
+participante: <strong>«Silenciar para todos»</strong>. Su micrófono se
+corta para toda la sala y se le anuncia quién lo ha hecho. Es un
+silencio <em>suave</em>: la persona puede volver a activar su micrófono
+con <code>M</code> cuando vaya a hablar (así se resuelve el clásico «se
+te oye hablar con la vecina» sin pedir la palabra). En la barra de
+controles, quien tenga permiso ve además <strong>«Silenciar los
+micrófonos de todos»</strong>, que hace lo mismo con todos los demás de
+golpe. Su atajo es <code>Ctrl</code> + <code>Mayús</code> +
+<code>M</code>: una combinación de tres teclas a propósito, para que no
+se pulse por error al lado de la <code>M</code>. Solo existe en una sala
+moderada; en las demás esa combinación se la queda el navegador.</p>
+<p><strong>Expulsar.</strong> Según la opción elegida: los
+administradores (o todos) expulsan directamente desde las opciones del
+participante con <strong>«Expulsar de la sala»</strong>, sin votación; o
+bien se vota como en una sala pública (con <strong>al menos
+tres</strong> votantes con derecho a voto; si solo votan los
+administradores, cuentan solo ellos). Nadie puede expulsarse a sí mismo.
+A un administrador solo puede silenciarlo o expulsarlo otro
+administrador.</p>
+<p><strong>Lo que no te dejan hacer, no aparece.</strong> Si tu papel no
+permite grabar, compartir o emitir audio, cambiar el atenuado,
+retransmitir o escribir en el chat, ese botón no está en la barra y la
+letra correspondiente (<code>R</code>, <code>A</code>, <code>F</code>,
+<code>D</code>) responde «No puedes hacer eso en esta sala». El panel de
+chat sigue abriéndose aunque no puedas escribir, porque ahí siguen
+quedando todos los avisos.</p>
+<p>La sala lleva la insignia <strong>MOD</strong> en la cabecera, y al
+entrar se anuncia que es moderada y quiénes son los administradores.
+Todos los cambios (nombramientos, silencios, expulsiones) se anuncian y
+quedan en el chat.</p>
+<h2 id="salas-reservadas-una-sala-que-te-han-dado-de-antemano">Salas
+reservadas (una sala que te han dado de antemano)</h2>
+<p>Normalmente una sala solo existe mientras hay alguien dentro, y la
+crea quien llega primero. Eso es un problema cuando anuncias un enlace
+con antelación: cualquiera podría abrir «tu» sala antes que tú y
+convertirse en su administrador, o la sala moderada podría desaparecer
+sin más en cuanto se vacíe. Una <strong>sala reservada</strong> lo
+resuelve. El operador de la instancia reserva un nombre de sala para ti
+y te da <strong>dos enlaces</strong>:</p>
+<ul>
+<li>el <strong>enlace de anfitrión</strong>, que contiene una clave
+secreta. Guárdalo para ti; quien abre la sala con él es su
+<strong>administrador</strong>, siempre, incluso después de salir y
+volver;</li>
+<li>el <strong>enlace público</strong>, la dirección normal de la sala,
+que es el que anuncias.</li>
+</ul>
+<p>Hasta que abras la sala con el enlace de anfitrión, quien siga el
+enlace público oye «Esta sala está reservada y su anfitrión aún no la ha
+abierto» y espera en esa pantalla; entra automáticamente en cuanto
+llegas (y entonces llama a la puerta como cualquiera que entra en una
+sala moderada, así que tú decides quién pasa). Una sala reservada es
+siempre una sala moderada, con los privilegios de participante que el
+operador fijó al reservarla, y <strong>sigue siendo moderada</strong>
+mientras no estás: nadie puede quedársela, y vuelves como su
+administrador.</p>
+<p>Tu navegador recuerda la clave en esa pestaña, así que puedes
+recargar la página o pasar por el vestíbulo para poner tu nombre sin
+perderla, y se quita de la barra de direcciones al momento para que un
+enlace copiado nunca la lleve. Si pierdes el enlace de anfitrión, pide
+al operador uno nuevo (el antiguo deja de funcionar).</p>
+<hr />
+<h1 id="notas-compartidas">Notas compartidas</h1>
+<p>Si esta instancia de SonicRoom tiene las notas configuradas, la barra
+tiene un botón de <strong>Notas compartidas</strong> y <code>Alt</code>
++ <code>N</code> hace lo mismo. Abre un único bloc de notas colaborativo
+para la sala <strong>en una pestaña nueva del navegador</strong> — nunca
+en un marco dentro de la llamada, así que tu lector de pantalla se
+encuentra con un documento editable normal y corriente.</p>
+<p>La primera pulsación crea la nota; la de todos los demás abre la
+misma, y el hecho de que exista se anuncia y se registra en el chat con
+el enlace. Vuelve a la pestaña de SonicRoom y la llamada sigue en
+marcha.</p>
+<hr />
+<h1 id="opciones-que-puedes-poner-en-la-barra-de-direcciones">Opciones
+que puedes poner en la barra de direcciones</h1>
+<p>Todo lo que va después de <code>?</code> en un enlace de sala fija
+una opción, y se pueden combinar varias con <code>&amp;</code>.</p>
+<table>
+<colgroup>
+<col style="width: 15%" />
+<col style="width: 84%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Opción</th>
+<th>Efecto</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>?displayName=Ana</code></td>
+<td>Entra con este nombre, saltándose el vestíbulo</td>
+</tr>
+<tr class="even">
+<td><code>?video=on</code></td>
+<td>La convierte en videollamada</td>
+</tr>
+<tr class="odd">
+<td><code>?public=true</code></td>
+<td>Hace pública la sala</td>
+</tr>
+<tr class="even">
+<td><code>?mic=off</code></td>
+<td>Entra sin micrófono: solo escuchar y chat</td>
+</tr>
+<tr class="odd">
+<td><code>?p2p=off</code></td>
+<td>Pasa siempre por el servidor, incluso con dos personas</td>
+</tr>
+<tr class="even">
+<td><code>?lang=es</code></td>
+<td>Fuerza el idioma de la interfaz (<code>en</code>, <code>es</code>,
+<code>fr</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>?ios=on</code></td>
+<td>Fuerza la ruta de audio de iOS en cualquier navegador (un apaño para
+problemas de audio tercos)</td>
+</tr>
+<tr class="even">
+<td><code>?host=…</code></td>
+<td>Abre una sala reservada como su anfitrión (ver «Salas reservadas»);
+se quita de la barra al momento</td>
+</tr>
+</tbody>
+</table>
+<p>Por ejemplo, un enlace que mete a alguien directamente en una
+videollamada en francés como «Ana»:</p>
+<pre><code>https://tu-instancia.example/room/estudio?video=on&amp;lang=fr&amp;displayName=Ana</code></pre>
+<hr />
+<h1 id="cuando-algo-no-funciona">Cuando algo no funciona</h1>
+<p><strong>Una letra suelta no escribe nada y no hace nada.</strong> Tu
+lector de pantalla está en modo de lectura y se come la tecla.
+<code>NVDA</code> + <code>Espacio</code>, <code>tecla JAWS</code> +
+<code>Z</code>, <code>Bloq Mayús</code> + <code>Espacio</code> para el
+Narrador, o desactiva la navegación rápida en VoiceOver. Este es con
+diferencia el problema más frecuente.</p>
+<p><strong>La letra aparece escrita en el cuadro de chat.</strong> El
+foco está en el cuadro de mensaje. Es a propósito: tienes que poder
+escribir la letra M en un mensaje. Pulsa <code>Escape</code> para cerrar
+el chat, o sal del cuadro con el tabulador, y vuelve a intentarlo.
+<code>Alt</code> + número es el único atajo que sigue funcionando desde
+dentro del cuadro.</p>
+<p><strong>El tabulador no me lleva al botón siguiente de la
+barra.</strong> No es su función. La barra entera es una sola parada;
+usa la <code>Flecha derecha</code>. El tabulador sale de la barra.</p>
+<p><strong><code>Alt</code> + un número dice «No hay mensaje
+1».</strong> Todavía no se ha dicho nada en la sala. Los sucesos de sala
+cuentan como mensajes, así que la primera entrada de alguien ya lo
+llena.</p>
+<p><strong>No oigo a nadie.</strong> Comprueba el cuadro combinado de
+<strong>Altavoces</strong> en los ajustes de audio: los navegadores no
+siempre siguen el dispositivo predeterminado del sistema. Comprueba
+después que no has silenciado a esa persona para ti: su fila diría
+«silenciado por ti».</p>
+<p><strong>Me dicen que se me oye muy bajo.</strong> Sube <strong>tu
+nivel de micrófono</strong> en tu propia fila de la lista de
+participantes, o usa el botón Probar del vestíbulo, que va diciendo la
+banda de nivel mientras ajustas.</p>
+<p><strong>Mi micrófono adicional no ha arrancado.</strong> SonicRoom
+pide exactamente ese dispositivo en lugar de aceptar un sustituto, así
+que si lo está usando otro programa o está desconectado, falla en vez de
+enviar dos veces tu micrófono principal sin avisar. Cierra lo que esté
+ocupando el dispositivo y vuelve a marcarlo.</p>
+<p><strong>Comparto una pantalla y no va sonido.</strong> No se marcó la
+casilla de audio en el diálogo de compartir del propio navegador. Ese
+diálogo es del navegador, no de SonicRoom. Prueba con Chrome o Edge si
+el tuyo ni siquiera ofrece la opción.</p>
+<p><strong>«Describir vídeo» dice que añada una clave de API.</strong>
+Esa función usa tu propia clave de API de Claude, que se introduce con
+el botón de la llave de la barra de vídeo. Se guarda solo en este
+navegador.</p>
+<hr />
+<h1 id="referencia-rápida-de-teclas">Referencia rápida de teclas</h1>
+<table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 59%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Tecla</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>M</code></td>
+<td>Silenciar / activar micrófono</td>
+</tr>
+<tr class="even">
+<td><code>A</code></td>
+<td>Compartir / dejar de compartir el audio de pantalla o pestaña</td>
+</tr>
+<tr class="odd">
+<td><code>F</code></td>
+<td>Emitir audio: abre el selector de origen</td>
+</tr>
+<tr class="even">
+<td><code>D</code></td>
+<td>Atenuado automático (toda la sala)</td>
+</tr>
+<tr class="odd">
+<td><code>R</code></td>
+<td>Iniciar / detener grabación</td>
+</tr>
+<tr class="even">
+<td><code>W</code></td>
+<td>Quién habla</td>
+</tr>
+<tr class="odd">
+<td><code>V</code></td>
+<td>Cámara (videollamadas)</td>
+</tr>
+<tr class="even">
+<td><code>E</code></td>
+<td>Vídeo a pantalla completa (videollamadas)</td>
+</tr>
+<tr class="odd">
+<td><code>Alt</code> + <code>1</code>…<code>9</code>,
+<code>0</code></td>
+<td>Leer los diez últimos mensajes, del más nuevo al más viejo</td>
+</tr>
+<tr class="even">
+<td>El mismo <code>Alt</code> + número dos veces</td>
+<td>Copiar ese mensaje</td>
+</tr>
+<tr class="odd">
+<td><code>Alt</code> + <code>N</code></td>
+<td>Notas compartidas en una pestaña nueva</td>
+</tr>
+<tr class="even">
+<td><code>Ctrl</code> + <code>Mayús</code> + <code>M</code></td>
+<td>Silenciar a todos (salas moderadas)</td>
+</tr>
+<tr class="odd">
+<td><code>Tab</code> / <code>Mayús</code> + <code>Tab</code></td>
+<td>Entre las partes de la aplicación</td>
+</tr>
+<tr class="even">
+<td><code>Izquierda</code> / <code>Derecha</code></td>
+<td>Recorrer una barra; cambiar un deslizador</td>
+</tr>
+<tr class="odd">
+<td><code>Arriba</code> / <code>Abajo</code></td>
+<td>Recorrer una lista</td>
+</tr>
+<tr class="even">
+<td><code>Inicio</code> / <code>Fin</code></td>
+<td>Primero / último; mínimo / máximo</td>
+</tr>
+<tr class="odd">
+<td><code>Enter</code> / <code>Espacio</code></td>
+<td>Activar</td>
+</tr>
+<tr class="even">
+<td><code>Escape</code></td>
+<td>Cerrar panel, diálogo o pantalla completa</td>
+</tr>
+<tr class="odd">
+<td><code>Retroceso</code></td>
+<td>Salir de las opciones; subir una carpeta</td>
+</tr>
+<tr class="even">
+<td><code>Enter</code> en el cuadro de mensaje</td>
+<td>Enviar</td>
+</tr>
+<tr class="odd">
+<td><code>Mayús</code> + <code>Enter</code> en el cuadro de mensaje</td>
+<td>Salto de línea</td>
+</tr>
+<tr class="even">
+<td><code>Control</code> / <code>Cmd</code> + <code>C</code> sobre un
+mensaje</td>
+<td>Copiarlo</td>
+</tr>
+<tr class="odd">
+<td><code>NVDA</code> + <code>Espacio</code></td>
+<td>NVDA: modo exploración ↔︎ modo foco</td>
+</tr>
+<tr class="even">
+<td><code>tecla JAWS</code> + <code>Z</code></td>
+<td>JAWS: cursor virtual desactivado / activado</td>
+</tr>
+<tr class="odd">
+<td><code>Bloq Mayús</code> + <code>Espacio</code></td>
+<td>Narrador: modo de exploración desactivado / activado</td>
+</tr>
+<tr class="even">
+<td><code>Izquierda</code> + <code>Derecha</code> a la vez</td>
+<td>VoiceOver: navegación rápida desactivada / activada</td>
+</tr>
+<tr class="odd">
+<td><code>modificador de Orca</code> + <code>A</code></td>
+<td>Orca: modo navegación ↔︎ modo foco</td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>

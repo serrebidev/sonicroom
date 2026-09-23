@@ -8,6 +8,7 @@ import type {
 } from "mediasoup/types";
 import { routerOptions, transportOptions } from "./mediasoup-config.js";
 import type { ChatMessage } from "./chat-util.js";
+import type { ModerationPolicy } from "./moderation-util.js";
 
 export interface Peer {
   id: string;
@@ -15,6 +16,9 @@ export interface Peer {
   // Best-effort client IP (see clientIp in signaling). Kept so a vote-to-kick
   // can room-ban it on removal, the same soft ban a knock-deny applies.
   ip: string;
+  // The per-session join token this peer joined with ("" if none). Lets a
+  // moderated room re-recognise an admin after a reconnect (adminTokens).
+  token: string;
   // Mirrors the client's mute toggle (set via producer-pause/-resume, which
   // fire in P2P mode too) so late joiners can render existing peers' state.
   muted: boolean;
@@ -35,6 +39,15 @@ export interface Room {
   // Pins the room to the SFU even with <=2 peers; sticky for the room's
   // lifetime once any joiner sets it (see decideMode's forceSfu).
   disableP2p: boolean;
+  // Room TYPE: a VIDEO call (the lobby's "Video call" room type / `?video=on`).
+  // SonicRoom is audio-first, so this is off by default and sticky for the
+  // room's lifetime once any joiner sets it. A video room is pinned to the SFU
+  // (video never rides the P2P mesh — camera/screen tracks are separate
+  // "camera"/"screen" producers, like share/file), and the produce handler
+  // REJECTS any video producer unless this flag is set, so an audio room can
+  // never carry video. Clients read it from the join response and only then
+  // load their video UI.
+  isVideo: boolean;
   // Whether this room is publicly listed in the lobby (via the "Make this room
   // public" toggle / `?public=true` URL param). Private by default; sticky for
   // the room's lifetime once any joiner sets it. Listed by getPublicRooms.
@@ -94,11 +107,36 @@ export interface Room {
   // the set of peerids who've voted to remove them. When a target's set reaches
   // kickThreshold(votable peers) it's removed. A target's entry is cleared on
   // kick; a voter's votes are dropped when they leave (see cleanupKickVotes).
-  // Only ever populated for public rooms.
+  // Only ever populated for public rooms — or for a MODERATED room whose kick
+  // policy is a vote (among admins, or among everyone).
   kickVotes: Map<string, Set<string>>;
+  // MODERATED room ("sala moderada"): the privilege policy this room was
+  // created with, or null for an ordinary private/public room (the default —
+  // every admin capability is gated on this being non-null, so an unmoderated
+  // room behaves exactly as before). Fixed at creation, for the room's lifetime.
+  // A moderated room is pinned to the SFU so the server can pause a muted
+  // producer itself. See moderation-util.ts.
+  moderation: ModerationPolicy | null;
+  // Peer ids of the current admins (the creator and co-admins they named).
+  // Empty for unmoderated rooms — and once the last admin leaves, the room
+  // stops being moderated altogether (endModerationIfNoAdmins).
+  admins: Set<string>;
+  // Join tokens of admins, so an admin who reconnects (new socket id) comes back
+  // as an admin. Revoking removes the token again; ending moderation clears all.
+  adminTokens: Set<string>;
+  // RESERVED room: opened from a reservation (reservations.ts) by its host.
+  // The policy came from the reservation, and the room STAYS moderated after
+  // the last admin leaves (endModerationIfNoAdmins skips it) — the host can
+  // come back as admin with the key at any time.
+  reserved: boolean;
   // Rolling chat history (bounded to CHAT_HISTORY_MAX) so late joiners receive
   // recent messages on join. Newest last.
   messages: ChatMessage[];
+  // Shared collaborative note for this room (a NoteLab edit-link URL), or null
+  // until someone first opens the "Notes" button / Alt+N. Created once and then
+  // reused by everyone for the room's lifetime; lives and dies with the room.
+  // See notes.ts. Always null when the feature is unconfigured (no NOTELAB_URL).
+  notesUrl: string | null;
 }
 
 const rooms = new Map<string, Room>();
@@ -137,6 +175,7 @@ export async function getOrCreateRoom(roomName: string): Promise<Room> {
     peers: new Map(),
     mode: "p2p",
     disableP2p: false,
+    isVideo: false,
     isPublic: false,
     pendingJoins: new Map(),
     admittedTokens: new Set(),
@@ -151,17 +190,29 @@ export async function getOrCreateRoom(roomName: string): Promise<Room> {
     observerWired: false,
     duckingEnabled: true,
     kickVotes: new Map(),
+    moderation: null,
+    admins: new Set(),
+    adminTokens: new Set(),
+    reserved: false,
     messages: [],
+    notesUrl: null,
   };
   rooms.set(roomName, room);
   return room;
 }
 
-export function createPeer(room: Room, peerId: string, displayName: string, ip: string): Peer {
+export function createPeer(
+  room: Room,
+  peerId: string,
+  displayName: string,
+  ip: string,
+  token = "",
+): Peer {
   const peer: Peer = {
     id: peerId,
     displayName,
     ip,
+    token,
     muted: false,
     sendTransport: null,
     recvTransport: null,
@@ -210,17 +261,57 @@ export function getRooms() {
   return rooms;
 }
 
+// Occupancy of ONE room by name, or null if no such room is live. Rooms only
+// exist while they hold at least one peer (removePeer destroys an empty one),
+// so "the room exists" is the same statement as "someone is in it" — there is
+// no such thing as a live-but-empty room to report a count of 0 for.
+// `participants` counts every peer, `casters` the send-only music sources among
+// them, so `participants - casters` is the number of humans. Names are
+// deliberately NOT included: for a public room they're already in
+// getPublicRooms, and for a private one the count is all this should reveal.
+export function getRoomInfo(roomName: string): {
+  name: string;
+  participants: number;
+  casters: number;
+  isPublic: boolean;
+  isVideo: boolean;
+  isModerated: boolean;
+  mode: RoomMode;
+} | null {
+  const room = rooms.get(roomName);
+  if (!room) return null;
+  return {
+    name: room.name,
+    participants: room.peers.size,
+    casters: room.casters.size,
+    isPublic: room.isPublic,
+    isVideo: room.isVideo,
+    isModerated: room.moderation != null,
+    mode: room.mode,
+  };
+}
+
 // Snapshot of the currently-live PUBLIC rooms for the lobby list: each room's
 // name plus the display names of everyone currently in it. Private rooms are
 // omitted entirely. Rooms only exist while they hold at least one peer, so
-// `participants` is never empty.
-export function getPublicRooms(): { name: string; participants: string[] }[] {
-  const out: { name: string; participants: string[] }[] = [];
+// `participants` is never empty. `isVideo` lets the lobby flag video rooms so a
+// visitor knows a camera may be expected before they walk in; `isModerated`
+// likewise flags a room with admins (whose door is always knock-gated).
+export function getPublicRooms(): {
+  name: string;
+  participants: string[];
+  isVideo: boolean;
+  isModerated: boolean;
+}[] {
+  const out: { name: string; participants: string[]; isVideo: boolean; isModerated: boolean }[] =
+    [];
   for (const room of rooms.values()) {
     if (!room.isPublic) continue;
     out.push({
       name: room.name,
       participants: Array.from(room.peers.values()).map((p) => p.displayName),
+      isVideo: room.isVideo,
+      isModerated: room.moderation != null,
     });
   }
   return out;

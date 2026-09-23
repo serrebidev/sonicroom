@@ -1,12 +1,17 @@
 import { z } from "zod";
 import { CHAT_TEXT_MAX } from "../chat-util.js";
+import { moderationPolicySchema } from "../moderation-util.js";
 
 // --- Validation schemas ---
+// Room names are CASE-INSENSITIVE: the canonical form is lowercase, applied
+// here so every entry point (join, /api/rooms/:name) keys the room map the
+// same way — /room/Foo and /room/foo are one room.
 export const roomNameSchema = z
   .string()
   .min(1)
   .max(64)
-  .regex(/^[a-zA-Z0-9_-]+$/, "Room name must be alphanumeric, hyphens, or underscores");
+  .regex(/^[a-zA-Z0-9_-]+$/, "Room name must be alphanumeric, hyphens, or underscores")
+  .transform((s) => s.toLowerCase());
 
 export const displayNameSchema = z
   .string()
@@ -60,6 +65,10 @@ export const joinSchema = z.object({
   // List this room publicly in the lobby (the "Make this room public" toggle /
   // `?public=true` URL param). Off by default; sticky once any joiner sets it.
   isPublic: z.boolean().optional(),
+  // Room TYPE: make this a VIDEO call (the lobby's "Video call" room type /
+  // `?video=on` URL param). Audio-first: off by default, and sticky once any
+  // joiner sets it — the whole room is then a video room (pinned to the SFU).
+  video: z.boolean().optional(),
   // Set on a reconnect if this peer was sharing audio when it dropped, so the
   // server re-pins SFU for the rejoin (the share producer is rebuilt right
   // after, in setupSfu). On a first join it's always false.
@@ -74,4 +83,13 @@ export const joinSchema = z.object({
   // Identifies an already-admitted session so a reconnect/refresh skips the
   // knock gate, and is what an approval records as "admitted".
   joinToken: z.string().min(1).max(128).optional(),
+  // Create this room as a MODERATED room with this privilege policy (the
+  // lobby's "Admin options"). Honoured ONLY when this join CREATES the room —
+  // the creator becomes its admin; on an existing room it is ignored (the
+  // policy is fixed for the room's lifetime). See moderation-util.ts.
+  moderation: moderationPolicySchema.optional(),
+  // Host key of a RESERVED room (from the host link's `?host=`, kept in
+  // sessionStorage). Required to OPEN a reserved room; on any join it makes
+  // the peer an admin and skips the knock gate. See reservations.ts.
+  hostKey: z.string().min(1).max(128).optional(),
 });

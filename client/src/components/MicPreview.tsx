@@ -241,11 +241,14 @@ export function MicPreview() {
           type="range"
           min="0"
           max={MAX_MIC_GAIN}
-          step="0.01"
+          // One step is one VoiceOver swipe on iOS (WebKit steps by `step`), so a
+          // finer step makes each swipe inaudible and the slider seem stuck.
+          step="0.1"
           value={micGain}
           onChange={(e) => setMicGain(parseFloat(e.target.value))}
           className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-sonic-600 accent-sonic-accent"
           aria-label={m.mic_slider_label()}
+          aria-valuetext={m.mic_gain_valuetext({ value: micGain.toFixed(1) })}
           aria-describedby="mic-help"
         />
       </div>

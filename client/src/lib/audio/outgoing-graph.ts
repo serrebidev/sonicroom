@@ -16,24 +16,40 @@ import { resumeContext, GAIN_RAMP } from "./shared-context";
 const MIC_LIMITER = { threshold: -3, knee: 0, ratio: 20, attack: 0.003, release: 0.25 };
 
 // "Loudness boost": the level lift of voice processing's auto gain, without its
-// echo cancel / noise suppression. A 4:1 compressor from -36 dB; Web Audio adds
-// automatic makeup gain from the curve (~+16 dB here), so quiet speech comes up
-// while loud peaks are held down, and the limiter after it still stops clipping.
-// ponytail: fixed curve tuned by ear; lower threshold = louder (and noisier).
-export const LOUDNESS_BOOST = { threshold: -36, knee: 12, ratio: 4, attack: 0.005, release: 0.25 };
+// echo cancel / noise suppression. A fixed +18 dB pre-gain into a 6:1
+// compressor from -30 dB (Web Audio adds ~+15 dB makeup) acts as a leveller:
+// speech from -50 to -22 dBFS RMS comes out at about -21 to -15 dBFS, peaks
+// near -5, so the limiter after it rarely has to act. Measured offline in
+// Chrome. Room noise is lifted too (no noise suppression, by design).
+// ponytail: fixed curve; raise preGain or lower threshold for louder.
+export const LOUDNESS_BOOST = {
+  preGain: 8,
+  threshold: -30,
+  knee: 10,
+  ratio: 6,
+  attack: 0.005,
+  release: 0.25,
+};
 
-export function createLoudnessBoost(ctx: BaseAudioContext): DynamicsCompressorNode {
-  const boost = ctx.createDynamicsCompressor();
-  boost.threshold.value = LOUDNESS_BOOST.threshold;
-  boost.knee.value = LOUDNESS_BOOST.knee;
-  boost.ratio.value = LOUDNESS_BOOST.ratio;
-  boost.attack.value = LOUDNESS_BOOST.attack;
-  boost.release.value = LOUDNESS_BOOST.release;
-  return boost;
+// The boost sub-graph: input (pre-gain) → compressor. Connect `output` onward.
+export function createLoudnessBoost(ctx: BaseAudioContext): {
+  input: GainNode;
+  output: DynamicsCompressorNode;
+} {
+  const input = ctx.createGain();
+  input.gain.value = LOUDNESS_BOOST.preGain;
+  const output = ctx.createDynamicsCompressor();
+  output.threshold.value = LOUDNESS_BOOST.threshold;
+  output.knee.value = LOUDNESS_BOOST.knee;
+  output.ratio.value = LOUDNESS_BOOST.ratio;
+  output.attack.value = LOUDNESS_BOOST.attack;
+  output.release.value = LOUDNESS_BOOST.release;
+  input.connect(output);
+  return { input, output };
 }
 
-// Route `gain` into the limiter either directly or through `boost` (which is
-// always connected to the limiter), so boost-off costs nothing.
+// Route `gain` into the limiter either directly or through the boost (whose
+// output is always connected to the limiter), so boost-off costs nothing.
 export function routeLoudnessBoost(
   gain: AudioNode,
   boost: AudioNode,
@@ -66,7 +82,7 @@ export class OutgoingAudioGraph {
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micGain: GainNode | null = null;
   private limiter: DynamicsCompressorNode | null = null;
-  private loudnessBoost: DynamicsCompressorNode | null = null;
+  private loudnessBoost: GainNode | null = null;
   private outDest: MediaStreamAudioDestinationNode | null = null;
   private micStream: MediaStream | null = null;
   // Share sub-graph (displaySource → shareDest) + its capture + producer.
@@ -113,12 +129,12 @@ export class OutgoingAudioGraph {
     limiter.release.value = MIC_LIMITER.release;
     const outDest = this.ctx.createMediaStreamDestination();
     const loudnessBoost = createLoudnessBoost(this.ctx);
-    loudnessBoost.connect(limiter);
-    routeLoudnessBoost(micGain, loudnessBoost, limiter, this.store.getState().loudnessBoostEnabled);
+    loudnessBoost.output.connect(limiter);
+    routeLoudnessBoost(micGain, loudnessBoost.input, limiter, this.store.getState().loudnessBoostEnabled);
     limiter.connect(outDest);
     this.micGain = micGain;
     this.limiter = limiter;
-    this.loudnessBoost = loudnessBoost;
+    this.loudnessBoost = loudnessBoost.input;
     this.outDest = outDest;
   }
 

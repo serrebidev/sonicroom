@@ -67,9 +67,7 @@ export function MicPreview() {
   const ctxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   // Preview mirrors the room graph: gain → (loudness boost) → limiter.
-  const boostRef = useRef<{ boost: DynamicsCompressorNode; limiter: DynamicsCompressorNode } | null>(
-    null,
-  );
+  const boostRef = useRef<{ boost: GainNode; limiter: DynamicsCompressorNode } | null>(null);
   const rafRef = useRef<number | null>(null);
   const meterRef = useRef<HTMLDivElement | null>(null);
   // role="meter" element (precise value, read on demand) + the polite live
@@ -155,10 +153,10 @@ export function MicPreview() {
     const monitor = ctx.createGain();
     monitor.gain.value = 1;
     const boost = createLoudnessBoost(ctx);
-    boost.connect(limiter);
+    boost.output.connect(limiter);
     source.connect(gain);
-    routeLoudnessBoost(gain, boost, limiter, useRoomStore.getState().loudnessBoostEnabled);
-    boostRef.current = { boost, limiter };
+    routeLoudnessBoost(gain, boost.input, limiter, useRoomStore.getState().loudnessBoostEnabled);
+    boostRef.current = { boost: boost.input, limiter };
     limiter.connect(analyser);
     analyser.connect(monitor);
     monitor.connect(ctx.destination);

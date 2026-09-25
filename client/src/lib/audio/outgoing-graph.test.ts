@@ -53,7 +53,9 @@ describe("OutgoingAudioGraph", () => {
     expect(nodes.micGain.connectedTo).toEqual([nodes.limiter]);
     graph.setLoudnessBoost(true);
     expect(nodes.micGain.connectedTo).toEqual([nodes.loudnessBoost]);
-    expect(nodes.loudnessBoost.connectedTo).toEqual([nodes.limiter]);
+    // pre-gain → compressor → limiter
+    const compressor = nodes.loudnessBoost.connectedTo[0] as { connectedTo: unknown[] };
+    expect(compressor.connectedTo).toEqual([nodes.limiter]);
     graph.setLoudnessBoost(false);
     expect(nodes.micGain.connectedTo).toEqual([nodes.limiter]);
   });

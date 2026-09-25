@@ -16,11 +16,11 @@ import { resumeContext, GAIN_RAMP } from "./shared-context";
 const MIC_LIMITER = { threshold: -3, knee: 0, ratio: 20, attack: 0.003, release: 0.25 };
 
 // "Loudness boost": the level lift of voice processing's auto gain, without its
-// echo cancel / noise suppression. A 4:1 compressor from -24 dB; Web Audio adds
-// automatic makeup gain from the curve (~+11 dB here), so quiet speech comes up
+// echo cancel / noise suppression. A 4:1 compressor from -36 dB; Web Audio adds
+// automatic makeup gain from the curve (~+16 dB here), so quiet speech comes up
 // while loud peaks are held down, and the limiter after it still stops clipping.
 // ponytail: fixed curve tuned by ear; lower threshold = louder (and noisier).
-export const LOUDNESS_BOOST = { threshold: -24, knee: 12, ratio: 4, attack: 0.005, release: 0.25 };
+export const LOUDNESS_BOOST = { threshold: -36, knee: 12, ratio: 4, attack: 0.005, release: 0.25 };
 
 export function createLoudnessBoost(ctx: BaseAudioContext): DynamicsCompressorNode {
   const boost = ctx.createDynamicsCompressor();

@@ -15,6 +15,35 @@ import { resumeContext, GAIN_RAMP } from "./shared-context";
 // attack. Adds ~5 ms of look-ahead latency, negligible for voice.
 const MIC_LIMITER = { threshold: -3, knee: 0, ratio: 20, attack: 0.003, release: 0.25 };
 
+// "Loudness boost": the level lift of voice processing's auto gain, without its
+// echo cancel / noise suppression. A 4:1 compressor from -24 dB; Web Audio adds
+// automatic makeup gain from the curve (~+11 dB here), so quiet speech comes up
+// while loud peaks are held down, and the limiter after it still stops clipping.
+// ponytail: fixed curve tuned by ear; lower threshold = louder (and noisier).
+export const LOUDNESS_BOOST = { threshold: -24, knee: 12, ratio: 4, attack: 0.005, release: 0.25 };
+
+export function createLoudnessBoost(ctx: BaseAudioContext): DynamicsCompressorNode {
+  const boost = ctx.createDynamicsCompressor();
+  boost.threshold.value = LOUDNESS_BOOST.threshold;
+  boost.knee.value = LOUDNESS_BOOST.knee;
+  boost.ratio.value = LOUDNESS_BOOST.ratio;
+  boost.attack.value = LOUDNESS_BOOST.attack;
+  boost.release.value = LOUDNESS_BOOST.release;
+  return boost;
+}
+
+// Route `gain` into the limiter either directly or through `boost` (which is
+// always connected to the limiter), so boost-off costs nothing.
+export function routeLoudnessBoost(
+  gain: AudioNode,
+  boost: AudioNode,
+  limiter: AudioNode,
+  enabled: boolean,
+) {
+  gain.disconnect();
+  gain.connect(enabled ? boost : limiter);
+}
+
 // The share + file producers negotiate full stereo hi-fi (the router's 256 kbps
 // ceiling allows it), independent of voice. Identical for both.
 const SHARE_FILE_CODEC_OPTIONS = {
@@ -37,6 +66,7 @@ export class OutgoingAudioGraph {
   private micSource: MediaStreamAudioSourceNode | null = null;
   private micGain: GainNode | null = null;
   private limiter: DynamicsCompressorNode | null = null;
+  private loudnessBoost: DynamicsCompressorNode | null = null;
   private outDest: MediaStreamAudioDestinationNode | null = null;
   private micStream: MediaStream | null = null;
   // Share sub-graph (displaySource → shareDest) + its capture + producer.
@@ -82,11 +112,20 @@ export class OutgoingAudioGraph {
     limiter.attack.value = MIC_LIMITER.attack;
     limiter.release.value = MIC_LIMITER.release;
     const outDest = this.ctx.createMediaStreamDestination();
-    micGain.connect(limiter);
+    const loudnessBoost = createLoudnessBoost(this.ctx);
+    loudnessBoost.connect(limiter);
+    routeLoudnessBoost(micGain, loudnessBoost, limiter, this.store.getState().loudnessBoostEnabled);
     limiter.connect(outDest);
     this.micGain = micGain;
     this.limiter = limiter;
+    this.loudnessBoost = loudnessBoost;
     this.outDest = outDest;
+  }
+
+  // Live loudness-boost toggle (the store already holds the persisted choice).
+  setLoudnessBoost(enabled: boolean) {
+    if (this.micGain && this.loudnessBoost && this.limiter)
+      routeLoudnessBoost(this.micGain, this.loudnessBoost, this.limiter, enabled);
   }
 
   // The processed outgoing track / stream everyone receives. ensure() must have run.

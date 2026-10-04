@@ -1,0 +1,12 @@
+[Unit]
+Description=Keep SonicRoom updated from upstream main
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+Persistent=true
+Unit=sonicroom-updater.service
+
+[Install]
+WantedBy=timers.target

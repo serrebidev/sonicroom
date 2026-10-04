@@ -1,0 +1,33 @@
+# Fork branches merged onto upstream main for deployment (one per line).
+# sonicroom-update prunes a line itself once its PR is merged or the branch
+# is deleted; a conflicting unmerged branch is skipped with a WARNING.
+#
+# Order matters only in that a branch must not conflict with what is already
+# merged above it. A branch that already contains the branches above it can go
+# anywhere — the merge is then a no-op.
+
+# Points the Windows client default ServerUrl at this instance instead of
+# upstream sonic.gomsen.com (deployment-local; upstream would not take it).
+fork/serrebi/windows-default-server
+# Stereo downmix for audio-proxy transcodes (AC3 5.1 IPTV failed). Upstream PR #14.
+fork/serrebi/opus-stereo-downmix
+
+# Retry yt-dlp once and report its real error when audio-proxy extraction fails. Upstream PR #15; drop once merged
+fork/serrebi/ytdlp-retry-diagnostics
+# Pre-join mic slider usable with iOS VoiceOver. Upstream PR (ios-voiceover-sliders).
+fork/serrebi/ios-voiceover-sliders
+# Loudness boost mic option. Upstream PR (loudness-boost).
+fork/serrebi/loudness-boost
+# Voice processing on by default everywhere (laptop-mic feedback squeal). Upstream PR (voice-processing-default-on).
+fork/serrebi/voice-processing-default-on
+
+# Mic feedback-howl guard: notch the tone + duck + spoken hint. Upstream PR #19.
+fork/serrebi/howl-suppressor
+
+# Windows voice processing (AEC/NS/AGC) + media playback + web echo cancellation
+# of system audio. Upstream PR #9. Merge of deploy done 2026-10-04 (fdf40cd), so
+# this line and the seven overlay lines above all live in one branch head.
+fork/serrebi-media-playback
+# Electron voice-processing default + reservation-clock prune. Superset of the
+# overlays; no upstream PR. Fixes server/src/reservations.ts + admin.ts clock.
+fork/fixes/perm-default-and-reservation-clock

@@ -1,0 +1,325 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+REPO=/var/www/sonicroom
+APP_USER=sonicroom
+# Deploy base: upstream main. Feature overlays: branches on the user's fork,
+# listed one-per-line in $BRANCHES_FILE (comments/# and blank lines ignored),
+# e.g. "fork/codex/fix-ios-double-playback". The deployed tree is the local
+# branch "deploy", REGENERATED each run as base + merge of every listed branch,
+# so unmerged PRs stay live until upstream accepts them (an accepted branch's
+# line is pruned automatically, see "Auto-prune" below).
+REMOTE=origin
+FORK_REMOTE=fork
+BASE_REF="$REMOTE/main"
+BRANCH=deploy
+SERVICE=sonicroom.service
+STATE_DIR=/var/lib/sonicroom
+DEPLOYED_FILE="$STATE_DIR/deployed-commit"
+BRANCHES_FILE="$STATE_DIR/deploy-branches"
+DEPLOYED_INPUTS_FILE="$STATE_DIR/deployed-inputs"
+COREPACK_HOME="$STATE_DIR/corepack"
+APP_HOME="$STATE_DIR/home"
+TMP_DIR="$STATE_DIR/tmp"
+TURN_OVERLAY=/usr/local/sbin/sonicroom-turn-overlay
+TURN_META="$STATE_DIR/turn-overlay.meta"
+TURN_PENDING_META="$STATE_DIR/turn-overlay.meta.pending"
+LOCK_FILE=/run/lock/sonicroom-update.lock
+
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Another SonicRoom update is already running; skipping."
+  exit 0
+fi
+
+run_as_app() {
+  step="$*"
+  (
+    cd "$REPO"
+    exec /usr/sbin/runuser -u "$APP_USER" -- env \
+      HOME="$APP_HOME" \
+      COREPACK_HOME="$COREPACK_HOME" \
+      TMPDIR="$TMP_DIR" \
+      CI=true \
+      /usr/bin/corepack "$@"
+  )
+  step=
+}
+
+git_as_app() {
+  /usr/sbin/runuser -u "$APP_USER" -- /usr/bin/git -C "$REPO" "$@"
+}
+
+# --- Issue log for AI agents --------------------------------------------------
+# Every problem an update causes is appended to $ISSUES_FILE as one JSON object
+# per line and echoed to the journal as "UPDATE-ISSUE {...}" at err priority
+# (journalctl -u sonicroom-updater -p err), followed by a pointer to the agent
+# playbook. $OPEN_FILE holds the signatures of still-open issues so the hourly
+# timer logs each one once; when a run no longer raises it, a "resolved" record
+# is appended.
+ISSUES_FILE="$STATE_DIR/update-issues.jsonl"
+OPEN_FILE="$STATE_DIR/update-issues.open"
+PLAYBOOK="$STATE_DIR/AGENTS.md"
+raised=()
+fail_msg=
+failed_cmd=
+step=
+
+journal() { # journald reads a leading <N> as the priority (3 = err)
+  if [[ -n "${INVOCATION_ID:-}" ]]; then echo "<$1>$2"; else echo "$2"; fi
+}
+
+log_issue() { # kind severity message [branch]
+  local kind=$1 severity=$2 message=$3 branch=${4:-} sig record
+  sig="$kind|$branch|$message|$(git_as_app rev-parse "$BASE_REF" 2>/dev/null || true)"
+  raised+=("$sig")
+  grep -qxF -- "$sig" "$OPEN_FILE" 2>/dev/null && return 0
+  record=$(KIND=$kind SEV=$severity MSG=$message BR=$branch INPUTS=${inputs:-} \
+    DEPLOYED=$(cat "$DEPLOYED_FILE" 2>/dev/null || true) /usr/bin/python3 -c '
+import json, os, time
+e = os.environ
+print(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "status": "open",
+  "kind": e["KIND"], "severity": e["SEV"], "message": e["MSG"],
+  "branch": e["BR"] or None, "inputs": e["INPUTS"] or None,
+  "still_serving": e["DEPLOYED"] or None,
+  "logs": "journalctl -u sonicroom-updater --since \"-2h\" --no-pager"}))')
+  printf '%s\n' "$record" >>"$ISSUES_FILE"
+  printf '%s\n' "$sig" >>"$OPEN_FILE"
+  journal 3 "UPDATE-ISSUE $record"
+  journal 3 "UPDATE-ISSUES $(grep -c . "$OPEN_FILE") open - brainstorm, investigate, fix, restart if possible. Playbook: $PLAYBOOK"
+}
+
+# Called on every successful exit: close issues this run did not raise again.
+settle_issues() {
+  [[ -s "$OPEN_FILE" ]] || return 0
+  local sig keep=()
+  while IFS= read -r sig; do
+    if printf '%s\n' "${raised[@]}" | grep -qxF -- "$sig"; then
+      keep+=("$sig")
+    else
+      SIG=$sig /usr/bin/python3 -c '
+import json, os, time
+k, b, rest = os.environ["SIG"].split("|", 2)
+m = rest.rsplit("|", 1)[0]
+print(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "status": "resolved",
+  "kind": k, "branch": b or None, "message": m}))' | tee -a "$ISSUES_FILE" | sed 's/^/UPDATE-RESOLVED /'
+    fi
+  done <"$OPEN_FILE"
+  if ((${#keep[@]})); then printf '%s\n' "${keep[@]}" >"$OPEN_FILE"; else rm -f "$OPEN_FILE"; fi
+}
+
+die() {
+  fail_msg=$1
+  echo "$1" >&2
+  exit 1
+}
+trap 'failed_cmd="line $LINENO: $BASH_COMMAND"' ERR
+
+stage=
+server_stage=
+cleanup() {
+  local rc=$?
+  trap - ERR
+  if [[ -n "${stage:-}" ]]; then
+    rm -rf "$stage"
+  fi
+  if [[ -n "${server_stage:-}" ]]; then
+    rm -rf "$server_stage"
+  fi
+  if ((rc != 0)); then
+    log_issue update-failed error "${fail_msg:-command failed (exit $rc)${step:+ during corepack $step} at ${failed_cmd:-unknown}}"
+  else
+    settle_issues
+  fi
+}
+trap cleanup EXIT
+
+install -d -o "$APP_USER" -g "$APP_USER" -m 0750 \
+  "$STATE_DIR" "$COREPACK_HOME" "$APP_HOME" "$TMP_DIR" "$STATE_DIR/media"
+
+git_as_app fetch "$REMOTE" --prune
+git_as_app fetch "$FORK_REMOTE" --prune
+git_as_app rev-parse --verify "$BASE_REF^{commit}" >/dev/null
+
+feature_branches=()
+if [[ -f "$BRANCHES_FILE" ]]; then
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="${line//[[:space:]]/}"
+    [[ -n "$line" ]] && feature_branches+=("$line")
+  done <"$BRANCHES_FILE"
+fi
+
+# Drop a branch's line (plus the comment block directly above it) from
+# $BRANCHES_FILE once it no longer needs overlaying.
+drop_branch_line() {
+  local target=$1 tmp line pending=()
+  tmp=$(mktemp "$BRANCHES_FILE.XXXXXX")
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ ^[[:space:]]*# ]]; then
+      pending+=("$line")
+      continue
+    fi
+    local bare="${line%%#*}"
+    bare="${bare//[[:space:]]/}"
+    if [[ "$bare" != "$target" ]]; then
+      ((${#pending[@]})) && printf '%s\n' "${pending[@]}" >>"$tmp"
+      printf '%s\n' "$line" >>"$tmp"
+    fi
+    pending=()
+  done <"$BRANCHES_FILE"
+  ((${#pending[@]})) && printf '%s\n' "${pending[@]}" >>"$tmp"
+  chmod --reference="$BRANCHES_FILE" "$tmp"
+  mv "$tmp" "$BRANCHES_FILE"
+}
+
+# True when GitHub reports the fork branch's upstream PR as merged. Catches a
+# squash merge that upstream then edited further, which neither the ancestry
+# nor the tree check below can see.
+pr_merged() {
+  local head="serrebidev:${1#"$FORK_REMOTE"/}"
+  /usr/bin/curl -fsS --max-time 20 \
+    "https://api.github.com/repos/ogomez92/sonicroom/pulls?state=closed&head=$head" 2>/dev/null |
+    /usr/bin/python3 -c 'import json,sys; sys.exit(0 if any(p.get("merged_at") for p in json.load(sys.stdin)) else 1)' 2>/dev/null
+}
+
+# Auto-prune: a branch that is gone from the fork (deleted after merge), or
+# whose change upstream main already contains, is removed from the list.
+# A branch that still conflicts and is NOT merged is skipped for this run so
+# upstream updates keep deploying; it is retried whenever main or it moves.
+kept=()
+for fb in "${feature_branches[@]}"; do
+  base_tree=$(git_as_app rev-parse "$BASE_REF^{tree}")
+  if ! git_as_app rev-parse --verify --quiet "$fb^{commit}" >/dev/null; then
+    echo "Pruning $fb: branch no longer exists on the fork."
+    drop_branch_line "$fb"
+  elif git_as_app merge-base --is-ancestor "$fb" "$BASE_REF"; then
+    echo "Pruning $fb: merged into $BASE_REF."
+    drop_branch_line "$fb"
+  elif merged=$(git_as_app merge-tree --write-tree "$BASE_REF" "$fb" 2>/dev/null); then
+    if [[ "${merged%%$'\n'*}" == "$base_tree" ]]; then
+      echo "Pruning $fb: $BASE_REF already contains its changes."
+      drop_branch_line "$fb"
+    else
+      kept+=("$fb")
+    fi
+  elif pr_merged "$fb"; then
+    echo "Pruning $fb: its upstream PR is merged (conflict is upstream's later edits)."
+    drop_branch_line "$fb"
+  else
+    log_issue branch-conflict warning "skipping $fb: it conflicts with $BASE_REF and its PR is not merged, so this feature is NOT deployed; rebase it onto $BASE_REF" "$fb"
+  fi
+done
+feature_branches=("${kept[@]}")
+
+if [[ -n "$(git_as_app status --porcelain --untracked-files=no)" ]]; then
+  die "Refusing to update: $REPO has tracked local changes."
+fi
+
+current_branch=$(git_as_app branch --show-current)
+if [[ "$current_branch" != "$BRANCH" ]]; then
+  die "Refusing to update: expected branch $BRANCH, found $current_branch."
+fi
+
+# Deployment inputs: the base head plus every feature-branch head. Nothing
+# moved -> nothing to do (the deploy branch itself is derived from these).
+inputs="base=$(git_as_app rev-parse "$BASE_REF")"
+for fb in "${feature_branches[@]}"; do
+  if ! git_as_app rev-parse --verify --quiet "$fb^{commit}" >/dev/null; then
+    die "Refusing to update: feature branch $fb not found (check $BRANCHES_FILE)."
+  fi
+  inputs+=" $fb=$(git_as_app rev-parse "$fb")"
+done
+
+deployed_head=$(cat "$DEPLOYED_FILE" 2>/dev/null || true)
+deployed_inputs=$(cat "$DEPLOYED_INPUTS_FILE" 2>/dev/null || true)
+turn_refresh_needed=0
+if "$TURN_OVERLAY" --needs-refresh; then
+  turn_refresh_needed=1
+fi
+
+if [[ "$inputs" == "$deployed_inputs" && "$turn_refresh_needed" == 0 ]]; then
+  echo "SonicRoom is already deployed for inputs: $inputs"
+  exit 0
+fi
+
+# Regenerate the deploy branch: base, then merge each feature branch. A
+# conflicting branch was already skipped by the auto-prune pass above, so this
+# abort is only a safety net (the previous deployment keeps serving).
+git_as_app checkout -q -B "$BRANCH" "$BASE_REF"
+for fb in "${feature_branches[@]}"; do
+  if ! git_as_app merge --no-edit "$fb"; then
+    git_as_app merge --abort || true
+    die "Refusing to update: merge of $fb onto $BASE_REF conflicts; rebase it or drop it from $BRANCHES_FILE."
+  fi
+done
+target_head=$(git_as_app rev-parse HEAD)
+
+run_as_app pnpm install --frozen-lockfile
+
+run_as_app pnpm --filter client exec paraglide-js compile \
+  --project ./project.inlang --outdir ./src/paraglide
+if ! run_as_app pnpm --filter server test; then
+  log_issue tests-failed warning "upstream server tests did not pass (deploy continued); check whether upstream or an overlay branch broke them"
+fi
+# Client suite (vitest). vitest.config.ts pins NODE_ENV=test itself, so this is
+# safe whatever NODE_ENV the unit inherits.
+if ! run_as_app pnpm --filter client test; then
+  log_issue tests-failed warning "client tests did not pass (deploy continued); check whether upstream or an overlay branch broke them"
+fi
+run_as_app pnpm lint
+run_as_app pnpm --filter server exec tsc --noEmit
+run_as_app pnpm --filter client exec tsc -b
+
+server_stage=$(mktemp -d "$REPO/server/.dist-update.XXXXXX")
+chown "$APP_USER:$APP_USER" "$server_stage"
+run_as_app pnpm --filter server exec tsc --outDir "$server_stage"
+
+stage=$(mktemp -d "$REPO/client/.dist-update.XXXXXX")
+chown "$APP_USER:$APP_USER" "$stage"
+
+run_as_app pnpm --filter client exec vite build --outDir "$stage"
+rm -f "$TURN_PENDING_META"
+"$TURN_OVERLAY" "$stage"
+rm -rf "$REPO/client/.dist-previous"
+if [[ -d "$REPO/client/dist" ]]; then
+  mv "$REPO/client/dist" "$REPO/client/.dist-previous"
+fi
+mv "$stage" "$REPO/client/dist"
+stage=
+mv "$TURN_PENDING_META" "$TURN_META"
+rm -rf "$REPO/client/.dist-previous"
+
+rm -rf "$REPO/server/.dist-previous"
+if [[ -d "$REPO/server/dist" ]]; then
+  mv "$REPO/server/dist" "$REPO/server/.dist-previous"
+fi
+mv "$server_stage" "$REPO/server/dist"
+server_stage=
+rm -rf "$REPO/server/.dist-previous"
+
+restart=1
+if [[ -n "$deployed_head" ]] && git_as_app cat-file -e "$deployed_head^{commit}" 2>/dev/null; then
+  if git_as_app diff --quiet "$deployed_head" HEAD -- \
+    server package.json pnpm-lock.yaml pnpm-workspace.yaml; then
+    restart=0
+  fi
+fi
+
+if [[ "$restart" == 1 ]]; then
+  /usr/bin/systemctl restart "$SERVICE"
+fi
+
+for _ in {1..20}; do
+  if /usr/bin/curl --fail --silent --show-error http://127.0.0.1:3100/health >/dev/null; then
+    printf '%s\n' "$target_head" >"$DEPLOYED_FILE.tmp"
+    mv "$DEPLOYED_FILE.tmp" "$DEPLOYED_FILE"
+    printf '%s\n' "$inputs" >"$DEPLOYED_INPUTS_FILE.tmp"
+    mv "$DEPLOYED_INPUTS_FILE.tmp" "$DEPLOYED_INPUTS_FILE"
+    echo "Deployed SonicRoom at $target_head."
+    exit 0
+  fi
+  sleep 1
+done
+
+die "SonicRoom failed its health check after update."

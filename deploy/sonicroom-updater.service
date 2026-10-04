@@ -1,0 +1,11 @@
+[Unit]
+Description=Update SonicRoom from upstream main
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sonicroom-update
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30min

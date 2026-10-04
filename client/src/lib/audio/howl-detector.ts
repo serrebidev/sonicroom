@@ -168,7 +168,9 @@ export class HowlDetector {
       }
     }
     this.slots = this.slots.map((s) =>
-      s && (nowMs - s.sinceMs < HOWL.holdMs || nowMs - s.lastHotMs < HOWL.releaseAfterMs) ? s : null,
+      s && (nowMs - s.sinceMs < HOWL.holdMs || nowMs - s.lastHotMs < HOWL.releaseAfterMs)
+        ? s
+        : null,
     );
 
     if (duck) this.duckUntilMs = nowMs + HOWL.duckHoldMs;
@@ -182,7 +184,12 @@ export class HowlDetector {
     const depth = -Math.min(HOWL.maxDepthDb, Math.max(0, t.lastDb - HOWL.depthOffsetDb));
     const near = this.slots.find((s) => s && Math.abs(Math.log2(s.hz / hz)) < HOWL.reuseOctaves);
     if (near) {
-      Object.assign(near, { hz, bin: t.bin, gainDb: Math.min(near.gainDb, depth), lastHotMs: nowMs });
+      Object.assign(near, {
+        hz,
+        bin: t.bin,
+        gainDb: Math.min(near.gainDb, depth),
+        lastHotMs: nowMs,
+      });
       return;
     }
     const free = this.slots.indexOf(null);

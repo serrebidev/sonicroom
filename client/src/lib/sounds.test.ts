@@ -21,6 +21,10 @@ const EXPECTED_MIN_OSC: Record<Cue, number> = {
   knock: 3, // three raps, one thud tone each
   "peer-mute": 1, // one tone
   "peer-unmute": 1, // one tone
+  // Camera shutter: one noise burst (0 oscillators — it creates a buffer source)
+  // plus the two-note blip. See the video-on/video-off cases in sounds.ts.
+  "video-on": 2, // two tones
+  "video-off": 2, // two tones
 };
 
 const ALL_CUES = Object.keys(EXPECTED_MIN_OSC) as Cue[];

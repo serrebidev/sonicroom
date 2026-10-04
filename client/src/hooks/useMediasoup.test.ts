@@ -104,6 +104,12 @@ function sfuJoin(peers: JoinResponse["peers"], extra: Partial<JoinResponse> = {}
   return joinRoom({ join: { mode: "sfu", peers, ...extra }, id });
 }
 
+// JoinResponse.moderation is deliberately a loose Record in the socket mock (the
+// fake speaks the wire, not the app's types). A ModerationPolicy has no index
+// signature, so passing one needs the cast the wire type implies.
+const asWireModeration = (p: typeof DEFAULT_MODERATION_POLICY) =>
+  p as unknown as Record<string, unknown>;
+
 async function fire(event: string, payload?: unknown) {
   await act(async () => {
     await socket().fire(event, payload);
@@ -867,7 +873,7 @@ describe("moderation", () => {
 
   it("applies admins-changed to every row and announces it as a room event", async () => {
     const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
-      moderation: DEFAULT_MODERATION_POLICY,
+      moderation: asWireModeration(DEFAULT_MODERATION_POLICY),
       isAdmin: false,
       admins: [{ peerId: "id-bob", displayName: "Bob" }],
     });
@@ -907,7 +913,7 @@ describe("moderation", () => {
 
   it("moderation-ended drops the policy and every admin badge and announces it", async () => {
     const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
-      moderation: DEFAULT_MODERATION_POLICY,
+      moderation: asWireModeration(DEFAULT_MODERATION_POLICY),
       isAdmin: false,
       admins: [{ peerId: "id-bob", displayName: "Bob" }],
     });
@@ -925,7 +931,7 @@ describe("moderation", () => {
 
   it("a forced mute silences us locally without a producer-pause emit, and we can unmute", async () => {
     const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
-      moderation: DEFAULT_MODERATION_POLICY,
+      moderation: asWireModeration(DEFAULT_MODERATION_POLICY),
       isAdmin: false,
       admins: [{ peerId: "id-bob", displayName: "Bob" }],
     });
@@ -944,7 +950,7 @@ describe("moderation", () => {
 
   it("emits the admin actions and announces admin removals by name", async () => {
     const h = await sfuJoin([peerEntry("id-bob"), peerEntry("id-carol")], {
-      moderation: DEFAULT_MODERATION_POLICY,
+      moderation: asWireModeration(DEFAULT_MODERATION_POLICY),
       isAdmin: true,
       admins: [{ peerId: "id-self", displayName: "Alice" }],
     });

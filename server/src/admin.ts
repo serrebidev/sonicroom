@@ -299,7 +299,7 @@ export function createAdminRouter(deps: AdminDeps): Router {
       !writeOr500(res, () => {
         const file = readReservationsFile(deps.filePath);
         replaced = !!file.rooms[name];
-        writeReservationsFile(deps.filePath, upsertReservation(file, name, reservation));
+        writeReservationsFile(deps.filePath, upsertReservation(file, name, reservation), t);
       })
     )
       return;
@@ -347,6 +347,7 @@ export function createAdminRouter(deps: AdminDeps): Router {
         writeReservationsFile(
           deps.filePath,
           upsertReservation(file, name.data, { ...rotated, createdAt: existing.createdAt }),
+          t,
         );
       })
     )
@@ -374,6 +375,7 @@ export function createAdminRouter(deps: AdminDeps): Router {
       return;
     }
     let found = true;
+    const t = now();
     if (
       !writeOr500(res, () => {
         const file = readReservationsFile(deps.filePath);
@@ -381,7 +383,7 @@ export function createAdminRouter(deps: AdminDeps): Router {
           found = false;
           return;
         }
-        writeReservationsFile(deps.filePath, removeReservation(file, name.data));
+        writeReservationsFile(deps.filePath, removeReservation(file, name.data), t);
       })
     )
       return;

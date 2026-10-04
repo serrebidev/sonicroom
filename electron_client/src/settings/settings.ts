@@ -115,8 +115,13 @@ async function init(): Promise<void> {
   // Audio/voice prefs from localStorage (shared origin with the client).
   ($("micGain") as HTMLInputElement).value = getString("sonicroom:micGain") ?? "1";
   ($("hifiVoice") as HTMLInputElement).checked = getString("sonicroom:hifiVoice") === "true";
+  // Defaults ON when unset, matching loadVoiceProcessing() in the client's store
+  // (default-on since the echo-cancellation fix). An old `=== "true"` check read
+  // an unset key as OFF, so this window showed the wrong state and — because
+  // persistPrefs() writes the checkbox either way — SAVING it silently turned
+  // voice processing off for the user.
   ($("voiceProcessing") as HTMLInputElement).checked =
-    getString("sonicroom:voiceProcessing") === "true";
+    getString("sonicroom:voiceProcessing") !== "false";
   ($("announceMode") as HTMLSelectElement).value =
     getString("sonicroom:chatAnnounceMode") ?? "polite";
 

@@ -10,10 +10,7 @@ import type { Transport, Producer } from "mediasoup-client/types";
 import { useRoomStore } from "../../stores/room";
 import { resumeContext, GAIN_RAMP } from "./shared-context";
 import { HOWL, HowlDetector } from "./howl-detector";
-import {
-  announce_feedback_ducked,
-  announce_feedback_restored,
-} from "../../paraglide/messages.js";
+import { announce_feedback_ducked, announce_feedback_restored } from "../../paraglide/messages.js";
 
 // Howl (acoustic feedback) guard polling. setInterval is throttled to ~1 s in a
 // hidden tab; the detector's persistence is wall-time based, so it still
@@ -150,7 +147,12 @@ export class OutgoingAudioGraph {
     const outDest = this.ctx.createMediaStreamDestination();
     const loudnessBoost = createLoudnessBoost(this.ctx);
     loudnessBoost.output.connect(limiter);
-    routeLoudnessBoost(micGain, loudnessBoost.input, limiter, this.store.getState().loudnessBoostEnabled);
+    routeLoudnessBoost(
+      micGain,
+      loudnessBoost.input,
+      limiter,
+      this.store.getState().loudnessBoostEnabled,
+    );
     limiter.connect(outDest);
     this.micGain = micGain;
     this.limiter = limiter;

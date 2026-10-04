@@ -11,6 +11,10 @@ public sealed class AppSettings
     public string ServerUrl { get; set; } = "https://calls.serrebiradio.com";
     public string Room { get; set; } = "test";
     public string DisplayName { get; set; } = "WinNative";
+    /// <summary>Host key of a RESERVED room (from its <c>?host=</c> link). Blank for ordinary
+    /// rooms. Persisting it means a host rejoins as admin without re-pasting, matching the web
+    /// client which keeps the key in sessionStorage per room.</summary>
+    public string HostKey { get; set; } = "";
     /// <summary>Microphone by product name (WaveIn indices shift across replugs).</summary>
     public string MicDevice { get; set; } = "System default";
     /// <summary>Speaker/render device by product name (WaveOut indices shift across replugs).</summary>

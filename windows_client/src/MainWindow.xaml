@@ -19,6 +19,15 @@
                      Text="https://sonic.gomsen.com" />
             <TextBox x:Name="RoomBox" Header="Room" AutomationProperties.Name="Room" Text="test" />
             <TextBox x:Name="NameBox" Header="Display name" AutomationProperties.Name="Display name" Text="WinNative" />
+            <!-- Only needed for a RESERVED room: paste the key from that room's host link
+                 (?host=...) to be the one who may open it. Left blank for every ordinary
+                 room, and ignored by the server unless the name is actually reserved.
+                 Deliberately NOT a password field: masking buys nothing here (the key is
+                 persisted in plaintext settings.json anyway) and hides the value from the
+                 person pasting it, who then cannot check it character by character. -->
+            <TextBox x:Name="HostKeyBox"
+                     Header="Host key (reserved rooms only)" AutomationProperties.Name="Host key, for reserved rooms only"
+                     AutomationProperties.HelpText="From the room's host link, the part after host equals. Leave empty unless the room is reserved." />
             <ComboBox x:Name="MicSelect" Header="Microphone" AutomationProperties.Name="Microphone"
                       HorizontalAlignment="Stretch" DropDownOpened="OnMicDropDownOpened" />
             <ComboBox x:Name="SpeakerSelect" Header="Speaker" AutomationProperties.Name="Speaker"

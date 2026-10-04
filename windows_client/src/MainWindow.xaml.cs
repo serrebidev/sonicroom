@@ -94,6 +94,7 @@ public sealed partial class MainWindow : Window
         ServerBox.Text = settings.ServerUrl;
         RoomBox.Text = settings.Room;
         NameBox.Text = settings.DisplayName;
+        HostKeyBox.Text = settings.HostKey;
         var voiceProcessing = settings.VoiceProcessingEnabled;
         HifiCheck.IsChecked = settings.HifiVoice && !voiceProcessing;
         VoiceProcessingLobbyCheck.IsChecked = voiceProcessing;
@@ -167,6 +168,7 @@ public sealed partial class MainWindow : Window
             ServerUrl = ServerBox.Text.Trim(),
             Room = RoomBox.Text.Trim(),
             DisplayName = NameBox.Text.Trim(),
+            HostKey = HostKeyBox.Text.Trim(),
             MicDevice = MicSelect.SelectedIndex == 0 ? "System default" : (MicSelect.SelectedItem as string ?? "System default"),
             SpeakerDevice = SpeakerSelect.SelectedIndex == 0 ? "System default" : (SpeakerSelect.SelectedItem as string ?? "System default"),
             Language = I18n.Lang,
@@ -247,6 +249,9 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetName(RoomBox, I18n.T("header_room"));
         NameBox.Header = I18n.T("header_name");
         AutomationProperties.SetName(NameBox, I18n.T("header_name"));
+        HostKeyBox.Header = I18n.T("host_key");
+        AutomationProperties.SetName(HostKeyBox, I18n.T("host_key_name"));
+        AutomationProperties.SetHelpText(HostKeyBox, I18n.T("host_key_help"));
         MicSelect.Header = I18n.T("header_mic");
         AutomationProperties.SetName(MicSelect, I18n.T("header_mic"));
         SpeakerSelect.Header = I18n.T("header_speaker");
@@ -885,6 +890,10 @@ public sealed partial class MainWindow : Window
             else Announce(I18n.F("file_failed", error));
         });
         session.JoinPending += () => Enqueue(() => Announce(I18n.T("waiting_admit")));
+        // A reserved room refused us until its host arrives. This is a closed door, not a
+        // failure, so say so plainly. Announce() also updates the lobby status line,
+        // which is where the user is looking while a join is pending.
+        session.WaitingForHost += () => Enqueue(() => Announce(I18n.T("waiting_host")));
         session.RoomBecamePublic += () => Enqueue(() =>
         {
             UpdateKickVisibility();
@@ -934,7 +943,7 @@ public sealed partial class MainWindow : Window
             await session.ConnectAsync(
                 ServerBox.Text.Trim(), room, NameBox.Text.Trim(),
                 ListenOnlyCheck.IsChecked == true, PublicCheck.IsChecked == true,
-                mic.Index, speaker.Index);
+                mic.Index, speaker.Index, HostKeyBox.Text.Trim());
 
             _serverUrl = ServerBox.Text.Trim().TrimEnd('/');
             _roomName = room;

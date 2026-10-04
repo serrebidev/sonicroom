@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Concentus.Enums;
@@ -53,6 +54,8 @@ public sealed class RoomSession : IAsyncDisposable
     private readonly Dictionary<string, (MicCapture Cap, MediasoupSendTransport.Producer Prod)> _extraMics = new();
     private MediasoupSendTransport.Producer? _fileProducer;
     private System.Threading.CancellationTokenSource? _filePumpCts;
+    /// <summary>Cancels the "waiting for a reserved room's host" poll when we tear down.</summary>
+    private System.Threading.CancellationTokenSource? _reservedWaitCts;
 
     private readonly object _map = new();
     private readonly Dictionary<string, string> _peerNames = new();          // peerId → name
@@ -80,6 +83,9 @@ public sealed class RoomSession : IAsyncDisposable
     public event Action<bool, string?>? StreamingChanged;   // active, by
     public event Action<string?>? StreamingFailed;
     public event Action? JoinPending;
+    /// <summary>A RESERVED room refused the join because its host has not arrived yet. The UI
+    /// shows the waiting screen; the session then polls until the name goes live.</summary>
+    public event Action? WaitingForHost;
     public event Action<IReadOnlyList<JoinRequestItem>>? JoinRequestsChanged;
     public event Action<KickVote>? KickVoteChanged;              // full payload: target/voter names + tally
     public event Action<string, string>? PeerKickedEvent;        // displayName, reason ("vote"|"caster")
@@ -142,9 +148,84 @@ public sealed class RoomSession : IAsyncDisposable
     private int _micDeviceNumber = -1; // -1 = wave mapper (the Windows default input)
     private int _speakerDeviceNumber = -1;
 
+    /// <summary>How often to re-check whether a RESERVED room has been opened by its host while
+    /// we wait outside. Matches the web client's 3 s cadence.</summary>
+    private const int ReservedRoomPollMs = 3000;
+
+    /// <summary>
+    /// Join, and if the server refuses with <c>reserved</c>, wait outside for the room's host
+    /// to open it and try again. The server deliberately creates no room for a refused visitor,
+    /// so the name only goes live once the key holder actually joins — polling
+    /// <c>GET /api/rooms/:name</c> for <c>{exists:true}</c> is what tells us that happened.
+    ///
+    /// Matching the web client here matters: a reserved room that a host has not opened yet is
+    /// NOT an error, it is a door that is simply closed. Without this the user saw the raw
+    /// string "reserved" and had no idea they were expected to wait.
+    /// </summary>
+    private async Task<JoinAck> JoinWithReservedRoomWaitAsync(string serverUrl, string room, JoinRequest req)
+    {
+        for (;;)
+        {
+            try
+            {
+                return await _sig.JoinAsync(req);
+            }
+            catch (SignalingException ex) when (ex.Message == "reserved")
+            {
+                WaitingForHost?.Invoke();
+                try
+                {
+                    await WaitForReservedRoomAsync(serverUrl, room);
+                }
+                finally
+                {
+                    WaitingForHost = null; // fire-and-forget signals: clear so a re-arm works
+                }
+            }
+        }
+    }
+
+    /// <summary>Poll the room lookup until the reserved name exists. Returns early if the
+    /// session is torn down meanwhile, so leaving while waiting does not hang the caller.</summary>
+    private async Task WaitForReservedRoomAsync(string serverUrl, string room)
+    {
+        var url = $"{serverUrl.TrimEnd('/')}/api/rooms/{Uri.EscapeDataString(room)}";
+        var cts = new System.Threading.CancellationTokenSource();
+        _reservedWaitCts = cts;
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        try
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(ReservedRoomPollMs, cts.Token);
+                    using var json = await http.GetAsync(url, cts.Token);
+                    if (!json.IsSuccessStatusCode) continue; // transient — keep waiting
+                    var body = await json.Content.ReadAsStringAsync(cts.Token);
+                    if (body.Contains("\"exists\":true", StringComparison.Ordinal)) return;
+                }
+                catch (OperationCanceledException)
+                {
+                    return; // leaving the room while waiting — not an error
+                }
+                catch (Exception ex)
+                {
+                    // A blip must not abandon the wait: the room is still coming.
+                    Log?.Invoke($"[join] reserved-room poll failed: {ex.Message}");
+                }
+            }
+        }
+        finally
+        {
+            _reservedWaitCts = null;
+            cts.Dispose();
+        }
+    }
+
     public async Task ConnectAsync(string serverUrl, string room, string displayName,
         bool listenOnly = false, bool makePublic = false, int micDeviceNumber = -1,
-        int speakerDeviceNumber = -1)
+        int speakerDeviceNumber = -1, string? hostKey = null)
     {
         _listenOnly = listenOnly;
         _micDeviceNumber = micDeviceNumber;
@@ -165,9 +246,10 @@ public sealed class RoomSession : IAsyncDisposable
             DisplayName = displayName,
             JoinToken = Guid.NewGuid().ToString("N"),
             IsPublic = makePublic ? true : null,
+            HostKey = string.IsNullOrWhiteSpace(hostKey) ? null : hostKey.Trim(),
         };
 
-        var ack = await _sig.JoinAsync(req);
+        var ack = await JoinWithReservedRoomWaitAsync(serverUrl, room, req);
         if (ack.IsPending)
         {
             JoinPending?.Invoke(); // UI shows "waiting to be let in…"
@@ -1076,6 +1158,7 @@ public sealed class RoomSession : IAsyncDisposable
         _mic?.Dispose();
         _sharePumpCts?.Cancel();
         _filePumpCts?.Cancel();
+        _reservedWaitCts?.Cancel();   // stop polling for a reserved room's host on teardown
         foreach (var m in _extraMics.Values) m.Cap.Dispose();
         _extraMics.Clear();
         _shareBus.Dispose();

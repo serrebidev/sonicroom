@@ -23,6 +23,14 @@ public sealed class JoinRequest
     public required string DisplayName { get; init; }
     public bool? IsPublic { get; init; }
     public string? JoinToken { get; init; }
+    /// <summary>
+    /// Host key of a RESERVED room, taken from the host link's <c>?host=</c>. Presenting it
+    /// is what lets us OPEN the reserved room; on every join it also makes us its admin and
+    /// skips the knock gate. The server stores only a sha256 of the key, so this is the one
+    /// copy we hold. Optional: omitted when empty, because the server's zod schema treats
+    /// undefined as absent and rejects null (max 128 chars).
+    /// </summary>
+    public string? HostKey { get; init; }
     public bool Sharing { get; init; }
     public bool FileStreaming { get; init; }
     public bool ExtraMic { get; init; }
@@ -44,6 +52,9 @@ public sealed class JoinRequest
         };
         if (r.IsPublic is bool p) d["isPublic"] = p;
         if (!string.IsNullOrEmpty(r.JoinToken)) d["joinToken"] = r.JoinToken;
+        // Reserved-room host key. Truncate to the server's 128-char ceiling rather than
+        // sending an over-long value that zod would reject outright.
+        if (!string.IsNullOrEmpty(r.HostKey)) d["hostKey"] = r.HostKey.Length > 128 ? r.HostKey[..128] : r.HostKey;
         if (r.Sharing) d["sharing"] = true;
         if (r.FileStreaming) d["fileStreaming"] = true;
         if (r.ExtraMic) d["extraMic"] = true;

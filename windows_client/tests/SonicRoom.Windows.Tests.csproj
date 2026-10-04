@@ -18,5 +18,6 @@
     <Compile Include="..\src\Audio\PeerMixer.cs" Link="Audio\PeerMixer.cs" />
     <Compile Include="..\src\Audio\ProcessedFrameConverter.cs" Link="Audio\ProcessedFrameConverter.cs" />
     <Compile Include="..\src\Audio\VoiceProcessingSelection.cs" Link="Audio\VoiceProcessingSelection.cs" />
+    <Compile Include="..\src\Signaling\SignalingMessages.cs" Link="Signaling\SignalingMessages.cs" />
   </ItemGroup>
 </Project>

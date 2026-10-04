@@ -15,8 +15,11 @@
             <TextBlock x:Name="SubtitleText" Text="Native Windows client" Opacity="0.6" HorizontalAlignment="Center" Margin="0,0,0,8" />
             <ComboBox x:Name="LanguageSelect" Header="Language" AutomationProperties.Name="Language"
                       HorizontalAlignment="Stretch" SelectionChanged="OnLanguageChanged" />
-            <TextBox x:Name="ServerBox" Header="Server URL" AutomationProperties.Name="Server URL"
-                     Text="https://sonic.gomsen.com" />
+            <!-- No Text= default on purpose. MainWindow's Loaded handler overwrites this from
+                 AppSettings.ServerUrl, so a literal here is dead weight that only goes stale:
+                 it previously named upstream's sonic.gomsen.com while the real default is
+                 calls.serrebiradio.com. AppSettings.ServerUrl is the single source of truth. -->
+            <TextBox x:Name="ServerBox" Header="Server URL" AutomationProperties.Name="Server URL" />
             <TextBox x:Name="RoomBox" Header="Room" AutomationProperties.Name="Room" Text="test" />
             <TextBox x:Name="NameBox" Header="Display name" AutomationProperties.Name="Display name" Text="WinNative" />
             <ComboBox x:Name="MicSelect" Header="Microphone" AutomationProperties.Name="Microphone"

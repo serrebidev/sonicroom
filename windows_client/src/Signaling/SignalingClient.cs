@@ -260,11 +260,25 @@ public sealed class SignalingClient : IAsyncDisposable
         catch { return "<unreadable>"; }
     }
 
-    // Events not yet given typed handlers — logged verbatim for now. switch-to-p2p can never
-    // apply to this client (it always joins disableP2p:true, which pins the room to the SFU).
+    // Events with no typed handler yet. These are logged verbatim so a room that
+    // exercises them leaves a trace in log.txt instead of dropping them silently.
+    // switch-to-p2p can never apply to this client (it always joins
+    // disableP2p:true, which pins the room to the SFU). The rest are live server
+    // features this client does not implement yet: notes/NoteLab, the moderated
+    // room admin role, and video rooms. Listing them costs nothing and means a
+    // user reporting "my admin muted me and nothing happened" has evidence.
     private static readonly string[] RawLoggedEvents =
     {
         "switch-to-p2p",
+        "notes-updated",
+        "open-notes",
+        "admins-changed",
+        "you-were-muted",
+        "all-muted",
+        "moderation-ended",
+        "room-video",
+        "video-started",
+        "video-stopped",
     };
 
     public async ValueTask DisposeAsync()

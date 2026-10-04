@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { ChatMessage } from "../lib/chat";
 import { getLocale, setLocale as applyParaglideLocale, type Locale } from "../lib/i18n";
-import { isIOS } from "../lib/microphone";
 import type { ModerationPolicy } from "../lib/moderation";
 import {
   normalizeBackgroundChoice,
@@ -86,9 +85,9 @@ function saveStringChecked(key: string, value: string): boolean {
 function loadVoiceProcessing(): boolean {
   try {
     const value = localStorage.getItem(VOICE_PROCESSING_KEY);
-    return value == null ? isIOS : value === "true";
+    return value == null ? true : value === "true";
   } catch {
-    return isIOS;
+    return true;
   }
 }
 
@@ -360,7 +359,9 @@ interface RoomState {
   micDeviceId: string;
   speakerDeviceId: string;
   // Browser voice processing (echo cancellation, noise suppression and
-  // automatic gain). Defaults on for iOS/iPadOS and off elsewhere.
+  // automatic gain). Defaults on everywhere: without echo cancellation a
+  // laptop's built-in mic picks up headphone leakage and squeals with feedback.
+  // A saved choice (e.g. raw audio for music) is kept.
   voiceProcessingEnabled: boolean;
   // Opt-in "loudness boost": compress + lift the outgoing mic (the level part
   // of voice processing, without echo cancel / noise suppression). Default off.

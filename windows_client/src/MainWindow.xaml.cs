@@ -306,6 +306,8 @@ public sealed partial class MainWindow : Window
         StreamButton.Content = _session?.IsStreaming == true ? I18n.T("stop_streaming") : I18n.T("stream");
         LeaveButton.Content = I18n.T("leave");
         AutomationProperties.SetName(LeaveButton, I18n.T("leave_call"));
+        NotesButton.Content = I18n.T("notes");
+        AutomationProperties.SetName(NotesButton, I18n.T("notes_open"));
         MicGainLabel.Text = I18n.T("mic_gain");
         AutomationProperties.SetName(MicGainSlider, I18n.T("mic_gain_name"));
         MediaVolumeLabel.Text = I18n.T("media_volume");
@@ -885,6 +887,12 @@ public sealed partial class MainWindow : Window
             else Announce(I18n.F("file_failed", error));
         });
         session.JoinPending += () => Enqueue(() => Announce(I18n.T("waiting_admit")));
+        // Only offer Notes when the server actually has NoteLab configured — otherwise the
+        // button could only ever answer "notes are not available here".
+        NotesButton.Visibility = session.NotesEnabled ? Visibility.Visible : Visibility.Collapsed;
+        // A peer created the room's note: our next Notes press opens it directly.
+        session.NotesUpdated += (url, by) => Enqueue(() =>
+            Announce(by is null ? I18n.T("notes_ready") : I18n.F("notes_ready_by", by)));
         session.RoomBecamePublic += () => Enqueue(() =>
         {
             UpdateKickVisibility();
@@ -1354,6 +1362,54 @@ public sealed partial class MainWindow : Window
             Diag.Log("Download recording", ex);
             Announce(I18n.F("download_failed", ex.Message));
         }
+    }
+
+    // ---- shared notes (NoteLab) -------------------------------------------------------------------
+
+    private async void OnNotesClick(object sender, RoutedEventArgs e)
+    {
+        if (_session is null) return;
+        try
+        {
+            var url = await _session.OpenNotesAsync();
+            if (url is null)
+            {
+                // The room or the server may not allow notes. Say which, rather than
+                // failing silently or showing a generic error.
+                Announce(I18n.T(_session.NotesError switch
+                {
+                    "forbidden" => "notes_not_allowed",
+                    "notes_disabled" => "notes_disabled",
+                    _ => "notes_failed",
+                }));
+                return;
+            }
+            OpenInBrowser(url);
+            Announce(I18n.T("notes_opened"));
+        }
+        catch (Exception ex)
+        {
+            Diag.Log("Open notes", ex);
+            Announce(I18n.F("notes_failed_msg", ex.Message));
+        }
+    }
+
+    /// <summary>Hand a URL to the default browser. The note is a web app (NoteLab), not
+    /// something this client can render, and the URL is the only access — so it must not
+    /// be logged with the room's peers' data or silently dropped.</summary>
+    private void OpenInBrowser(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            Announce(I18n.T("notes_bad_url"));
+            return;
+        }
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = uri.ToString(),
+            UseShellExecute = true, // let the OS pick the browser
+        });
     }
 
     // ---- Icecast streaming ------------------------------------------------------------------------

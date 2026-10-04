@@ -66,6 +66,12 @@ public sealed class JoinAck
     [JsonPropertyName("streaming")] public bool Streaming { get; set; }
     [JsonPropertyName("voiceActive")] public bool VoiceActive { get; set; }
     [JsonPropertyName("duckingEnabled")] public bool DuckingEnabled { get; set; }
+    /// <summary>Whether this server has NoteLab configured (NOTELAB_URL). When false the
+    /// shared-notes button must not be shown at all.</summary>
+    [JsonPropertyName("notesEnabled")] public bool NotesEnabled { get; set; }
+    /// <summary>This room's note URL if one already exists — created by a previous open, or
+    /// by another peer while we were away. Null when none yet.</summary>
+    [JsonPropertyName("notesUrl")] public string? NotesUrl { get; set; }
     [JsonPropertyName("kickVotes")] public List<KickVoteTally>? KickVotes { get; set; }
     [JsonPropertyName("messages")] public List<ChatMessage>? Messages { get; set; }
 
@@ -244,4 +250,21 @@ public sealed class JoinRequestItem
 public sealed class JoinDenied
 {
     [JsonPropertyName("by")] public string? By { get; set; }
+}
+
+/// <summary>A peer created this room's shared note. The URL is the access — the server only
+/// sends it to peers who pass the room's notes gate, so receiving it means we may open it.</summary>
+public sealed class NotesUpdated
+{
+    [JsonPropertyName("url")] public string? Url { get; set; }
+    [JsonPropertyName("by")] public string? By { get; set; }
+}
+
+/// <summary>The <c>open-notes</c> ack: either the note URL, or a failure code
+/// (<c>forbidden</c>, <c>notes_disabled</c>, <c>notes_failed</c>).</summary>
+public sealed class OpenNotesAck
+{
+    [JsonPropertyName("ok")] public bool Ok { get; set; }
+    [JsonPropertyName("error")] public string? Error { get; set; }
+    [JsonPropertyName("url")] public string? Url { get; set; }
 }

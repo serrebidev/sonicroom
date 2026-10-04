@@ -127,6 +127,18 @@ public static class I18n
         ["stop_streaming"] = ("Stop streaming", "Detener retransmisión", "Arrêter la diffusion"),
         ["leave"] = ("Leave", "Salir", "Quitter"),
         ["leave_call"] = ("Leave call", "Salir de la llamada", "Quitter l'appel"),
+
+        // ---- shared notes (NoteLab) ----------------------------------------------------------------
+        ["notes"] = ("Notes", "Notas", "Notes"),
+        ["notes_open"] = ("Open the room's shared notes", "Abrir las notas compartidas de la sala", "Ouvrir les notes partagées du salon"),
+        ["notes_opened"] = ("Shared notes opened in your browser.", "Notas compartidas abiertas en tu navegador.", "Notes partagées ouvertes dans votre navigateur."),
+        ["notes_ready"] = ("The room's shared notes are ready.", "Las notas compartidas de la sala están listas.", "Les notes partagées du salon sont prêtes."),
+        ["notes_ready_by"] = ("{0} created the room's shared notes.", "{0} ha creado las notas compartidas de la sala.", "{0} a créé les notes partagées du salon."),
+        ["notes_not_allowed"] = ("Shared notes are not allowed in this room.", "Las notas compartidas no están permitidas en esta sala.", "Les notes partagées ne sont pas autorisées dans cette salle."),
+        ["notes_disabled"] = ("This server does not have shared notes turned on.", "Este servidor no tiene activadas las notas compartidas.", "Ce serveur n'a pas activé les notes partagées."),
+        ["notes_failed"] = ("Shared notes could not be opened.", "No se pudieron abrir las notas compartidas.", "Impossible d'ouvrir les notes partagées."),
+        ["notes_failed_msg"] = ("Shared notes could not be opened: {0}", "No se pudieron abrir las notas compartidas: {0}", "Impossible d'ouvrir les notes partagées : {0}"),
+        ["notes_bad_url"] = ("The server sent an unusable notes link.", "El servidor envió un enlace de notas no utilizable.", "Le serveur a envoyé un lien de notes inutilisable."),
         ["mic_gain"] = ("Mic gain", "Ganancia del micro", "Gain du micro"),
         ["mic_gain_name"] = ("Microphone gain, percent", "Ganancia del micrófono, porcentaje", "Gain du microphone, pourcentage"),
         ["master"] = ("Master", "General", "Général"),

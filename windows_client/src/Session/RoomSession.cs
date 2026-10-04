@@ -85,6 +85,8 @@ public sealed class RoomSession : IAsyncDisposable
     public event Action<string, string>? PeerKickedEvent;        // displayName, reason ("vote"|"caster")
     public event Action? YouWereKicked;
     public event Action? RoomBecamePublic;
+    /// <summary>Another peer created the room's shared note: the URL, and who made it.</summary>
+    public event Action<string, string?>? NotesUpdated;
     public event Action? Joined;
     public event Action<string, bool>? PeerShareChanged;         // displayName, started
     public event Action<string, bool>? PeerFileChanged;          // displayName, started
@@ -111,6 +113,10 @@ public sealed class RoomSession : IAsyncDisposable
     public bool IsStreaming { get; private set; }
     public bool RoomIsPublic { get; private set; }
     public bool DuckingEnabled { get; private set; } = true;
+    /// <summary>Whether the server has NoteLab configured. When false there is no Notes button.</summary>
+    public bool NotesEnabled { get; private set; }
+    /// <summary>This room's note URL once known (from the join ack or a peer's creation).</summary>
+    public string? NotesUrl { get; private set; }
     public string? MyPeerId { get; private set; }
 
     /// <summary>Hi-fi voice opt-in: stereo ~128 kbps instead of the default mono ~64 kbps.
@@ -195,6 +201,10 @@ public sealed class RoomSession : IAsyncDisposable
         DuckingEnabled = ack.DuckingEnabled;
         _mixer.DuckingEnabled = ack.DuckingEnabled;
         _mixer.DuckActive = ack.VoiceActive;
+        // Shared notes: availability comes from the server, and the room's URL may already
+        // exist (created by an earlier open, or by another peer while we were away).
+        NotesEnabled = ack.NotesEnabled;
+        NotesUrl = string.IsNullOrEmpty(ack.NotesUrl) ? null : ack.NotesUrl;
         _rpc = new MediasoupRpc(_sig);
         _recv = new MediasoupRecvTransport(_rpc, _device);
         _recv.Log += m => Log?.Invoke($"[recv] {m}");
@@ -417,6 +427,16 @@ public sealed class RoomSession : IAsyncDisposable
         _sig.OnStreamingFailed += v => { IsStreaming = false; StreamingFailed?.Invoke(v.Error); };
 
         _sig.OnRoomPublic += () => { RoomIsPublic = true; RoomBecamePublic?.Invoke(); };
+        // Someone created the room's note. Cache the URL so the next Notes press opens it
+        // straight away instead of asking the server again.
+        _sig.OnNotesUpdated += v =>
+        {
+            if (!string.IsNullOrEmpty(v.Url))
+            {
+                NotesUrl = v.Url;
+                NotesUpdated?.Invoke(v.Url, v.By);
+            }
+        };
         _sig.OnJoinRequests += v => JoinRequestsChanged?.Invoke(v.Requests);
         _sig.OnKickVote += v => { lock (_map) _kickVotes[v.TargetId] = v.Votes; KickVoteChanged?.Invoke(v); };
         _sig.OnShareStarted += v => PeerShareChanged?.Invoke(v.DisplayName, true);
@@ -594,6 +614,36 @@ public sealed class RoomSession : IAsyncDisposable
 
     /// <summary>Remove a music caster immediately (any room; server hard-guards to casters).</summary>
     public Task KickCasterAsync(string targetId) => _sig.EmitAckRawAsync("kick-caster", new { targetId });
+
+    // ---- shared notes (NoteLab) ---------------------------------------------------------------
+
+    /// <summary>
+    /// Get this room's shared note, creating it on first use. Returns the URL to open, or
+    /// null when the server refused (<c>forbidden</c> = this room's notes are gated;
+    /// <c>notes_disabled</c> = the server has no NoteLab; <c>notes_failed</c> = NoteLab is
+    /// unreachable). Refusals come back as a null result rather than an exception because
+    /// they are ordinary states, and the caller just reports which one happened.
+    /// </summary>
+    public async Task<string?> OpenNotesAsync()
+    {
+        if (!NotesEnabled) return null;
+        // Already known (from the join ack, or a peer creating it while we were in the room):
+        // no need to ask the server again.
+        if (!string.IsNullOrEmpty(NotesUrl)) return NotesUrl;
+
+        var ack = await _sig.OpenNotesAsync();
+        if (!ack.Ok || string.IsNullOrEmpty(ack.Url))
+        {
+            NotesError = ack.Error ?? "notes_failed";
+            return null;
+        }
+        NotesUrl = ack.Url;
+        return ack.Url;
+    }
+
+    /// <summary>Why the last <see cref="OpenNotesAsync"/> failed, or null if it has not failed.
+    /// One of "forbidden", "notes_disabled", "notes_failed".</summary>
+    public string? NotesError { get; private set; }
 
     // ---- room-wide auto-ducking ---------------------------------------------------------------
 

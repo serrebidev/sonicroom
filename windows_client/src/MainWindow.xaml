@@ -261,6 +261,15 @@
                         <KeyboardAccelerator Modifiers="Control" Key="L" ScopeOwner="{x:Bind CallPanel}" />
                     </Button.KeyboardAccelerators>
                 </Button>
+                <!-- Shared room notes (NoteLab). Hidden entirely when the server has no
+                     NoteLab configured, so a room without the feature never shows a dead
+                     button. Ctrl+N mirrors the web client's Alt+N. -->
+                <Button x:Name="NotesButton" Content="Notes" Click="OnNotesClick"
+                        Visibility="Collapsed" AutomationProperties.Name="Open the room's shared notes">
+                    <Button.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Control" Key="N" ScopeOwner="{x:Bind CallPanel}" />
+                    </Button.KeyboardAccelerators>
+                </Button>
                 </StackPanel>
             </ScrollViewer>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">

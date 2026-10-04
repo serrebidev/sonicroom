@@ -52,6 +52,8 @@ public sealed class SignalingClient : IAsyncDisposable
     public event Action? OnJoinApproved;
     public event Action<JoinDenied>? OnJoinDenied;
     public event Action? OnRoomPublic;
+    /// <summary>Someone created this room's shared note; we may now open it.</summary>
+    public event Action<NotesUpdated>? OnNotesUpdated;
 
     public event Action<StreamPresence>? OnShareStarted;
     public event Action<StreamPresence>? OnShareStopped;
@@ -101,6 +103,26 @@ public sealed class SignalingClient : IAsyncDisposable
     /// </summary>
     public Task<JoinAck> JoinAsync(JoinRequest request, int timeoutMs = DefaultAckTimeoutMs)
         => EmitAckAsync<JoinAck>("join", request.ToWire(), timeoutMs);
+
+    /// <summary>
+    /// Ask the server for this room's shared note, creating it on first use. Returns the ack
+    /// rather than throwing on <c>ok:false</c>, because a refusal here is an expected outcome
+    /// to report to the user ("notes are off here", "you are not allowed"), not a transport
+    /// failure: the server signals both with <c>{ok:false,error}</c> on a healthy socket.
+    /// </summary>
+    public async Task<OpenNotesAck> OpenNotesAsync(int timeoutMs = DefaultAckTimeoutMs)
+    {
+        try
+        {
+            var raw = await EmitAckRawAsync("open-notes", new Dictionary<string, object?>(), timeoutMs);
+            return raw.Deserialize<OpenNotesAck>() ?? new OpenNotesAck();
+        }
+        catch (SignalingException ex)
+        {
+            // Hand back the refusal as data so the caller can say something useful.
+            return new OpenNotesAck { Ok = false, Error = ex.Message };
+        }
+    }
 
     /// <summary>Emit an event with an ack, enforcing the <c>{ok,error}</c> envelope + timeout.</summary>
     public async Task<T> EmitAckAsync<T>(string eventName, object payload,
@@ -207,6 +229,7 @@ public sealed class SignalingClient : IAsyncDisposable
         HandleBare("join-approved", () => OnJoinApproved?.Invoke());
         Handle<JoinDenied>("join-denied", v => OnJoinDenied?.Invoke(v));
         HandleBare("room-public", () => OnRoomPublic?.Invoke());
+        Handle<NotesUpdated>("notes-updated", v => OnNotesUpdated?.Invoke(v));
 
         Handle<StreamPresence>("share-started", v => OnShareStarted?.Invoke(v));
         Handle<StreamPresence>("share-stopped", v => OnShareStopped?.Invoke(v));

@@ -312,6 +312,19 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetName(MediaVolumeSlider, I18n.T("media_volume_name"));
         MasterLabel.Text = I18n.T("master");
         AutomationProperties.SetName(MasterVolume, I18n.T("master_volume_name"));
+        RefreshSliderValueTexts();
+    }
+
+    /// <summary>
+    /// Re-spell the three named sliders' values for the screen reader. Done in code rather
+    /// than by binding because these are x:Name'd controls, not bound rows. Also called from
+    /// each ValueChanged handler so the spoken value tracks the arrows.
+    /// </summary>
+    private void RefreshSliderValueTexts()
+    {
+        AutomationProperties.SetValueText(MicGainSlider, I18n.PercentValue(MicGainSlider.Value));
+        AutomationProperties.SetValueText(MediaVolumeSlider, I18n.PercentValue(MediaVolumeSlider.Value));
+        AutomationProperties.SetValueText(MasterVolume, I18n.PercentValue(MasterVolume.Value));
     }
 
     private static void RelabelDefaultSlot(ComboBox combo)
@@ -948,6 +961,12 @@ public sealed partial class MainWindow : Window
             UpdateDownloadVisibility();
             ConnectScroll.Visibility = Visibility.Collapsed;
             CallPanel.Visibility = Visibility.Visible;
+            // Move focus into the call screen. Without this the focused element stays on
+            // the (now collapsed) connect panel and the screen reader keeps reading the
+            // join form, so the user has to tab blindly to find the toolbar. Land on the
+            // chat composer: it is the one control that always accepts input and is the
+            // natural next action in a call.
+            ChatInput.Focus(FocusState.Programmatic);
             UpdateKickVisibility();
             _speakTimer?.Start();
 
@@ -1066,15 +1085,20 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnMasterVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
-        => _session?.SetMasterVolume((float)ToGain(e.NewValue));
+    {
+        AutomationProperties.SetValueText(MasterVolume, I18n.PercentValue(e.NewValue));
+        _session?.SetMasterVolume((float)ToGain(e.NewValue));
+    }
 
     private void OnMicGainChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        AutomationProperties.SetValueText(MicGainSlider, I18n.PercentValue(e.NewValue));
         if (_session is not null) _session.MicGain = (float)ToGain(e.NewValue);
     }
 
     private void OnMediaVolumeChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
+        AutomationProperties.SetValueText(MediaVolumeSlider, I18n.PercentValue(e.NewValue));
         if (_session is not null) _session.MediaVolume = (float)ToGain(e.NewValue);
     }
 

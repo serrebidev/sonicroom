@@ -15,13 +15,13 @@
             <TextBlock x:Name="SubtitleText" Text="Native Windows client" Opacity="0.6" HorizontalAlignment="Center" Margin="0,0,0,8" />
             <ComboBox x:Name="LanguageSelect" Header="Language" AutomationProperties.Name="Language"
                       HorizontalAlignment="Stretch" SelectionChanged="OnLanguageChanged" />
-            <TextBox x:Name="ServerBox" Header="Server URL" AutomationProperties.Name="Server URL"
+            <TextBox x:Name="ServerBox" AutomationProperties.AutomationId="server_box" Header="Server URL" AutomationProperties.Name="Server URL"
                      Text="https://sonic.gomsen.com" />
-            <TextBox x:Name="RoomBox" Header="Room" AutomationProperties.Name="Room" Text="test" />
-            <TextBox x:Name="NameBox" Header="Display name" AutomationProperties.Name="Display name" Text="WinNative" />
-            <ComboBox x:Name="MicSelect" Header="Microphone" AutomationProperties.Name="Microphone"
+            <TextBox x:Name="RoomBox" AutomationProperties.AutomationId="room_box" Header="Room" AutomationProperties.Name="Room" Text="test" />
+            <TextBox x:Name="NameBox" AutomationProperties.AutomationId="name_box" Header="Display name" AutomationProperties.Name="Display name" Text="WinNative" />
+            <ComboBox x:Name="MicSelect" AutomationProperties.AutomationId="mic_select" Header="Microphone" AutomationProperties.Name="Microphone"
                       HorizontalAlignment="Stretch" DropDownOpened="OnMicDropDownOpened" />
-            <ComboBox x:Name="SpeakerSelect" Header="Speaker" AutomationProperties.Name="Speaker"
+            <ComboBox x:Name="SpeakerSelect" AutomationProperties.AutomationId="speaker_select" Header="Speaker" AutomationProperties.Name="Speaker"
                       HorizontalAlignment="Stretch" DropDownOpened="OnSpeakerDropDownOpened" />
             <Grid ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
@@ -32,17 +32,17 @@
                 <ProgressBar x:Name="MicLevelBar" Grid.Column="1" Maximum="100" VerticalAlignment="Center"
                              AutomationProperties.Name="Microphone level" />
             </Grid>
-            <CheckBox x:Name="ListenOnlyCheck" Content="Listen only (no microphone)" />
-            <CheckBox x:Name="PublicCheck" Content="Make this room public (listed + vote-to-kick)" />
+            <CheckBox x:Name="ListenOnlyCheck" AutomationProperties.AutomationId="listen_only_check" Content="Listen only (no microphone)" />
+            <CheckBox x:Name="PublicCheck" AutomationProperties.AutomationId="public_check" Content="Make this room public (listed + vote-to-kick)" />
             <StackPanel Orientation="Horizontal" Spacing="16">
-                <CheckBox x:Name="HifiCheck" Content="Hi-fi voice (stereo, higher bitrate)"
+                <CheckBox x:Name="HifiCheck" AutomationProperties.AutomationId="hifi_check" Content="Hi-fi voice (stereo, higher bitrate)"
                           Click="OnHifiChanged"
                           AutomationProperties.HelpText="Applies from your next call. Cannot be combined with voice processing — checking one turns the other off" />
-                <CheckBox x:Name="VoiceProcessingLobbyCheck" Content="Voice processing"
+                <CheckBox x:Name="VoiceProcessingLobbyCheck" AutomationProperties.AutomationId="voice_processing_lobby_check" Content="Voice processing"
                           Click="OnVoiceProcessingChanged"
                           AutomationProperties.HelpText="Echo cancellation and noise suppression; your microphone level is never changed" />
             </StackPanel>
-            <Button x:Name="ConnectButton" Content="Join call" Click="OnConnectClick"
+            <Button x:Name="ConnectButton" AutomationProperties.AutomationId="connect_button" Content="Join call" Click="OnConnectClick"
                     Style="{StaticResource AccentButtonStyle}" HorizontalAlignment="Stretch" />
             <TextBlock x:Name="ConnectStatus" Opacity="0.7" TextWrapping="Wrap"
                        AutomationProperties.Name="Connection status" />
@@ -56,7 +56,7 @@
                         HorizontalAlignment="Right"
                         AutomationProperties.Name="Refresh public rooms" />
             </Grid>
-            <ListView x:Name="PublicRoomsList" SelectionMode="None" IsItemClickEnabled="True"
+            <ListView x:Name="PublicRoomsList" AutomationProperties.AutomationId="public_rooms_list" SelectionMode="None" IsItemClickEnabled="True"
                       ItemClick="OnPublicRoomClick" MaxHeight="180"
                       AutomationProperties.Name="Public rooms" />
             <TextBlock x:Name="PublicRoomsEmpty" Text="No public rooms right now." Opacity="0.6" />
@@ -86,7 +86,7 @@
                 <!-- Participants -->
                 <Border Grid.Column="0" BorderThickness="1" CornerRadius="6"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                    <ListView x:Name="PeersList" SelectionMode="None"
+                    <ListView x:Name="PeersList" AutomationProperties.AutomationId="peers_list" SelectionMode="None"
                               AutomationProperties.Name="Participants">
                         <ListView.ItemTemplate>
                             <DataTemplate>
@@ -114,6 +114,7 @@
                                     <Slider Grid.Column="4" Minimum="0" Maximum="200" StepFrequency="1"
                                             Value="{Binding VolumePercent, Mode=TwoWay}" ValueChanged="OnPeerVolumeChanged"
                                             AutomationProperties.Name="{Binding VolumeLabel}"
+                                            AutomationProperties.ValueText="{Binding VolumeValueText}"
                                             VerticalAlignment="Center" />
                                     <!-- Client-side mute of this one peer (my ears only). -->
                                     <ToggleButton Grid.Column="5" Content="{Binding LocalMuteContent}"
@@ -167,7 +168,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBox x:Name="ChatInput" PlaceholderText="Message" KeyDown="OnChatKeyDown"
+                        <TextBox x:Name="ChatInput" AutomationProperties.AutomationId="chat_input" PlaceholderText="Message" KeyDown="OnChatKeyDown"
                                  AutomationProperties.Name="Message" />
                         <Button x:Name="SendButton" Grid.Column="1" Content="Send" Click="OnSendChatClick"
                                 AutomationProperties.Name="Send message" />
@@ -190,58 +191,58 @@
                 <StackPanel x:Name="CallControls" Orientation="Horizontal" Spacing="8"
                             XYFocusKeyboardNavigation="Enabled" TabFocusNavigation="Once"
                             AutomationProperties.Name="Call controls">
-                <ToggleButton x:Name="MuteButton" Content="Mute" Click="OnMuteClick"
+                <ToggleButton x:Name="MuteButton" AutomationProperties.AutomationId="mute_button" Content="Mute" Click="OnMuteClick"
                               AutomationProperties.Name="Mute microphone">
                     <ToggleButton.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="M" ScopeOwner="{x:Bind CallPanel}" />
                     </ToggleButton.KeyboardAccelerators>
                 </ToggleButton>
-                <ToggleButton x:Name="DeafenButton" Content="Deafen" Click="OnDeafenClick"
+                <ToggleButton x:Name="DeafenButton" AutomationProperties.AutomationId="deafen_button" Content="Deafen" Click="OnDeafenClick"
                               AutomationProperties.Name="Deafen">
                     <ToggleButton.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="D" ScopeOwner="{x:Bind CallPanel}" />
                     </ToggleButton.KeyboardAccelerators>
                 </ToggleButton>
                 <!-- Room-wide auto-ducking toggle (anyone can flip it; server-authoritative). -->
-                <ToggleButton x:Name="DuckButton" Content="Auto-duck music" Click="OnDuckClick"
+                <ToggleButton x:Name="DuckButton" AutomationProperties.AutomationId="duck_button" Content="Auto-duck music" Click="OnDuckClick"
                               AutomationProperties.Name="Auto-duck music under voices">
                     <ToggleButton.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="U" ScopeOwner="{x:Bind CallPanel}" />
                     </ToggleButton.KeyboardAccelerators>
                 </ToggleButton>
-                <Button x:Name="SpeakersButton" Content="Who's speaking" Click="OnSpeakersClick"
+                <Button x:Name="SpeakersButton" AutomationProperties.AutomationId="speakers_button" Content="Who's speaking" Click="OnSpeakersClick"
                         AutomationProperties.Name="Announce who is speaking">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="W" ScopeOwner="{x:Bind CallPanel}" />
                     </Button.KeyboardAccelerators>
                 </Button>
-                <Button x:Name="ShareButton" Content="Share app audio" Click="OnShareClick">
+                <Button x:Name="ShareButton" AutomationProperties.AutomationId="share_button" Content="Share app audio" Click="OnShareClick">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="S" ScopeOwner="{x:Bind CallPanel}" />
                     </Button.KeyboardAccelerators>
                 </Button>
-                <Button x:Name="ExtraMicButton" Content="Extra mics" Click="OnExtraMicClick">
+                <Button x:Name="ExtraMicButton" AutomationProperties.AutomationId="extra_mic_button" Content="Extra mics" Click="OnExtraMicClick">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="E" ScopeOwner="{x:Bind CallPanel}" />
                     </Button.KeyboardAccelerators>
                 </Button>
-                <Button x:Name="FileButton" Content="Play media" Click="OnFileClick">
+                <Button x:Name="FileButton" AutomationProperties.AutomationId="file_button" Content="Play media" Click="OnFileClick">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="F" ScopeOwner="{x:Bind CallPanel}" />
                     </Button.KeyboardAccelerators>
                 </Button>
                 <!-- Swap the streamed media in place (same producer, listeners see one continuous
                      stream). Visible only while a file is streaming. -->
-                <Button x:Name="ChangeFileButton" Content="Change media" Click="OnChangeFileClick"
+                <Button x:Name="ChangeFileButton" AutomationProperties.AutomationId="change_file_button" Content="Change media" Click="OnChangeFileClick"
                         Visibility="Collapsed" />
-                <Button x:Name="RecordButton" Content="Record" Click="OnRecordClick">
+                <Button x:Name="RecordButton" AutomationProperties.AutomationId="record_button" Content="Record" Click="OnRecordClick">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="R" ScopeOwner="{x:Bind CallPanel}" />
                     </Button.KeyboardAccelerators>
                 </Button>
                 <!-- Download the finished (or in-progress) recording; the flyout picks mixed vs
                      per-track. Visible while the server still holds the recording. -->
-                <Button x:Name="DownloadButton" Content="Download recording" Visibility="Collapsed"
+                <Button x:Name="DownloadButton" AutomationProperties.AutomationId="download_button" Content="Download recording" Visibility="Collapsed"
                         AutomationProperties.Name="Download recording">
                     <Button.Flyout>
                         <MenuFlyout>
@@ -250,12 +251,12 @@
                         </MenuFlyout>
                     </Button.Flyout>
                 </Button>
-                <Button x:Name="StreamButton" Content="Stream" Click="OnStreamClick">
+                <Button x:Name="StreamButton" AutomationProperties.AutomationId="stream_button" Content="Stream" Click="OnStreamClick">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="T" ScopeOwner="{x:Bind CallPanel}" />
                     </Button.KeyboardAccelerators>
                 </Button>
-                <Button x:Name="LeaveButton" Content="Leave" Click="OnLeaveClick"
+                <Button x:Name="LeaveButton" AutomationProperties.AutomationId="leave_button" Content="Leave" Click="OnLeaveClick"
                         AutomationProperties.Name="Leave call">
                     <Button.KeyboardAccelerators>
                         <KeyboardAccelerator Modifiers="Control" Key="L" ScopeOwner="{x:Bind CallPanel}" />
@@ -265,18 +266,18 @@
             </ScrollViewer>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                 <TextBlock x:Name="MicGainLabel" Text="Mic gain" VerticalAlignment="Center" />
-                <Slider x:Name="MicGainSlider" Minimum="0" Maximum="400" StepFrequency="1" Value="100"
+                <Slider x:Name="MicGainSlider" AutomationProperties.AutomationId="mic_gain_slider" Minimum="0" Maximum="400" StepFrequency="1" Value="100"
                         Width="120" VerticalAlignment="Center" ValueChanged="OnMicGainChanged"
                         AutomationProperties.Name="Microphone gain" />
-                <CheckBox x:Name="VoiceProcessingCallCheck" Content="Voice processing"
+                <CheckBox x:Name="VoiceProcessingCallCheck" AutomationProperties.AutomationId="voice_processing_call_check" Content="Voice processing"
                           VerticalAlignment="Center" Click="OnVoiceProcessingChanged"
                           AutomationProperties.HelpText="Echo cancellation and noise suppression; your microphone level is never changed" />
                 <TextBlock x:Name="MediaVolumeLabel" Text="Media" VerticalAlignment="Center" />
-                <Slider x:Name="MediaVolumeSlider" Minimum="0" Maximum="200" StepFrequency="1" Value="100"
+                <Slider x:Name="MediaVolumeSlider" AutomationProperties.AutomationId="media_volume_slider" Minimum="0" Maximum="200" StepFrequency="1" Value="100"
                         Width="120" VerticalAlignment="Center" ValueChanged="OnMediaVolumeChanged"
                         AutomationProperties.Name="Media volume for you and remote listeners" />
                 <TextBlock x:Name="MasterLabel" Text="Master" VerticalAlignment="Center" />
-                <Slider x:Name="MasterVolume" Minimum="0" Maximum="200" StepFrequency="1" Value="100"
+                <Slider x:Name="MasterVolume" AutomationProperties.AutomationId="master_volume" Minimum="0" Maximum="200" StepFrequency="1" Value="100"
                         Width="140" VerticalAlignment="Center" ValueChanged="OnMasterVolumeChanged"
                         AutomationProperties.Name="Master volume" />
             </StackPanel>

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace SonicRoom.Windows;
@@ -24,6 +25,21 @@ public static class I18n
     }
 
     public static string F(string key, params object[] args) => string.Format(T(key), args);
+
+    /// <summary>
+    /// Spoken value for a 0-200 volume-style slider. Every such slider is exposed as
+    /// 0-200 with 100 as unity, so UIA's default (a bare "150") both omits the unit and
+    /// hides the fact that the top of the range is 200, not 100. Announcing 100 as
+    /// "normal" is what tells a screen-reader user the control is already where they
+    /// want it.
+    /// </summary>
+    public static string PercentValue(double percent)
+    {
+        var rounded = (int)Math.Round(percent);
+        return rounded == 100
+            ? F("percent_value_unity", rounded)
+            : F("percent_value", rounded);
+    }
 
     private static readonly Dictionary<string, (string En, string Es, string Fr)> Table = new()
     {
@@ -140,6 +156,11 @@ public static class I18n
         ["vote_label"] = ("{0} to kick", "{0} para expulsar", "{0} pour expulser"),
         ["row_votes"] = ("{0} votes to kick", "{0} votos para expulsar", "{0} votes pour expulser"),
         ["volume_label"] = ("Volume for {0}, percent", "Volumen de {0}, porcentaje", "Volume de {0}, pourcentage"),
+        // Spoken value for the sliders. UIA would otherwise read a bare "150", which
+        // gives no hint that the unit is percent and no hint that 0-200 is normal
+        // (100 is unity, not the top).
+        ["percent_value"] = ("{0} percent", "{0} por ciento", "{0} pour cent"),
+        ["percent_value_unity"] = ("{0} percent, normal", "{0} por ciento, normal", "{0} pour cent, normal"),
         ["local_mute_btn"] = ("Mute", "Silenciar", "Muet"),
         ["local_mute_label"] = ("Mute {0} locally (only for you)", "Silenciar a {0} localmente (solo para ti)", "Couper {0} localement (pour vous seulement)"),
         ["stop_stream_btn"] = ("Stop stream", "Detener transmisión", "Arrêter le flux"),

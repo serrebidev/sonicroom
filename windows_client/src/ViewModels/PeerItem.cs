@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Microsoft.UI.Xaml;
@@ -36,8 +37,12 @@ public sealed class PeerItem : INotifyPropertyChanged
     public double VolumePercent
     {
         get => _volumePercent;
-        set { _volumePercent = value; Raise(); }
+        set { if (Math.Abs(_volumePercent - value) < 0.001) return; _volumePercent = value; Raise(); Raise(nameof(VolumeValueText)); }
     }
+
+    /// <summary>Spoken value for the volume slider ("150 percent", "100 percent, normal").
+    /// Bound to AutomationProperties.ValueText so NVDA reads a unit instead of a bare number.</summary>
+    public string VolumeValueText => I18n.PercentValue(_volumePercent);
 
     /// <summary>Short status text shown next to the name ("muted" when the peer is muted).</summary>
     public string MuteLabel => _muted ? I18n.T("peer_muted_label") : "";
@@ -159,6 +164,7 @@ public sealed class PeerItem : INotifyPropertyChanged
         Raise(nameof(LocalMuteLabel));
         Raise(nameof(VoteLabel));
         Raise(nameof(VolumeLabel));
+        Raise(nameof(VolumeValueText));
         Raise(nameof(KickLabel));
         Raise(nameof(CasterLabel));
         Raise(nameof(StopStreamLabel));

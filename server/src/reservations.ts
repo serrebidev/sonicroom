@@ -212,7 +212,17 @@ export function readReservationsFile(filePath: string): ReservationsFile {
 // is owned by the service user, so a root-run CLI still leaves a file the
 // admin UI can rewrite). chown needs root; failures are ignored and the
 // caller's log line says what to check. Returns whether it was created.
-export function writeReservationsFile(filePath: string, file: ReservationsFile): boolean {
+//
+// `now` is injected so the prune agrees with the rest of the caller's clock
+// (the admin router, the ReservationStore and the CLI all thread one through).
+// Reading Date.now() here instead pruned against a different clock than the one
+// that created the entries, so a caller with a fixed clock had the record it
+// had just written silently pruned away on the next write.
+export function writeReservationsFile(
+  filePath: string,
+  file: ReservationsFile,
+  now: number = Date.now(),
+): boolean {
   const dir = path.dirname(filePath);
   mkdirSync(dir, { recursive: true });
   let existed = true;
@@ -223,7 +233,7 @@ export function writeReservationsFile(filePath: string, file: ReservationsFile):
     existed = false;
   }
   const tmp = `${filePath}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(pruneExpired(file, Date.now()), null, 2) + "\n", { mode });
+  writeFileSync(tmp, JSON.stringify(pruneExpired(file, now), null, 2) + "\n", { mode });
   if (!existed) {
     try {
       let owner: { uid: number; gid: number } | null = null;

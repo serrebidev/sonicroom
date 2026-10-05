@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Concentus.Enums;
@@ -56,6 +57,7 @@ public sealed class RoomSession : IAsyncDisposable
 
     private readonly object _map = new();
     private readonly Dictionary<string, string> _peerNames = new();          // peerId → name
+    private readonly Dictionary<string, string> _admins = new();            // peerId → name (moderated rooms)
     private readonly Dictionary<string, (string PeerId, string Source, uint Ssrc, string? Title)> _producers = new();
     private readonly Dictionary<string, List<uint>> _peerSsrcs = new();       // peerId → ssrcs
     private readonly Dictionary<string, int> _kickVotes = new();              // targetId → votes
@@ -82,7 +84,8 @@ public sealed class RoomSession : IAsyncDisposable
     public event Action? JoinPending;
     public event Action<IReadOnlyList<JoinRequestItem>>? JoinRequestsChanged;
     public event Action<KickVote>? KickVoteChanged;              // full payload: target/voter names + tally
-    public event Action<string, string>? PeerKickedEvent;        // displayName, reason ("vote"|"caster")
+    /// <summary>Someone was removed: display name, reason ("vote"|"caster"|"admin"), and who did it.</summary>
+    public event Action<string, string, string?>? PeerKickedEvent;
     public event Action? YouWereKicked;
     public event Action? RoomBecamePublic;
     public event Action? Joined;
@@ -104,6 +107,20 @@ public sealed class RoomSession : IAsyncDisposable
     /// <summary>A selected legacy Wave device could not be mapped and the default was used.</summary>
     public event Action<string>? VoiceDeviceFallback;
 
+    // ---- shared notes (NoteLab) --------------------------------------------------------
+    /// <summary>The room's note became available (someone created it). Carries the URL.</summary>
+    public event Action<string, string?>? NotesAvailable;   // url, by (null = "available to you")
+
+    // ---- moderated rooms (admins) ------------------------------------------------------
+    /// <summary>An admin was named or revoked; the admin set may have changed.</summary>
+    public event Action<AdminsChanged>? AdminsChanged;
+    /// <summary>The last admin left: the room is no longer moderated and every control returns.</summary>
+    public event Action? ModerationEnded;
+    /// <summary>An admin force-muted my voice (soft — I may unmute myself again).</summary>
+    public event Action<string?>? ForceMutedBy;            // by
+    /// <summary>An admin force-muted everyone else.</summary>
+    public event Action<string?, int>? AllMutedBy;         // by, count
+
     public bool IsRecording { get; private set; }
     /// <summary>Capability token for the download endpoints. Kept after the recording stops
     /// (the file stays downloadable) and dropped only on <c>recording-expired</c>.</summary>
@@ -112,6 +129,29 @@ public sealed class RoomSession : IAsyncDisposable
     public bool RoomIsPublic { get; private set; }
     public bool DuckingEnabled { get; private set; } = true;
     public string? MyPeerId { get; private set; }
+
+    // ---- shared notes ------------------------------------------------------------------
+    /// <summary>Whether the server has NOTELAB_URL configured (gates the Notes control).</summary>
+    public bool NotesEnabled { get; private set; }
+    /// <summary>This room's note URL, once known. Null until someone creates it.</summary>
+    public string? NotesUrl { get; private set; }
+
+    // ---- moderated rooms ---------------------------------------------------------------
+    /// <summary>The room's fixed policy; null for an ordinary private/public room.</summary>
+    public ModerationPolicy? Moderation { get; private set; }
+    /// <summary>Whether I am an admin of this moderated room.</summary>
+    public bool IsAdmin { get; private set; }
+    /// <summary>Whether the room name is reserved (host-keyed).</summary>
+    public bool RoomIsReserved { get; private set; }
+
+    /// <summary>May I perform this action right now? Mirrors the server's <c>allowed</c>.</summary>
+    public bool Can(string action) => Session.Moderation.Allowed(Moderation, IsAdmin, action);
+
+    /// <summary>How I may remove people: "direct" | "vote" | "none" (unmoderated = "vote").</summary>
+    public string MyKickMode => Moderation is null ? "vote" : Session.Moderation.KickMode(Moderation, IsAdmin);
+
+    /// <summary>Whether a moderated room is in effect (every admin path is gated on this).</summary>
+    public bool IsModerated => Moderation is not null;
 
     /// <summary>Hi-fi voice opt-in: stereo ~128 kbps instead of the default mono ~64 kbps.
     /// Read at call start (the live producer's codec can't be renegotiated) — set before Connect.</summary>
@@ -135,6 +175,12 @@ public sealed class RoomSession : IAsyncDisposable
     }
     public int KickVotesFor(string peerId) { lock (_map) return _kickVotes.TryGetValue(peerId, out var v) ? v : 0; }
 
+    /// <summary>Whether this peer is an admin (moderated rooms only).</summary>
+    public bool IsAdminPeer(string peerId) { lock (_map) return _admins.ContainsKey(peerId); }
+
+    /// <summary>The current admin names, for the room's admin list.</summary>
+    public IReadOnlyDictionary<string, string> AdminNames { get { lock (_map) return new Dictionary<string, string>(_admins); } }
+
     public bool Muted => _muted;
     public bool Deafened => _deafened;
     public IReadOnlyDictionary<string, string> PeerNames => _peerNames;
@@ -144,11 +190,12 @@ public sealed class RoomSession : IAsyncDisposable
 
     public async Task ConnectAsync(string serverUrl, string room, string displayName,
         bool listenOnly = false, bool makePublic = false, int micDeviceNumber = -1,
-        int speakerDeviceNumber = -1)
+        int speakerDeviceNumber = -1, string? hostKey = null, ModerationPolicy? moderation = null)
     {
         _listenOnly = listenOnly;
         _micDeviceNumber = micDeviceNumber;
         _speakerDeviceNumber = speakerDeviceNumber;
+        _serverBase = serverUrl.TrimEnd('/');   // for the reserved-room poll
         _shareBus.Log += m => Log?.Invoke($"[share] {m}");
 
         _output = new WaveOutEvent { DesiredLatency = 120, DeviceNumber = speakerDeviceNumber };
@@ -165,9 +212,11 @@ public sealed class RoomSession : IAsyncDisposable
             DisplayName = displayName,
             JoinToken = Guid.NewGuid().ToString("N"),
             IsPublic = makePublic ? true : null,
+            HostKey = hostKey,
+            Moderation = moderation,
         };
 
-        var ack = await _sig.JoinAsync(req);
+        var ack = await JoinWithReservedWaitAsync(req, room, displayName);
         if (ack.IsPending)
         {
             JoinPending?.Invoke(); // UI shows "waiting to be let in…"
@@ -187,6 +236,21 @@ public sealed class RoomSession : IAsyncDisposable
         MyPeerId = _sig.Id;
         if (ack.KickVotes is not null)
             foreach (var kv in ack.KickVotes) _kickVotes[kv.TargetId] = kv.Votes;
+
+        // Shared notes + moderated-room state, all seeded from the join snapshot.
+        NotesEnabled = ack.NotesEnabled;
+        NotesUrl = ack.NotesUrl;
+        Moderation = ack.Moderation;
+        IsAdmin = ack.IsAdmin;
+        RoomIsReserved = ack.Reserved;
+        if (ack.Admins is not null)
+        {
+            lock (_map)
+            {
+                _admins.Clear();
+                foreach (var a in ack.Admins) _admins[a.PeerId] = a.DisplayName;
+            }
+        }
 
         _device.Load(ack.RtpCapabilities);
         IsRecording = ack.Recording is not null;
@@ -217,6 +281,76 @@ public sealed class RoomSession : IAsyncDisposable
         Joined?.Invoke();
         Log?.Invoke($"joined '{room}' as '{displayName}' (mode={ack.Mode}, peers={ack.Peers.Count})");
     }
+
+    /// <summary>
+    /// Join, handling a RESERVED room name. The server refuses an early arrival with
+    /// <c>ok:false, error:"reserved"</c> and creates NO room, so the name reads as not live until
+    /// the host (whoever holds the key) opens it. Rather than failing, we announce that we are
+    /// waiting and poll <c>GET /api/rooms/:name</c> until it exists, then re-join by ourselves —
+    /// landing in the moderated room's knock gate like anyone else.
+    ///
+    /// Matching the web client matters: a reserved room whose host has not arrived is not an error,
+    /// it is a closed door. Without this the user saw the raw string "reserved".
+    ///
+    /// Any OTHER join error is rethrown at once: only <c>reserved</c> is a wait, not a failure.
+    /// </summary>
+    private async Task<JoinAck> JoinWithReservedWaitAsync(JoinRequest req, string room, string displayName)
+    {
+        for (; ; )
+        {
+            try
+            {
+                return await _sig.JoinAsync(req);
+            }
+            catch (SignalingException ex) when (ex.Message == "reserved")
+            {
+                AwaitingHost?.Invoke(room, displayName);
+                if (!await WaitForReservedRoomAsync(room)) break;   // left while waiting
+            }
+        }
+        throw new OperationCanceledException("Left while waiting for the reserved room's host.");
+    }
+
+    /// <summary>Poll the room lookup until the reserved name exists. Returns false if the session
+    /// was torn down first, so leaving while waiting never hangs the caller.</summary>
+    private async Task<bool> WaitForReservedRoomAsync(string room)
+    {
+        var url = $"{_serverBase}/api/rooms/{Uri.EscapeDataString(room)}";
+        var cts = new CancellationTokenSource();
+        _reservedWaitCts = cts;
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        try
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(ReservedRoomWaitMs, cts.Token);
+                    using var res = await http.GetAsync(url, cts.Token);
+                    if (!res.IsSuccessStatusCode) continue;         // 404 = not live yet; keep waiting
+                    var body = await res.Content.ReadAsStringAsync(cts.Token);
+                    if (body.Contains("\"exists\":true", StringComparison.Ordinal)) return true;
+                }
+                catch (OperationCanceledException) { return false; }
+                catch (Exception ex)
+                {
+                    // A blip must not abandon the wait: the room is still coming.
+                    Log?.Invoke($"reserved-room poll failed: {ex.Message}");
+                }
+            }
+        }
+        finally { _reservedWaitCts = null; cts.Dispose(); }
+        return false;
+    }
+
+    private string _serverBase = "";
+    private CancellationTokenSource? _reservedWaitCts;
+    /// <summary>How often to re-check a reserved room while waiting for its host. Matches the web
+    /// client's 3 s cadence; <c>internal</c> so tests can shorten it.</summary>
+    internal static int ReservedRoomWaitMs { get; set; } = 3000;
+
+    /// <summary>Raised when a reserved room refuses us and we start waiting for its host.</summary>
+    public event Action<string, string>? AwaitingHost;   // room, displayName
 
     private async Task StartMicAsync()
     {
@@ -467,10 +601,39 @@ public sealed class RoomSession : IAsyncDisposable
         {
             CleanupPeer(v.PeerId);
             lock (_map) _kickVotes.Remove(v.PeerId);
-            PeerKickedEvent?.Invoke(v.DisplayName, v.Reason);
+            PeerKickedEvent?.Invoke(v.DisplayName, v.Reason, v.By);
             PeerLeft?.Invoke(v.PeerId);
         };
         _sig.OnYouWereKicked += () => YouWereKicked?.Invoke();
+
+        // Shared notes: someone created the room's note. Deduped against a URL we already have.
+        _sig.OnNotesUpdated += v =>
+        {
+            if (string.IsNullOrEmpty(v.Url) || v.Url == NotesUrl) return;
+            NotesUrl = v.Url;
+            NotesAvailable?.Invoke(v.Url, v.By);
+        };
+
+        // Moderated rooms: the admin set changed; refresh gates and the admin badges.
+        _sig.OnAdminsChanged += v =>
+        {
+            if (v.Change is { } c && c.PeerId == MyPeerId) IsAdmin = c.IsAdmin;
+            lock (_map) _admins.Clear();
+            foreach (var a in v.Admins) _admins[a.PeerId] = a.DisplayName;
+            AdminsChanged?.Invoke(v);
+        };
+        // The last admin left: the room is no longer moderated, so every control comes back.
+        _sig.OnModerationEnded += () =>
+        {
+            Moderation = null;
+            IsAdmin = false;
+            lock (_map) _admins.Clear();
+            ModerationEnded?.Invoke();
+        };
+        // A SOFT forced mute: the server already paused my producer; I just reflect it locally and
+        // may still unmute myself (producer-resume is not gated).
+        _sig.OnYouWereMuted += v => { _muted = true; ForceMutedBy?.Invoke(v.By); };
+        _sig.OnAllMuted += v => AllMutedBy?.Invoke(v.By, v.Count);
     }
 
     /// <summary>The server force-closed one of MY producers (anti-troll stop): tear down the
@@ -598,6 +761,61 @@ public sealed class RoomSession : IAsyncDisposable
     // ---- room-wide auto-ducking ---------------------------------------------------------------
 
     public Task SetDuckingAsync(bool enabled) => _sig.EmitAckRawAsync("set-ducking", new { enabled });
+
+    // ---- shared notes (NoteLab) --------------------------------------------------------------
+
+    /// <summary>
+    /// Get this room's shared collaborative note, creating it on first use, and return its URL —
+    /// or null when the server would not give us one. A refusal comes back as DATA rather than an
+    /// exception because it is an ordinary, reportable state, not a transport failure: "forbidden"
+    /// (this room gates notes), "notes_disabled" (the server has no NoteLab configured) and
+    /// "notes_failed" (NoteLab unreachable) each need a different message. The reason is left in
+    /// <see cref="NotesError"/> so the caller can say which one happened.
+    /// </summary>
+    public async Task<string?> OpenNotesAsync()
+    {
+        if (!NotesEnabled) { NotesError = "notes_disabled"; return null; }
+        // Already known (join ack, or a peer created it while we were in the room): no round-trip.
+        if (!string.IsNullOrEmpty(NotesUrl)) return NotesUrl;
+
+        try
+        {
+            var ack = await _sig.EmitAckAsync<OpenNotesAck>("open-notes", new { });
+            if (!ack.Ok || string.IsNullOrEmpty(ack.Url))
+            {
+                NotesError = ack.Error ?? "notes_failed";
+                return null;
+            }
+            NotesUrl = ack.Url;
+            NotesError = null;
+            return ack.Url;
+        }
+        catch (SignalingException ex)
+        {
+            // The server answers notes_disabled / notes_failed / forbidden on a healthy socket.
+            NotesError = ex.Message;
+            return null;
+        }
+    }
+
+    /// <summary>Why the last <see cref="OpenNotesAsync"/> returned null: "forbidden",
+    /// "notes_disabled" or "notes_failed"; null when it succeeded or has not been tried.</summary>
+    public string? NotesError { get; private set; }
+
+    // ---- moderated rooms (admin actions) -------------------------------------------------------
+
+    /// <summary>Name a co-admin (needs the room's "allow several admins") or revoke one.</summary>
+    public Task SetAdminAsync(string targetId, bool admin)
+        => _sig.EmitAckRawAsync("set-admin", new { targetId, admin });
+
+    /// <summary>Force-mute ONE participant for everyone (soft — they may unmute themselves).</summary>
+    public Task MutePeerAsync(string targetId) => _sig.EmitAckRawAsync("mute-peer", new { targetId });
+
+    /// <summary>Force-mute everyone else in the room.</summary>
+    public Task MuteAllAsync() => _sig.EmitAckRawAsync("mute-all", new { });
+
+    /// <summary>Remove a participant at once, no vote (a moderated room's direct admin kick).</summary>
+    public Task KickPeerAsync(string targetId) => _sig.EmitAckRawAsync("kick-peer", new { targetId });
 
     // ---- extra microphones (each is its own "mic" producer) --------------------------------
 
@@ -1073,6 +1291,7 @@ public sealed class RoomSession : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        try { _reservedWaitCts?.Cancel(); } catch { }      // leaving while waiting must not hang
         _mic?.Dispose();
         _sharePumpCts?.Cancel();
         _filePumpCts?.Cancel();

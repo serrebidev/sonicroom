@@ -951,6 +951,11 @@ public sealed partial class MainWindow : Window
             UpdateKickVisibility();
             _speakTimer?.Start();
 
+            // Land the keyboard on Mute, the control that always accepts input. The Join button
+            // that was just pressed lives in the now-collapsed lobby, so without this the caret is
+            // stranded there and the first Tab walks an invisible screen instead of the room.
+            MuteButton.Focus(FocusState.Programmatic);
+
             var others = session.PeerNames.Count;
             Announce(others == 0
                 ? I18n.F("joined_room_alone", room)

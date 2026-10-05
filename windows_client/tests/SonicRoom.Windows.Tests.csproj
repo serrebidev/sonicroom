@@ -15,9 +15,12 @@
   <ItemGroup>
     <Compile Include="..\src\AppSettings.cs" Link="AppSettings.cs" />
     <Compile Include="..\src\Diag.cs" Link="Diag.cs" />
+    <Compile Include="..\src\LaunchArgs.cs" Link="LaunchArgs.cs" />
     <Compile Include="..\src\Audio\PeerMixer.cs" Link="Audio\PeerMixer.cs" />
     <Compile Include="..\src\Audio\ProcessedFrameConverter.cs" Link="Audio\ProcessedFrameConverter.cs" />
     <Compile Include="..\src\Audio\VoiceProcessingSelection.cs" Link="Audio\VoiceProcessingSelection.cs" />
+    <Compile Include="..\src\Session\Moderation.cs" Link="Session\Moderation.cs" />
+    <Compile Include="..\src\Signaling\SignalingMessages.cs" Link="Signaling\SignalingMessages.cs" />
     <Compile Include="..\src\Accessibility\PercentText.cs" Link="Accessibility\PercentText.cs" />
   </ItemGroup>
 </Project>

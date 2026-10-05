@@ -302,5 +302,79 @@ public static class I18n
         ["unit_days"] = ("days", "días", "jours"),
         ["time_ago"] = ("{0} ago", "hace {0}", "il y a {0}"),
         ["time_in"] = ("in {0}", "en {0}", "dans {0}"),
+
+        // ---- reserved rooms ---------------------------------------------------------------------
+        ["header_host_key"] = ("Host key (reserved rooms)", "Clave de anfitrión (salas reservadas)", "Clé d'hôte (salons réservés)"),
+        ["host_key_help"] = (
+            "From the room's host link. Needed only for a reserved room",
+            "Del enlace de anfitrión de la sala. Solo hace falta en una sala reservada",
+            "Depuis le lien d'hôte du salon. Requis uniquement pour un salon réservé"),
+        ["awaiting_host"] = (
+            "This room is reserved and not open yet. Waiting for its host — you will join automatically.",
+            "Esta sala está reservada y aún no está abierta. Esperando a su anfitrión; entrarás automáticamente.",
+            "Ce salon est réservé et pas encore ouvert. En attente de son hôte — vous rejoindrez automatiquement."),
+
+        // ---- shared notes (NoteLab) --------------------------------------------------------------
+        ["notes"] = ("Notes", "Notas", "Notes"),
+        ["open_notes"] = ("Open notes", "Abrir notas", "Ouvrir les notes"),
+        ["notes_opened"] = ("Opened the shared notes in your browser", "Notas compartidas abiertas en el navegador", "Notes partagées ouvertes dans votre navigateur"),
+        ["notes_available"] = (
+            "Shared notes are now available — press the Notes button",
+            "Las notas compartidas ya están disponibles; pulsa el botón Notas",
+            "Les notes partagées sont disponibles — appuyez sur le bouton Notes"),
+        ["notes_opened_by"] = ("{0} created the shared notes for this room", "{0} ha creado las notas compartidas de esta sala", "{0} a créé les notes partagées de ce salon"),
+        ["notes_disabled"] = (
+            "Shared notes are not available on this server",
+            "Las notas compartidas no están disponibles en este servidor",
+            "Les notes partagées ne sont pas disponibles sur ce serveur"),
+        ["notes_failed"] = ("Could not open the shared notes", "No se han podido abrir las notas compartidas", "Impossible d'ouvrir les notes partagées"),
+
+        // ---- moderated rooms (admin options + actions) -----------------------------------------------
+        ["admin_options"] = ("Admin options (moderated room)", "Opciones de administración (sala moderada)", "Options d'administration (salon modéré)"),
+        ["multiple_admins"] = ("Allow several administrators", "Permitir varios administradores", "Autoriser plusieurs administrateurs"),
+        ["hide_powered_by"] = ("Hide the 'Powered by SonicRoom' link", "Ocultar el enlace 'Powered by SonicRoom'", "Masquer le lien « Powered by SonicRoom »"),
+        ["policy_recording"] = ("Recording", "Grabación", "Enregistrement"),
+        ["policy_share_audio"] = ("Share app audio", "Compartir audio de apps", "Partager l'audio d'apps"),
+        ["policy_stream_audio"] = ("Stream audio", "Emitir audio", "Diffuser de l'audio"),
+        ["policy_ducking"] = ("Auto-duck music", "Atenuado automático", "Atténuer la musique"),
+        ["policy_live_streaming"] = ("Live streaming", "Retransmisión en directo", "Diffusion en direct"),
+        ["policy_approve_joins"] = ("Approve joins", "Aprobar entradas", "Approuver les entrées"),
+        ["policy_chat"] = ("Chat", "Chat", "Discussion"),
+        ["policy_notes"] = ("Shared notes", "Notas compartidas", "Notes partagées"),
+        ["policy_mute_peer"] = ("Mute one participant", "Silenciar a un participante", "Couper le micro d'un participant"),
+        ["policy_mute_all"] = ("Mute everyone", "Silenciar a todos", "Couper tous les micros"),
+        ["policy_kick"] = ("Remove from room", "Expulsar de la sala", "Retirer du salon"),
+
+        ["admin_label"] = ("administrator", "administrador", "administrateur"),
+        ["admin_granted"] = ("{0} is now an administrator", "{0} ahora es administrador", "{0} est désormais administrateur"),
+        ["admin_revoked"] = ("{0} is no longer an administrator", "{0} ya no es administrador", "{0} n'est plus administrateur"),
+        ["admin_action_failed"] = ("That action was refused: {0}", "El servidor ha rechazado la acción: {0}", "Le serveur a refusé l'action : {0}"),
+        ["not_allowed"] = ("You are not allowed to do that in this room", "No tienes permiso para hacer eso en esta sala", "Vous n'êtes pas autorisé à faire cela dans ce salon"),
+        ["mute_all"] = ("Mute everyone", "Silenciar a todos", "Couper tous les micros"),
+        ["mute_all_done"] = ("{0} muted everyone else", "{0} ha silenciado a todos los demás", "{0} a coupé tous les autres micros"),
+        ["mute_peer_btn"] = ("Mute", "Silenciar", "Muet"),
+        ["mute_peer_label"] = ("Mute {0} for everyone", "Silenciar a {0} para todos", "Couper {0} pour tout le monde"),
+        ["mute_peer_title"] = ("Mute participant", "Silenciar a un participante", "Couper le micro d'un participant"),
+        ["mute_peer_confirm"] = (
+            "Mute {0} for everyone? They can unmute themselves again.",
+            "¿Silenciar a {0} para todos? Puede volver a activarse.",
+            "Couper {0} pour tout le monde ? Il pourra se réactiver lui-même."),
+        ["you_were_muted"] = ("An administrator muted you", "Un administrador te ha silenciado", "Un administrateur vous a coupé le micro"),
+        ["you_were_muted_by"] = ("{0} muted you", "{0} te ha silenciado", "{0} a coupé votre micro"),
+        ["make_admin_btn"] = ("Make admin", "Hacer admin", "Nommer admin"),
+        ["revoke_admin_btn"] = ("Remove admin", "Quitar admin", "Retirer l'admin"),
+        ["make_admin_label"] = ("Make {0} an administrator", "Convertir a {0} en administrador", "Nommer {0} administrateur"),
+        ["revoke_admin_label"] = ("Remove administrator rights from {0}", "Quitar los permisos de administrador a {0}", "Retirer les droits d'administrateur à {0}"),
+        ["remove_from_room_btn"] = ("Remove", "Expulsar", "Retirer"),
+        ["remove_from_room_label"] = ("Remove {0} from the room", "Expulsar a {0} de la sala", "Retirer {0} du salon"),
+        ["remove_from_room_title"] = ("Remove participant", "Expulsar a un participante", "Retirer un participant"),
+        ["remove_from_room_confirm"] = (
+            "Remove {0} from the room?",
+            "¿Expulsar a {0} de la sala?",
+            "Retirer {0} du salon ?"),
+        ["removed_by_admin"] = ("{0} was removed from the room by {1}", "{0} ha sido expulsado de la sala por {1}", "{0} a été retiré du salon par {1}"),
+        ["moderation_ended"] = ("The room is no longer moderated", "La sala ya no está moderada", "Le salon n'est plus modéré"),
+        ["chat_admins_only"] = ("Chat is for administrators only", "El chat es solo para administradores", "Discussion réservée aux administrateurs"),
+        ["chat_disabled"] = ("Chat is turned off in this room", "El chat está desactivado en esta sala", "Discussion désactivée dans ce salon"),
     };
 }

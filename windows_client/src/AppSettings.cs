@@ -30,6 +30,9 @@ public sealed class AppSettings
     /// <summary>Per-device extra-mic channel choice, keyed by device product name (WaveIn
     /// indices shift across replugs) — the web's <c>sonicroom:micStereoByDevice</c>.</summary>
     public Dictionary<string, bool> MicStereoByDevice { get; set; } = new();
+    /// <summary>Host key for the reserved room, remembered from the last join so the host does not
+    /// retype it. Empty means none.</summary>
+    public string HostKey { get; set; } = "";
 
     private static string FilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SonicRoom", "settings.json");

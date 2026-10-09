@@ -42,7 +42,7 @@ public sealed class RoomSession : IAsyncDisposable
     private MediasoupRecvTransport? _recv;
     private IMicrophoneCapture? _mic;
     private OpusEncoder? _encoder;
-    private WaveOutEvent? _output;
+    private IWavePlayer? _output;
     private byte[] _encodeBuf = new byte[4000];
     private readonly short[] _monoBuf = new short[960]; // downmix scratch for the default mono voice
 
@@ -198,8 +198,7 @@ public sealed class RoomSession : IAsyncDisposable
         _serverBase = serverUrl.TrimEnd('/');   // for the reserved-room poll
         _shareBus.Log += m => Log?.Invoke($"[share] {m}");
 
-        _output = new WaveOutEvent { DesiredLatency = 120, DeviceNumber = speakerDeviceNumber };
-        _output.Init(_mixer);
+        _output = LowLatencyOutput.Open(speakerDeviceNumber, _mixer, m => Log?.Invoke(m));
         _output.Play();
 
         WireSignaling();

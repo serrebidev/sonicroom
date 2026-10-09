@@ -476,7 +476,7 @@ public sealed partial class MainWindow : Window
     private List<(int Index, string Name)> _micDevices = new();
     private List<(int Index, string Name)> _speakerDevices = new();
     private IMicrophoneCapture? _testCap;
-    private WaveOutEvent? _testOut;
+    private IWavePlayer? _testOut;
     private BufferedWaveProvider? _testBuf;
     private int _testFrameCount;
 
@@ -551,8 +551,7 @@ public sealed partial class MainWindow : Window
         {
             _testBuf = new BufferedWaveProvider(new WaveFormat(48000, 16, 2))
             { DiscardOnBufferOverflow = true, BufferDuration = TimeSpan.FromSeconds(1) };
-            _testOut = new WaveOutEvent { DesiredLatency = 120, DeviceNumber = SelectedSpeaker().Index };
-            _testOut.Init(_testBuf);
+            _testOut = LowLatencyOutput.Open(SelectedSpeaker().Index, _testBuf);
             _testOut.Play();
             if (VoiceProcessingLobbyCheck.IsChecked == true)
             {

@@ -42,9 +42,13 @@ public sealed class RoomSession : IAsyncDisposable
     private MediasoupRecvTransport? _recv;
     private IMicrophoneCapture? _mic;
     private OpusEncoder? _encoder;
-    private WaveOutEvent? _output;
+    private IWavePlayer? _output;
     private byte[] _encodeBuf = new byte[4000];
-    private readonly short[] _monoBuf = new short[960]; // downmix scratch for the default mono voice
+    // Voice goes out in 10 ms Opus frames (the server negotiates ptime 10 and the web
+    // client sends 10 ms): with 20 ms frames every word waits 10 ms longer to leave.
+    // Share / file / extra-mic producers are music feeds and keep 20 ms.
+    private const int VoiceFrameSamples = 480;
+    private readonly short[] _monoBuf = new short[VoiceFrameSamples]; // downmix scratch for the default mono voice
 
     private MediasoupSendTransport.Producer? _voiceProducer;
     private MediasoupSendTransport.Producer? _shareProducer;
@@ -198,8 +202,7 @@ public sealed class RoomSession : IAsyncDisposable
         _serverBase = serverUrl.TrimEnd('/');   // for the reserved-room poll
         _shareBus.Log += m => Log?.Invoke($"[share] {m}");
 
-        _output = new WaveOutEvent { DesiredLatency = 120, DeviceNumber = speakerDeviceNumber };
-        _output.Init(_mixer);
+        _output = LowLatencyOutput.Open(speakerDeviceNumber, _mixer, m => Log?.Invoke(m));
         _output.Play();
 
         WireSignaling();
@@ -424,7 +427,7 @@ public sealed class RoomSession : IAsyncDisposable
                 }
             }
 
-            next = new MicCapture(_micDeviceNumber);
+            next = new MicCapture(_micDeviceNumber, VoiceFrameSamples);
             next.FrameReady += OnMicFrame;
             next.Start();
             _mic = next;
@@ -449,6 +452,7 @@ public sealed class RoomSession : IAsyncDisposable
     private void OnMicFrame(short[] frame)
     {
         if (_send is null || _encoder is null || _voiceProducer is null || _muted) return;
+        if (frame.Length != VoiceFrameSamples * 2) return;   // both voice captures emit 10 ms
         try
         {
             var gain = MicGain;
@@ -463,7 +467,7 @@ public sealed class RoomSession : IAsyncDisposable
             else
             {
                 // Default voice: downmix to mono, then gain + soft limiter.
-                for (var i = 0; i < 960; i++)
+                for (var i = 0; i < VoiceFrameSamples; i++)
                     _monoBuf[i] = Limit((frame[2 * i] + frame[2 * i + 1]) * 0.5f * gain);
                 pcm = _monoBuf;
             }
@@ -474,8 +478,8 @@ public sealed class RoomSession : IAsyncDisposable
             for (var i = 0; i < pcm.Length; i++) { var a = Math.Abs((int)pcm[i]); if (a > peak) peak = a; }
             if (peak > 700) _lastVoiceActiveMs = Environment.TickCount64;
 
-            var len = _encoder.Encode(pcm, 0, 960, _encodeBuf, 0, _encodeBuf.Length);
-            _send.SendOpusFrame(_voiceProducer, _encodeBuf[..len]);
+            var len = _encoder.Encode(pcm, 0, VoiceFrameSamples, _encodeBuf, 0, _encodeBuf.Length);
+            _send.SendOpusFrame(_voiceProducer, _encodeBuf[..len], VoiceFrameSamples);
         }
         catch { /* drop a frame on encoder hiccup */ }
     }

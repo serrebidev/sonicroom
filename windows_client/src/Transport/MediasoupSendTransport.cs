@@ -156,8 +156,8 @@ public sealed class MediasoupSendTransport
         };
     }
 
-    /// <summary>Send one 20 ms Opus frame on a specific producer's audio stream.</summary>
-    public void SendOpusFrame(Producer producer, byte[] opus)
+    /// <summary>Send one Opus frame (<paramref name="samples"/> per channel; 960 = 20 ms).</summary>
+    public void SendOpusFrame(Producer producer, byte[] opus, uint samples = 960)
     {
         if (producer.Stream is not { } stream) return;
         if (!stream.IsSecurityContextReady())
@@ -169,7 +169,7 @@ public sealed class MediasoupSendTransport
         // SendAudio() lets SIPSorcery pick the payload type via GetSendingFormat(), which resolves
         // to PCMU (pt 0) on secondary bundled audio streams — mediasoup then drops every packet as
         // not matching the producer's declared Opus codec. Stamp the negotiated pt explicitly.
-        stream.SendAudioFrame(960, producer.PayloadType, opus);
+        stream.SendAudioFrame(samples, producer.PayloadType, opus);
         if (Interlocked.Increment(ref producer.FramesSent) == 1)
             Log?.Invoke($"sent first {producer.Source} RTP frame ssrc={producer.Ssrc} pt={producer.PayloadType} secure=true");
     }

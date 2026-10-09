@@ -6,12 +6,14 @@ namespace SonicRoom.Windows.Audio;
 
 /// <summary>
 /// Aggregates 16 kHz mono S16 DSP output, resamples it with NAudio's WDL resampler, and emits
-/// exact 20 ms 48 kHz frames using the client's existing interleaved-stereo contract.
+/// exact 10 ms 48 kHz frames using the client's existing interleaved-stereo contract. 10 ms
+/// matches the voice path's Opus frame (see RoomSession.VoiceFrameSamples): a 20 ms frame
+/// cannot be sent until 20 ms of speech has been captured.
 /// </summary>
 internal sealed class ProcessedFrameConverter
 {
-    internal const int InputSamplesPerFrame = 320;
-    internal const int OutputSamplesPerChannel = 960;
+    internal const int InputSamplesPerFrame = 160;
+    internal const int OutputSamplesPerChannel = 480;
     internal const int OutputShorts = OutputSamplesPerChannel * 2;
 
     private readonly Queue<short> _input = new();
@@ -36,7 +38,7 @@ internal sealed class ProcessedFrameConverter
             var requested = _resampler.ResamplePrepare(InputSamplesPerFrame, 1,
                 out var input, out var offset);
             if (requested != InputSamplesPerFrame)
-                throw new InvalidOperationException($"WDL requested {requested} samples instead of 320.");
+                throw new InvalidOperationException($"WDL requested {requested} samples instead of {InputSamplesPerFrame}.");
 
             for (var i = 0; i < InputSamplesPerFrame; i++)
                 input[offset + i] = _input.Dequeue() / 32768f;

@@ -33,6 +33,9 @@ public sealed class OpusJitterBuffer
     private const int StableSamples = SampleRate * 15;
     private const int MaxConcealFrames = 3;        // then treat the source as stopped
     private const int MaxFrameSamples = 5760;      // 120 ms, the Opus maximum
+    // A dry spell shorter than this was network jitter; a longer one was the sender
+    // pausing (mute pauses the voice producer) and must not raise the target.
+    private const int MaxJitterGapSamples = SampleRate / 4;
 
     private readonly OpusDecoder _decoder = new(SampleRate, Channels);
     private readonly SortedDictionary<long, byte[]> _packets = new();
@@ -46,6 +49,8 @@ public sealed class OpusJitterBuffer
     private int _frameSamples = 480;   // last decoded frame size (10 ms default)
     private int _emptyPulls;
     private long _samplesSinceUnderrun;
+    private bool _dry;
+    private long _drySamples;
 
     public int TargetMs { get; private set; } = StartTargetMs;
     public long Concealed { get; private set; }
@@ -63,6 +68,11 @@ public sealed class OpusJitterBuffer
     {
         if (payload.Length == 0) return;
         var ext = Extend(seq);
+        if (_dry)
+        {
+            _dry = false;
+            if (_drySamples <= MaxJitterGapSamples) OnUnderrun();
+        }
         if (_playing && ext < _nextSeq) { LatePackets++; return; }   // already concealed
         if (ext > _highestSeq) _highestSeq = ext;
         _packets[ext] = payload;
@@ -95,6 +105,7 @@ public sealed class OpusJitterBuffer
         _pcmLen -= have;
 
         _samplesSinceUnderrun += frames;
+        if (_dry) _drySamples += frames;
         if (_samplesSinceUnderrun >= StableSamples && TargetMs > MinTargetMs)
         {
             TargetMs = Math.Max(MinTargetMs, TargetMs - 10);
@@ -135,11 +146,11 @@ public sealed class OpusJitterBuffer
             return true;
         }
 
-        // Nothing queued at all: the buffer ran dry mid-stream (SonicRoom sends
-        // with DTX off, so a live sender never pauses). Count it once, bridge a
-        // short gap, then treat it as the end of the stream and rebuffer to the
-        // (now higher) target before playing again.
-        if (_emptyPulls == 0) OnUnderrun();
+        // Nothing queued at all: the buffer ran dry mid-stream. Bridge a short
+        // gap, then treat it as the end of the stream and rebuffer to the target
+        // before playing again. Whether it was jitter (raise the target) or the
+        // sender pausing (mute — don't) is only known when packets resume: Push.
+        if (_emptyPulls == 0) { _dry = true; _drySamples = 0; }
         if (++_emptyPulls <= MaxConcealFrames)
         {
             Conceal();

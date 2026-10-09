@@ -165,6 +165,7 @@ public class JitterBufferTests
         for (var i = 0; i < 6; i++) jb.Push((ushort)seq, pk[seq++]);
         for (var p = 0; p < 6; p++) jb.Pull(out10, Frame);
         for (var p = 0; p < 10; p++) jb.Pull(out10, Frame);          // sender stalls 100 ms
+        jb.Push((ushort)seq, pk[seq++]);                               // ...then resumes
         Assert.True(jb.Underruns >= 1);
         var raised = jb.TargetMs;
         Assert.True(raised > OpusJitterBuffer.StartTargetMs);
@@ -175,6 +176,25 @@ public class JitterBufferTests
             jb.Pull(out10, Frame);
         }
         Assert.True(jb.TargetMs < raised, $"target should relax, still {jb.TargetMs} ms");
+    }
+
+    [Fact]
+    public void SenderPauseLikeMuteDoesNotRaiseTheTarget()
+    {
+        // Muting pauses the voice producer: no RTP for seconds. That is not jitter,
+        // and treating it as such grew the delay by 20 ms on every mute.
+        var jb = new OpusJitterBuffer();
+        var pk = Packets(200);
+        var out10 = new short[Frame * 2];
+        var seq = 0;
+        for (var round = 0; round < 5; round++)
+        {
+            for (var i = 0; i < 20; i++) { jb.Push((ushort)seq, pk[seq++]); jb.Pull(out10, Frame); }
+            for (var i = 0; i < 100; i++) jb.Pull(out10, Frame);       // muted 1 s
+        }
+        jb.Push((ushort)seq, pk[seq]);
+        Assert.Equal(0, jb.Underruns);
+        Assert.Equal(OpusJitterBuffer.StartTargetMs, jb.TargetMs);
     }
 
     [Fact]

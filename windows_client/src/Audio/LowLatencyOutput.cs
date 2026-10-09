@@ -21,16 +21,18 @@ internal static class LowLatencyOutput
 
     public static IWavePlayer Open(int waveOutIndex, IWaveProvider source, Action<string>? log = null)
     {
+        WasapiOut? output = null;
         try
         {
             var device = ResolveRender(waveOutIndex);
-            var output = new WasapiOut(device, AudioClientShareMode.Shared, useEventSync: true, BufferMs);
+            output = new WasapiOut(device, AudioClientShareMode.Shared, useEventSync: true, BufferMs);
             output.Init(source);
             log?.Invoke($"speaker: WASAPI shared {BufferMs} ms on \"{device.FriendlyName}\"");
             return output;
         }
         catch (Exception ex)
         {
+            output?.Dispose();
             Diag.Log("WASAPI output unavailable, falling back to WaveOut", ex);
             log?.Invoke($"speaker: WASAPI failed ({ex.Message}); using WaveOut {FallbackWaveOutLatencyMs} ms");
             var fallback = new WaveOutEvent { DesiredLatency = FallbackWaveOutLatencyMs, DeviceNumber = waveOutIndex };
